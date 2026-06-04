@@ -46,7 +46,7 @@ export async function GET() {
     const guias17Track = envios.map((envio: any) => ({
       number: String(envio.guia || "").replace(/\s/g, ""),
     }));
-
+console.log("TRACK17:", process.env.TRACK176ABE5F9410182D2007AF65DEF694916C);
     const response17 = await fetch(
       "https://api.17track.net/track/v2.2/gettrackinfo",
       {
