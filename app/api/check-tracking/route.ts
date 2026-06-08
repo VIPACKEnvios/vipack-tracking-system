@@ -7,8 +7,7 @@ const client = twilio(
   process.env.TWILIO_AUTH_TOKEN!
 );
 
-const ACTUALIZACION_TEMPLATE =
-  "HX23277e717da845d5b292d5c196900566";
+const ACTUALIZACION_TEMPLATE = "HX23277e717da845d5b292d5c196900566";
 
 function traducirEstado(status: string) {
   const estados: Record<string, string> = {
@@ -16,7 +15,7 @@ function traducirEstado(status: string) {
     PickUp: "Recolectado por paquetería",
     AvailableForPickup: "Disponible para recoger en oficinas",
     InTransit: "En tránsito",
-    OutForDelivery: "En ruta de entrega",
+    OutForDelivery: "En ruta de entrega a tu domicilio",
     DeliveryFailure: "Intento de entrega fallido",
     Delivered: "Entregado",
     Exception: "Envío en espera del siguiente proceso.",
@@ -24,6 +23,10 @@ function traducirEstado(status: string) {
   };
 
   return estados[status] || status || "Sin actualización";
+}
+
+function limpiarGuia(valor: any) {
+  return String(valor || "").replace(/\D/g, "");
 }
 
 export async function GET() {
@@ -44,9 +47,16 @@ export async function GET() {
     }
 
     const guias17Track = envios.map((envio: any) => ({
-      number: String(envio.guia || "").replace(/\s/g, ""),
+      number: limpiarGuia(envio.guia),
     }));
-console.log("TRACK17:", process.env.TRACK176ABE5F9410182D2007AF65DEF694916C);
+
+    console.log(
+      "TRACK17 KEY:",
+      process.env.TRACK17_API_KEY
+        ? process.env.TRACK17_API_KEY.substring(0, 10)
+        : "NO EXISTE"
+    );
+
     const response17 = await fetch(
       "https://api.17track.net/track/v2.2/gettrackinfo",
       {
@@ -73,19 +83,41 @@ console.log("TRACK17:", process.env.TRACK176ABE5F9410182D2007AF65DEF694916C);
       });
     }
 
+    const acceptedList = data17?.data?.accepted || [];
+    const rejectedList = data17?.data?.rejected || [];
+
     const resultados = [];
 
     for (const envio of envios) {
-      const numeroGuia = String(envio.guia || "").replace(/\s/g, "");
+      const numeroGuia = limpiarGuia(envio.guia);
 
-      const aceptado = data17?.data?.accepted?.find(
-        (item: any) => item.number === numeroGuia
-      );
+      const aceptado = acceptedList.find((item: any) => {
+        const guia17 = limpiarGuia(item.number);
+
+        return (
+          guia17 === numeroGuia ||
+          guia17.endsWith(numeroGuia) ||
+          numeroGuia.endsWith(guia17)
+        );
+      });
 
       if (!aceptado) {
-        const rechazado = data17?.data?.rejected?.find(
-          (item: any) => item.number === numeroGuia
-        );
+        const rechazado = rejectedList.find((item: any) => {
+          const guia17 = limpiarGuia(item.number);
+
+          return (
+            guia17 === numeroGuia ||
+            guia17.endsWith(numeroGuia) ||
+            numeroGuia.endsWith(guia17)
+          );
+        });
+
+        await supabase
+          .from("envios")
+          .update({
+            fecha_ultima_revision: new Date().toISOString(),
+          })
+          .eq("id", envio.id);
 
         resultados.push({
           guia: envio.guia,
@@ -99,9 +131,26 @@ console.log("TRACK17:", process.env.TRACK176ABE5F9410182D2007AF65DEF694916C);
         continue;
       }
 
-      const statusOriginal =
-        aceptado?.track_info?.latest_status?.status ||
-        "Sin actualización";
+     const ultimoEvento =
+  aceptado?.track_info?.latest_event?.description ||
+  aceptado?.track_info?.latest_event?.location ||
+  "";
+
+let statusOriginal =
+  aceptado?.track_info?.latest_status?.status ||
+  aceptado?.track_info?.latest_event?.stage ||
+  "Sin actualización";
+
+const eventoTexto = String(ultimoEvento).toLowerCase();
+
+if (
+  eventoTexto.includes("mensajero") ||
+  eventoTexto.includes("reparto") ||
+  eventoTexto.includes("ruta") ||
+  eventoTexto.includes("out for delivery")
+) {
+  statusOriginal = "OutForDelivery";
+}
 
       const statusTraducido = traducirEstado(statusOriginal);
 
@@ -113,6 +162,7 @@ console.log("TRACK17:", process.env.TRACK176ABE5F9410182D2007AF65DEF694916C);
         .update({
           estatus_actual: statusTraducido,
           entregado: statusOriginal === "Delivered",
+          fecha_ultima_revision: new Date().toISOString(),
         })
         .eq("id", envio.id);
 
@@ -125,9 +175,7 @@ console.log("TRACK17:", process.env.TRACK176ABE5F9410182D2007AF65DEF694916C);
         await client.messages.create({
           from: process.env.TWILIO_WHATSAPP_NUMBER!,
           to: `whatsapp:+${envio.telefono_whatsapp}`,
-
           contentSid: ACTUALIZACION_TEMPLATE,
-
           contentVariables: JSON.stringify({
             "1": String(envio.cliente || ""),
             "2": String(envio.pedido || ""),
@@ -142,6 +190,10 @@ console.log("TRACK17:", process.env.TRACK176ABE5F9410182D2007AF65DEF694916C);
           .update({
             ultimo_estado_enviado: statusTraducido,
             ultimo_whatsapp: `Actualización enviada: ${statusTraducido}`,
+            whatsapp_entregado:
+              statusOriginal === "Delivered"
+                ? true
+                : envio.whatsapp_entregado,
           })
           .eq("id", envio.id);
 
