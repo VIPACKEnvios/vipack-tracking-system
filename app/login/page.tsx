@@ -9,7 +9,7 @@ export default function LoginPage() {
   const login = () => {
     if (
       usuario === "vipack" &&
-      password === "Envios2026!"
+      password === "VipackEnvios$2026"
     ) {
       document.cookie = "vipack-auth=ok; path=/";
       window.location.href = "/";
