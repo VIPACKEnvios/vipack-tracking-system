@@ -6,17 +6,27 @@ export default function LoginPage() {
   const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
 
-  const login = () => {
-    if (
-      usuario === "vipack" &&
-      password === "VipackEnvios$2026"
-    ) {
-      document.cookie = "vipack-auth=ok; path=/";
-      window.location.href = "/";
-    } else {
-      alert("Usuario o contraseña incorrectos");
-    }
-  };
+  const login = async () => {
+  const response = await fetch("/api/login", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      usuario,
+      password,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (data.success) {
+    document.cookie = "vipack-auth=ok; path=/";
+    window.location.href = "/";
+  } else {
+    alert("Usuario o contraseña incorrectos");
+  }
+};
 
   return (
     <div
