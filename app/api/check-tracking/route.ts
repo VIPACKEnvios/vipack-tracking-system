@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { supabase } from "@/lib/supabase";
 import twilio from "twilio";
 
@@ -30,8 +31,22 @@ function limpiarGuia(valor: any) {
   return String(valor || "").replace(/\D/g, "");
 }
 
+function limpiarTelefono(valor: any) {
+  return String(valor || "").replace(/\D/g, "").trim();
+}
+
 export async function GET() {
   try {
+    const cookieStore = await cookies();
+    const auth = cookieStore.get("vipack-auth");
+
+    if (!auth) {
+      return NextResponse.json(
+        { success: false, error: "No autorizado" },
+        { status: 401 }
+      );
+    }
+
     const { data: envios, error } = await supabase
       .from("envios")
       .select("*")
@@ -47,16 +62,20 @@ export async function GET() {
       });
     }
 
-    const guias17Track = envios.map((envio: any) => ({
-      number: limpiarGuia(envio.guia),
-    }));
+    const guias17Track = envios
+      .map((envio: any) => ({
+        number: limpiarGuia(envio.guia),
+      }))
+      .filter((item: any) => item.number);
 
-    console.log(
-      "TRACK17 KEY:",
-      process.env.TRACK17_API_KEY
-        ? process.env.TRACK17_API_KEY.substring(0, 10)
-        : "NO EXISTE"
-    );
+    if (guias17Track.length === 0) {
+      return NextResponse.json({
+        success: true,
+        total: 0,
+        resultados: [],
+        mensaje: "No hay guías válidas para revisar",
+      });
+    }
 
     const response17 = await fetch(
       "https://api.17track.net/track/v2.2/gettrackinfo",
@@ -91,6 +110,16 @@ export async function GET() {
 
     for (const envio of envios) {
       const numeroGuia = limpiarGuia(envio.guia);
+
+      if (!numeroGuia) {
+        resultados.push({
+          guia: envio.guia,
+          cliente: envio.cliente,
+          actualizado: false,
+          motivo: "Guía inválida",
+        });
+        continue;
+      }
 
       const aceptado = acceptedList.find((item: any) => {
         const guia17 = limpiarGuia(item.number);
@@ -132,26 +161,26 @@ export async function GET() {
         continue;
       }
 
-     const ultimoEvento =
-  aceptado?.track_info?.latest_event?.description ||
-  aceptado?.track_info?.latest_event?.location ||
-  "";
+      const ultimoEvento =
+        aceptado?.track_info?.latest_event?.description ||
+        aceptado?.track_info?.latest_event?.location ||
+        "";
 
-let statusOriginal =
-  aceptado?.track_info?.latest_status?.status ||
-  aceptado?.track_info?.latest_event?.stage ||
-  "Sin actualización";
+      let statusOriginal =
+        aceptado?.track_info?.latest_status?.status ||
+        aceptado?.track_info?.latest_event?.stage ||
+        "Sin actualización";
 
-const eventoTexto = String(ultimoEvento).toLowerCase();
+      const eventoTexto = String(ultimoEvento).toLowerCase();
 
-if (
-  eventoTexto.includes("mensajero") ||
-  eventoTexto.includes("reparto") ||
-  eventoTexto.includes("ruta") ||
-  eventoTexto.includes("out for delivery")
-) {
-  statusOriginal = "OutForDelivery";
-}
+      if (
+        eventoTexto.includes("mensajero") ||
+        eventoTexto.includes("reparto") ||
+        eventoTexto.includes("ruta") ||
+        eventoTexto.includes("out for delivery")
+      ) {
+        statusOriginal = "OutForDelivery";
+      }
 
       const statusTraducido = traducirEstado(statusOriginal);
 
@@ -173,43 +202,52 @@ if (
         !yaSeEnvioEseEstado &&
         statusTraducido !== "Sin actualización"
       ) {
-        try {
-  await client.messages.create({
-    from: process.env.TWILIO_WHATSAPP_NUMBER!,
-    to: `whatsapp:+${envio.telefono_whatsapp}`,
-    contentSid: ACTUALIZACION_TEMPLATE,
-    contentVariables: JSON.stringify({
-      "1": String(envio.cliente || "Cliente"),
-      "2": String(envio.pedido || "Sin pedido"),
-      "3": String(envio.paqueteria || "Paquetería"),
-      "4": String(envio.guia || "Sin guía"),
-      "5": String(statusTraducido || "Sin actualización"),
-    }),
-  });
+        const telefono = limpiarTelefono(envio.telefono_whatsapp);
 
-  whatsappEnviado = true;
-} catch (twilioError: any) {
-  await supabase
-    .from("envios")
-    .update({
-      ultimo_whatsapp: `Error WhatsApp: ${twilioError.message}`,
-    })
-    .eq("id", envio.id);
-}
+        if (!telefono) {
+          await supabase
+            .from("envios")
+            .update({
+              ultimo_whatsapp: "Error WhatsApp: teléfono vacío",
+            })
+            .eq("id", envio.id);
+        } else {
+          try {
+            await client.messages.create({
+              from: process.env.TWILIO_WHATSAPP_NUMBER!,
+              to: `whatsapp:+${telefono}`,
+              contentSid: ACTUALIZACION_TEMPLATE,
+              contentVariables: JSON.stringify({
+                "1": String(envio.cliente || "Cliente"),
+                "2": String(envio.pedido || "Sin pedido"),
+                "3": String(envio.paqueteria || "Paquetería"),
+                "4": String(envio.guia || "Sin guía"),
+                "5": String(statusTraducido || "Sin actualización"),
+              }),
+            });
 
-        await supabase
-          .from("envios")
-          .update({
-            ultimo_estado_enviado: statusTraducido,
-            ultimo_whatsapp: `Actualización enviada: ${statusTraducido}`,
-            whatsapp_entregado:
-              statusOriginal === "Delivered"
-                ? true
-                : envio.whatsapp_entregado,
-          })
-          .eq("id", envio.id);
+            whatsappEnviado = true;
 
-        whatsappEnviado = true;
+            await supabase
+              .from("envios")
+              .update({
+                ultimo_estado_enviado: statusTraducido,
+                ultimo_whatsapp: `Actualización enviada: ${statusTraducido}`,
+                whatsapp_entregado:
+                  statusOriginal === "Delivered"
+                    ? true
+                    : envio.whatsapp_entregado,
+              })
+              .eq("id", envio.id);
+          } catch (twilioError: any) {
+            await supabase
+              .from("envios")
+              .update({
+                ultimo_whatsapp: `Error WhatsApp: ${twilioError.message}`,
+              })
+              .eq("id", envio.id);
+          }
+        }
       }
 
       resultados.push({
