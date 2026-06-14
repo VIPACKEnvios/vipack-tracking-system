@@ -385,8 +385,8 @@ export default function Home() {
     <div className="flex justify-end mb-4">
       <button
         onClick={() => {
-          localStorage.removeItem("vipack-auth");
-          window.location.href = "/login";
+          document.cookie = "vipack-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+window.location.href = "/login";
         }}
         className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-700"
       >
