@@ -379,8 +379,20 @@ export default function Home() {
     setLogs(nuevosLogs);
   };
 
-  return (
-    <main className="min-h-screen bg-gray-100 p-10">
+ return (
+  <main className="min-h-screen bg-gray-100 p-10">
+
+    <div className="flex justify-end mb-4">
+      <button
+        onClick={() => {
+          localStorage.removeItem("vipack-auth");
+          window.location.href = "/login";
+        }}
+        className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-700"
+      >
+        Cerrar sesión
+      </button>
+    </div>
       <div className="max-w-6xl mx-auto bg-white rounded-2xl shadow-lg p-8">
         <div className="flex items-center justify-center gap-6 mb-8">
           <div
