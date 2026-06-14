@@ -19,6 +19,7 @@ function traducirEstado(status: string) {
     DeliveryFailure: "Intento de entrega fallido",
     Delivered: "Entregado",
     Exception: "Envío en espera del siguiente proceso.",
+    NotFound: "Envío en espera de ser registrado por la paquetería",
     Expired: "Caducado",
   };
 
@@ -172,18 +173,29 @@ if (
         !yaSeEnvioEseEstado &&
         statusTraducido !== "Sin actualización"
       ) {
-        await client.messages.create({
-          from: process.env.TWILIO_WHATSAPP_NUMBER!,
-          to: `whatsapp:+${envio.telefono_whatsapp}`,
-          contentSid: ACTUALIZACION_TEMPLATE,
-          contentVariables: JSON.stringify({
-            "1": String(envio.cliente || ""),
-            "2": String(envio.pedido || ""),
-            "3": String(envio.paqueteria || ""),
-            "4": String(envio.guia || ""),
-            "5": String(statusTraducido || ""),
-          }),
-        });
+        try {
+  await client.messages.create({
+    from: process.env.TWILIO_WHATSAPP_NUMBER!,
+    to: `whatsapp:+${envio.telefono_whatsapp}`,
+    contentSid: ACTUALIZACION_TEMPLATE,
+    contentVariables: JSON.stringify({
+      "1": String(envio.cliente || "Cliente"),
+      "2": String(envio.pedido || "Sin pedido"),
+      "3": String(envio.paqueteria || "Paquetería"),
+      "4": String(envio.guia || "Sin guía"),
+      "5": String(statusTraducido || "Sin actualización"),
+    }),
+  });
+
+  whatsappEnviado = true;
+} catch (twilioError: any) {
+  await supabase
+    .from("envios")
+    .update({
+      ultimo_whatsapp: `Error WhatsApp: ${twilioError.message}`,
+    })
+    .eq("id", envio.id);
+}
 
         await supabase
           .from("envios")
