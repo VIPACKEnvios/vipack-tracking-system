@@ -6,8 +6,13 @@ export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   const isLoginPage = path === "/login";
+  const isLoginApi = path === "/api/login";
 
-  if (!auth && !isLoginPage) {
+  if (isLoginPage || isLoginApi) {
+    return NextResponse.next();
+  }
+
+  if (!auth) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
