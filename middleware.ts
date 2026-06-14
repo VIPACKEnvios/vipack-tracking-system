@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
-  const auth = request.cookies.get("vipack-auth");
+  const auth = request.cookies.get("vipack-auth")?.value;
+  const path = request.nextUrl.pathname;
 
-  const isLoginPage = request.nextUrl.pathname === "/login";
+  const isLoginPage = path === "/login";
 
   if (!auth && !isLoginPage) {
     return NextResponse.redirect(new URL("/login", request.url));
@@ -14,8 +15,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/",
-    "/((?!_next|favicon.ico|api).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
