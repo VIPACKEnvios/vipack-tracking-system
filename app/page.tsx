@@ -497,7 +497,19 @@ window.location.href = "/login";
             >
               Generar Excel desde ZIP
             </button>
-
+<button
+  onClick={() => window.location.href = "/envios"}
+  style={{
+    background: "#072c74",
+    color: "white",
+    padding: "12px 24px",
+    borderRadius: "12px",
+    border: "none",
+    fontWeight: "bold",
+  }}
+>
+  Ver tabla de envíos
+</button>
             <div className="flex gap-2 items-center">
               <input
                 type="number"
