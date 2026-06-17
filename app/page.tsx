@@ -380,7 +380,7 @@ export default function Home() {
   };
 
  return (
-  <main className="min-h-screen bg-gray-100 p-10">
+  <main className="min-h-screen bg-gray-100 p-10 text-gray-900">
 
     <div className="flex justify-end mb-4">
       <button
@@ -441,7 +441,7 @@ window.location.href = "/login";
 
         <div className="space-y-6">
           <div>
-            <label className="block text-lg font-semibold mb-2">
+           <label className="block text-lg font-semibold mb-2 text-gray-900">
               Subir Excel de clientes
             </label>
 
@@ -451,12 +451,12 @@ window.location.href = "/login";
               onChange={(e) => {
                 if (e.target.files?.[0]) setExcelFile(e.target.files[0]);
               }}
-              className="w-full border p-3 rounded-lg"
+              className="w-full border p-3 rounded-lg bg-white text-gray-900"
             />
           </div>
 
           <div>
-            <label className="block text-lg font-semibold mb-2">
+            <label className="block text-lg font-semibold mb-2 text-gray-900">
               Subir ZIP con PDFs
             </label>
 
@@ -466,7 +466,7 @@ window.location.href = "/login";
               onChange={(e) => {
                 if (e.target.files?.[0]) setZipFile(e.target.files[0]);
               }}
-              className="w-full border p-3 rounded-lg"
+             className="w-full border p-3 rounded-lg bg-white text-gray-900"
             />
           </div>
 
