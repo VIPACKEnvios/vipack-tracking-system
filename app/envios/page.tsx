@@ -286,11 +286,14 @@ export default function EnviosPage() {
   };
 
   const td = {
-    padding: "8px",
-    borderBottom: "1px solid #ddd",
-    verticalAlign: "top" as const,
-    whiteSpace: "nowrap" as const,
-  };
+  padding: "8px",
+  borderBottom: "1px solid #ddd",
+  verticalAlign: "top" as const,
+  whiteSpace: "nowrap" as const,
+  color: "#111827",
+  background: "white",
+  fontWeight: "600",
+};
 
   const tarjetaResumen = (titulo: string, valor: number, color: string) => (
     <div
@@ -414,12 +417,14 @@ export default function EnviosPage() {
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             style={{
-              padding: "10px 12px",
-              border: "1px solid #ccc",
-              borderRadius: "8px",
-              minWidth: "360px",
-              fontWeight: "bold",
-            }}
+  padding: "10px 12px",
+  border: "1px solid #ccc",
+  borderRadius: "8px",
+  minWidth: "360px",
+  fontWeight: "bold",
+  color: "#111827",
+  background: "white",
+}}
           />
 
           <label
