@@ -9,6 +9,15 @@ export default function EnviosPage() {
   const [mostrarEntregados, setMostrarEntregados] = useState(false);
   const [procesandoId, setProcesandoId] = useState<number | null>(null);
   const [busqueda, setBusqueda] = useState("");
+  const [mostrarFormularioManual, setMostrarFormularioManual] = useState(false);
+
+  const [guiaManual, setGuiaManual] = useState({
+    cliente: "",
+    telefono_whatsapp: "",
+    pedido: "",
+    guia: "",
+    paqueteria: "DHL",
+  });
 
   const textoNormalizado = (estado: string) => {
     const texto = String(estado || "").toLowerCase();
@@ -260,6 +269,63 @@ export default function EnviosPage() {
     cargarEnvios();
   };
 
+  const guardarGuiaManual = async () => {
+  if (!guiaManual.cliente || !guiaManual.telefono_whatsapp || !guiaManual.guia) {
+    alert("Falta cliente, teléfono o guía");
+    return;
+  }
+
+  const telefonoLimpio = guiaManual.telefono_whatsapp
+    .replace(/\D/g, "")
+    .trim();
+
+  const { data: existente } = await supabase
+    .from("envios")
+    .select("id")
+    .eq("guia", guiaManual.guia.trim())
+    .limit(1);
+
+  if (existente && existente.length > 0) {
+    alert("Esta guía ya existe");
+    return;
+  }
+
+  const { error } = await supabase.from("envios").insert([
+    {
+      cliente: guiaManual.cliente,
+      telefono_whatsapp: telefonoLimpio,
+      pedido: guiaManual.pedido || "MANUAL",
+      guia: guiaManual.guia.trim(),
+      paqueteria: guiaManual.paqueteria,
+      pdf: "",
+      estatus_actual: "En espera",
+      ultimo_whatsapp: "",
+      ultimo_estado_enviado: "",
+      entregado: false,
+      fecha_envio: new Date().toISOString(),
+      fecha_ultima_revision: new Date().toISOString(),
+    },
+  ]);
+
+  if (error) {
+    alert("Error guardando guía: " + error.message);
+    return;
+  }
+
+  alert("✅ Guía guardada. Ahora puedes mandar WhatsApp cuando cambies el estado.");
+
+  setGuiaManual({
+    cliente: "",
+    telefono_whatsapp: "",
+    pedido: "",
+    guia: "",
+    paqueteria: "DHL",
+  });
+
+  setMostrarFormularioManual(false);
+  cargarEnvios();
+};
+
   const estadosDisponibles = [
     { nombre: "Recolectado", color: "#2563eb" },
     { nombre: "En tránsito", color: "#ca8a04" },
@@ -286,14 +352,14 @@ export default function EnviosPage() {
   };
 
   const td = {
-  padding: "8px",
-  borderBottom: "1px solid #ddd",
-  verticalAlign: "top" as const,
-  whiteSpace: "nowrap" as const,
-  color: "#111827",
-  background: "white",
-  fontWeight: "600",
-};
+    padding: "8px",
+    borderBottom: "1px solid #ddd",
+    verticalAlign: "top" as const,
+    whiteSpace: "nowrap" as const,
+    color: "#111827",
+    background: "white",
+    fontWeight: "600",
+  };
 
   const tarjetaResumen = (titulo: string, valor: number, color: string) => (
     <div
@@ -417,14 +483,14 @@ export default function EnviosPage() {
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             style={{
-  padding: "10px 12px",
-  border: "1px solid #ccc",
-  borderRadius: "8px",
-  minWidth: "360px",
-  fontWeight: "bold",
-  color: "#111827",
-  background: "white",
-}}
+              padding: "10px 12px",
+              border: "1px solid #ccc",
+              borderRadius: "8px",
+              minWidth: "360px",
+              fontWeight: "bold",
+              color: "#111827",
+              background: "white",
+            }}
           />
 
           <label
@@ -457,7 +523,145 @@ export default function EnviosPage() {
           >
             Actualizar tabla
           </button>
+
+          <button
+            onClick={() => setMostrarFormularioManual(!mostrarFormularioManual)}
+            style={{
+              background: "#ea580c",
+              color: "white",
+              border: "none",
+              padding: "8px 14px",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
+          >
+            + Agregar guía manual
+          </button>
         </div>
+
+        {mostrarFormularioManual && (
+          <div
+            style={{
+              background: "#f9fafb",
+              border: "1px solid #ddd",
+              borderRadius: "12px",
+              padding: "16px",
+              marginBottom: "18px",
+            }}
+          >
+            <h3 style={{ color: "#072c74", marginTop: 0 }}>
+              Agregar guía manual sin PDF
+            </h3>
+
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                flexWrap: "wrap",
+              }}
+            >
+              <input
+                placeholder="Cliente"
+                value={guiaManual.cliente}
+                onChange={(e) =>
+                  setGuiaManual({
+                    ...guiaManual,
+                    cliente: e.target.value,
+                  })
+                }
+                style={{
+                  padding: "10px",
+                  borderRadius: "8px",
+                  border: "1px solid #ccc",
+                }}
+              />
+
+              <input
+                placeholder="Teléfono"
+                value={guiaManual.telefono_whatsapp}
+                onChange={(e) =>
+                  setGuiaManual({
+                    ...guiaManual,
+                    telefono_whatsapp: e.target.value,
+                  })
+                }
+                style={{
+                  padding: "10px",
+                  borderRadius: "8px",
+                  border: "1px solid #ccc",
+                }}
+              />
+
+              <input
+                placeholder="Pedido/Folio"
+                value={guiaManual.pedido}
+                onChange={(e) =>
+                  setGuiaManual({
+                    ...guiaManual,
+                    pedido: e.target.value,
+                  })
+                }
+                style={{
+                  padding: "10px",
+                  borderRadius: "8px",
+                  border: "1px solid #ccc",
+                }}
+              />
+
+              <input
+                placeholder="Guía"
+                value={guiaManual.guia}
+                onChange={(e) =>
+                  setGuiaManual({
+                    ...guiaManual,
+                    guia: e.target.value,
+                  })
+                }
+                style={{
+                  padding: "10px",
+                  borderRadius: "8px",
+                  border: "1px solid #ccc",
+                }}
+              />
+
+              <select
+                value={guiaManual.paqueteria}
+                onChange={(e) =>
+                  setGuiaManual({
+                    ...guiaManual,
+                    paqueteria: e.target.value,
+                  })
+                }
+                style={{
+                  padding: "10px",
+                  borderRadius: "8px",
+                  border: "1px solid #ccc",
+                }}
+              >
+                <option value="DHL">DHL</option>
+                <option value="ESTAFETA">ESTAFETA</option>
+                <option value="FEDEX">FEDEX</option>
+                <option value="PAQUETEXPRESS">PAQUETEXPRESS</option>
+              </select>
+
+              <button
+                onClick={guardarGuiaManual}
+                style={{
+                  background: "#047857",
+                  color: "white",
+                  border: "none",
+                  padding: "10px 16px",
+                  borderRadius: "8px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                }}
+              >
+                Guardar Guía
+              </button>
+            </div>
+          </div>
+        )}
 
         <p style={{ color: "#555", fontWeight: "bold" }}>
           Nota: los entregados con más de 2 días se ocultan automáticamente.

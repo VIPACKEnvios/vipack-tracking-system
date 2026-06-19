@@ -516,7 +516,7 @@ window.location.href = "/login";
                 placeholder="ID del envío"
                 value={idEnvio}
                 onChange={(e) => setIdEnvio(e.target.value)}
-                className="border p-3 rounded-xl"
+                className="border p-3 rounded-xl bg-white text-gray-900"
               />
 
               <button
