@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import { supabase } from "@/lib/supabase";
 
-export default function Home() {
+export default function GuiasPage() {
   const [logs, setLogs] = useState<string[]>([]);
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [zipFile, setZipFile] = useState<File | null>(null);
@@ -379,22 +379,11 @@ export default function Home() {
     setLogs(nuevosLogs);
   };
 
- return (
-  <main className="min-h-screen bg-gray-100 p-10 text-gray-900">
 
-    <div className="flex justify-end mb-4">
-      <button
-        onClick={() => {
-          document.cookie = "vipack-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
-window.location.href = "/login";
-        }}
-        className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-700"
-      >
-        Cerrar sesión
-      </button>
-    </div>
-      <div className="max-w-6xl mx-auto bg-white rounded-2xl shadow-lg p-8">
-        <div className="flex items-center justify-center gap-6 mb-8">
+  return (
+    <main className="min-h-[calc(100vh-4rem)] bg-gray-100 p-4 text-gray-900 md:p-8">
+      <div className="mx-auto max-w-6xl rounded-2xl bg-white p-6 shadow-lg md:p-8">
+        <div className="mb-8 flex items-center justify-center gap-6">
           <div
             style={{
               display: "flex",
@@ -470,7 +459,7 @@ window.location.href = "/login";
             />
           </div>
 
-          <div className="flex gap-4 flex-wrap">
+          <div className="flex flex-wrap gap-4">
             <button
               onClick={handleValidate}
               className="bg-blue-600 text-white px-6 py-3 rounded-xl"
@@ -510,7 +499,7 @@ window.location.href = "/login";
 >
   Ver tabla de envíos
 </button>
-            <div className="flex gap-2 items-center">
+            <div className="flex items-center gap-2">
               <input
                 type="number"
                 placeholder="ID del envío"

@@ -5,10 +5,15 @@ export function middleware(request: NextRequest) {
   const auth = request.cookies.get("vipack-auth")?.value;
   const path = request.nextUrl.pathname;
 
-  const isLoginPage = path === "/login";
-  const isLoginApi = path === "/api/login";
+  const isPublicPage =
+    path === "/login" ||
+    path === "/registro-bazar";
 
-  if (isLoginPage || isLoginApi) {
+  const isPublicApi =
+    path === "/api/login" ||
+    path === "/api/registro-bazar/archivos";
+
+  if (isPublicPage || isPublicApi) {
     return NextResponse.next();
   }
 
