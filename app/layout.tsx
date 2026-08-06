@@ -41,7 +41,6 @@ export const metadata: Metadata = {
   ],
 
   creator: "VIPACK Envíos",
-
   publisher: "VIPACK Envíos",
 
   robots: {
@@ -62,10 +61,11 @@ export const metadata: Metadata = {
 
     images: [
       {
-        url: "/og-vipack.jpg",
+        url: "https://vipack-envios.com/og-vipack.jpg?v=2",
         width: 1200,
         height: 630,
         alt: "VIPACK Envíos",
+        type: "image/jpeg",
       },
     ],
   },
@@ -78,7 +78,9 @@ export const metadata: Metadata = {
     description:
       "Registro oficial de bazares y plataforma logística de VIPACK Envíos.",
 
-    images: ["/og-vipack.jpg"],
+    images: [
+      "https://vipack-envios.com/og-vipack.jpg?v=2",
+    ],
   },
 
   icons: {
