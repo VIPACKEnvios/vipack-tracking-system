@@ -2,12 +2,16 @@ import {
   NextRequest,
   NextResponse,
 } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+
+import {
+  getSupabaseAdmin,
+} from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const BUCKET_DOCUMENTOS = "documentos-bazares";
+const BUCKET_DOCUMENTOS =
+  "documentos-bazares";
 
 const TIPOS_PERMITIDOS = [
   "image/jpeg",
@@ -16,48 +20,76 @@ const TIPOS_PERMITIDOS = [
   "application/pdf",
 ];
 
-const TAMANO_MAXIMO = 10 * 1024 * 1024;
+const TAMANO_MAXIMO =
+  10 * 1024 * 1024;
+
+type SupabaseAdminClient =
+  ReturnType<typeof getSupabaseAdmin>;
 
 type ArchivoGuardado = {
   ruta: string;
   nombre: string;
 };
 
-function limpiarNombre(valor: string) {
+function limpiarNombre(
+  valor: string
+) {
   const nombreLimpio = valor
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9-_ ]/g, "")
+    .replace(
+      /[\u0300-\u036f]/g,
+      ""
+    )
+    .replace(
+      /[^a-zA-Z0-9-_ ]/g,
+      ""
+    )
     .trim()
     .replace(/\s+/g, "_")
     .slice(0, 70);
 
-  return nombreLimpio || "Bazar_sin_nombre";
+  return (
+    nombreLimpio ||
+    "Bazar_sin_nombre"
+  );
 }
 
-function limpiarTelefono(valor: string) {
-  return valor.replace(/\D/g, "");
+function limpiarTelefono(
+  valor: string
+) {
+  return valor.replace(
+    /\D/g,
+    ""
+  );
 }
 
-function obtenerExtension(archivo: File) {
-  const extensionesPorTipo: Record<
-    string,
-    string
-  > = {
-    "image/jpeg": "jpg",
-    "image/png": "png",
-    "image/webp": "webp",
-    "application/pdf": "pdf",
-  };
+function obtenerExtension(
+  archivo: File
+) {
+  const extensionesPorTipo:
+    Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "application/pdf": "pdf",
+    };
 
-  return extensionesPorTipo[archivo.type] || "";
+  return (
+    extensionesPorTipo[
+      archivo.type
+    ] || ""
+  );
 }
 
 function validarArchivo(
   archivo: File,
   nombreDocumento: string
 ) {
-  if (!TIPOS_PERMITIDOS.includes(archivo.type)) {
+  if (
+    !TIPOS_PERMITIDOS.includes(
+      archivo.type
+    )
+  ) {
     throw new Error(
       `${nombreDocumento}: solo se permiten archivos JPG, PNG, WEBP o PDF.`
     );
@@ -69,13 +101,17 @@ function validarArchivo(
     );
   }
 
-  if (archivo.size > TAMANO_MAXIMO) {
+  if (
+    archivo.size >
+    TAMANO_MAXIMO
+  ) {
     throw new Error(
       `${nombreDocumento}: el archivo no puede pesar más de 10 MB.`
     );
   }
 
-  const extension = obtenerExtension(archivo);
+  const extension =
+    obtenerExtension(archivo);
 
   if (!extension) {
     throw new Error(
@@ -85,23 +121,34 @@ function validarArchivo(
 }
 
 async function subirDocumento({
+  supabaseAdmin,
   archivo,
   folio,
   nombreBazar,
   nombreBase,
 }: {
+  supabaseAdmin:
+    SupabaseAdminClient;
   archivo: File;
   folio: string;
   nombreBazar: string;
   nombreBase: string;
 }): Promise<ArchivoGuardado> {
-  validarArchivo(archivo, nombreBase);
+  validarArchivo(
+    archivo,
+    nombreBase
+  );
 
-  const extension = obtenerExtension(archivo);
+  const extension =
+    obtenerExtension(archivo);
+
   const nombreBazarLimpio =
-    limpiarNombre(nombreBazar);
+    limpiarNombre(
+      nombreBazar
+    );
 
-  const marcaTiempo = Date.now();
+  const marcaTiempo =
+    Date.now();
 
   const nombreArchivo =
     `${nombreBase}_${marcaTiempo}.${extension}`;
@@ -115,15 +162,32 @@ async function subirDocumento({
   const arrayBuffer =
     await archivo.arrayBuffer();
 
-  const contenido = Buffer.from(arrayBuffer);
+  const contenido =
+    Buffer.from(
+      arrayBuffer
+    );
 
-  const { error } = await supabaseAdmin.storage
-    .from(BUCKET_DOCUMENTOS)
-    .upload(rutaStorage, contenido, {
-      contentType: archivo.type,
-      cacheControl: "3600",
-      upsert: false,
-    });
+  const {
+    error,
+  } =
+    await supabaseAdmin
+      .storage
+      .from(
+        BUCKET_DOCUMENTOS
+      )
+      .upload(
+        rutaStorage,
+        contenido,
+        {
+          contentType:
+            archivo.type,
+
+          cacheControl:
+            "3600",
+
+          upsert: false,
+        }
+      );
 
   if (error) {
     console.error(
@@ -137,23 +201,43 @@ async function subirDocumento({
   }
 
   return {
-    ruta: rutaStorage,
-    nombre: nombreArchivo,
+    ruta:
+      rutaStorage,
+
+    nombre:
+      nombreArchivo,
   };
 }
 
-async function eliminarDocumentos(
-  rutas: string[]
-) {
-  const rutasValidas = rutas.filter(Boolean);
+async function eliminarDocumentos({
+  supabaseAdmin,
+  rutas,
+}: {
+  supabaseAdmin:
+    SupabaseAdminClient;
 
-  if (rutasValidas.length === 0) {
+  rutas: string[];
+}) {
+  const rutasValidas =
+    rutas.filter(Boolean);
+
+  if (
+    rutasValidas.length === 0
+  ) {
     return;
   }
 
-  const { error } = await supabaseAdmin.storage
-    .from(BUCKET_DOCUMENTOS)
-    .remove(rutasValidas);
+  const {
+    error,
+  } =
+    await supabaseAdmin
+      .storage
+      .from(
+        BUCKET_DOCUMENTOS
+      )
+      .remove(
+        rutasValidas
+      );
 
   if (error) {
     console.error(
@@ -166,49 +250,89 @@ async function eliminarDocumentos(
 export async function POST(
   request: NextRequest
 ) {
-  let registroCreadoId: string | null = null;
+  let registroCreadoId:
+    string | null = null;
 
-  const documentosSubidos: string[] = [];
+  const documentosSubidos:
+    string[] = [];
+
+  let supabaseAdmin:
+    SupabaseAdminClient | null =
+      null;
 
   try {
+    /*
+     * El cliente administrativo se crea
+     * únicamente cuando se ejecuta la API.
+     *
+     * Esto evita que Vercel intente
+     * inicializar Supabase durante el build.
+     */
+    supabaseAdmin =
+      getSupabaseAdmin();
+
     const formData =
       await request.formData();
 
-    const nombreResponsable = String(
-      formData.get("nombre_responsable") || ""
-    ).trim();
+    const nombreResponsable =
+      String(
+        formData.get(
+          "nombre_responsable"
+        ) || ""
+      ).trim();
 
-    const telefono = limpiarTelefono(
-      String(formData.get("telefono") || "")
-    );
+    const telefono =
+      limpiarTelefono(
+        String(
+          formData.get(
+            "telefono"
+          ) || ""
+        )
+      );
 
-    const direccion = String(
-      formData.get("direccion") || ""
-    ).trim();
+    const direccion =
+      String(
+        formData.get(
+          "direccion"
+        ) || ""
+      ).trim();
 
-    const nombreBazar = String(
-      formData.get("nombre_bazar") || ""
-    ).trim();
+    const nombreBazar =
+      String(
+        formData.get(
+          "nombre_bazar"
+        ) || ""
+      ).trim();
 
-    const correo = String(
-      formData.get("correo") || ""
-    )
-      .trim()
-      .toLowerCase();
+    const correo =
+      String(
+        formData.get(
+          "correo"
+        ) || ""
+      )
+        .trim()
+        .toLowerCase();
 
-    const productos = String(
-      formData.get("productos") || ""
-    ).trim();
+    const productos =
+      String(
+        formData.get(
+          "productos"
+        ) || ""
+      ).trim();
 
-    const facebook = String(
-      formData.get("facebook") || ""
-    ).trim();
+    const facebook =
+      String(
+        formData.get(
+          "facebook"
+        ) || ""
+      ).trim();
 
-    const referencia1Nombre = String(
-      formData.get(
-        "referencia_1_nombre"
-      ) || ""
-    ).trim();
+    const referencia1Nombre =
+      String(
+        formData.get(
+          "referencia_1_nombre"
+        ) || ""
+      ).trim();
 
     const referencia1Telefono =
       limpiarTelefono(
@@ -219,11 +343,12 @@ export async function POST(
         )
       );
 
-    const referencia2Nombre = String(
-      formData.get(
-        "referencia_2_nombre"
-      ) || ""
-    ).trim();
+    const referencia2Nombre =
+      String(
+        formData.get(
+          "referencia_2_nombre"
+        ) || ""
+      ).trim();
 
     const referencia2Telefono =
       limpiarTelefono(
@@ -235,7 +360,9 @@ export async function POST(
       );
 
     const ineFrente =
-      formData.get("ine_frente");
+      formData.get(
+        "ine_frente"
+      );
 
     const comprobante =
       formData.get(
@@ -257,69 +384,94 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
+
           error:
             "Faltan datos obligatorios del formulario.",
         },
-        { status: 400 }
-      );
-    }
-
-    if (telefono.length < 10) {
-      return NextResponse.json(
         {
-          success: false,
-          error:
-            "El teléfono del responsable no es válido.",
-        },
-        { status: 400 }
+          status: 400,
+        }
       );
     }
 
     if (
-      referencia1Telefono.length < 10 ||
-      referencia2Telefono.length < 10
+      telefono.length < 10
     ) {
       return NextResponse.json(
         {
           success: false,
+
           error:
-            "Los teléfonos de las referencias deben contener al menos 10 dígitos.",
+            "El teléfono del responsable no es válido.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
     if (
-      !(ineFrente instanceof File) ||
+      referencia1Telefono.length <
+        10 ||
+      referencia2Telefono.length <
+        10
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          error:
+            "Los teléfonos de las referencias deben contener al menos 10 dígitos.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      !(
+        ineFrente instanceof
+        File
+      ) ||
       ineFrente.size === 0
     ) {
       return NextResponse.json(
         {
           success: false,
+
           error:
             "La fotografía del INE es obligatoria.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
     if (
-      !(comprobante instanceof File) ||
+      !(
+        comprobante instanceof
+        File
+      ) ||
       comprobante.size === 0
     ) {
       return NextResponse.json(
         {
           success: false,
+
           error:
             "El comprobante de domicilio es obligatorio.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
     /*
-     * Se validan ambos documentos antes de crear
-     * el registro en Supabase.
+     * Validamos ambos documentos
+     * antes de crear el registro.
      */
     validarArchivo(
       ineFrente,
@@ -332,37 +484,58 @@ export async function POST(
     );
 
     /*
-     * Crear el registro para obtener el folio
-     * automático generado en la tabla bazares.
+     * Crear el registro para obtener
+     * el folio automático.
      */
     const {
       data: registro,
-      error: errorRegistro,
-    } = await supabaseAdmin
-      .from("bazares")
-      .insert({
-        nombre_responsable:
-          nombreResponsable,
-        telefono,
-        direccion,
-        nombre_bazar: nombreBazar,
-        correo: correo || null,
-        productos,
-        facebook,
-        referencia_1_nombre:
-          referencia1Nombre,
-        referencia_1_telefono:
-          referencia1Telefono,
-        referencia_2_nombre:
-          referencia2Nombre,
-        referencia_2_telefono:
-          referencia2Telefono,
-        estado: "pendiente",
-      })
-      .select("id, folio")
-      .single();
+      error:
+        errorRegistro,
+    } =
+      await supabaseAdmin
+        .from("bazares")
+        .insert({
+          nombre_responsable:
+            nombreResponsable,
 
-    if (errorRegistro || !registro) {
+          telefono,
+
+          direccion,
+
+          nombre_bazar:
+            nombreBazar,
+
+          correo:
+            correo || null,
+
+          productos,
+
+          facebook,
+
+          referencia_1_nombre:
+            referencia1Nombre,
+
+          referencia_1_telefono:
+            referencia1Telefono,
+
+          referencia_2_nombre:
+            referencia2Nombre,
+
+          referencia_2_telefono:
+            referencia2Telefono,
+
+          estado:
+            "pendiente",
+        })
+        .select(
+          "id, folio"
+        )
+        .single();
+
+    if (
+      errorRegistro ||
+      !registro
+    ) {
       console.error(
         "Error creando el registro:",
         errorRegistro
@@ -374,17 +547,22 @@ export async function POST(
       );
     }
 
-    registroCreadoId = registro.id;
+    registroCreadoId =
+      registro.id;
 
     /*
      * Subir fotografía del INE.
      */
     const documentoIne =
       await subirDocumento({
-        archivo: ineFrente,
-        folio: registro.folio,
+        supabaseAdmin,
+        archivo:
+          ineFrente,
+        folio:
+          registro.folio,
         nombreBazar,
-        nombreBase: "INE_FRENTE",
+        nombreBase:
+          "INE_FRENTE",
       });
 
     documentosSubidos.push(
@@ -392,13 +570,19 @@ export async function POST(
     );
 
     /*
-     * Subir comprobante de domicilio.
+     * Subir comprobante.
      */
     const documentoComprobante =
       await subirDocumento({
-        archivo: comprobante,
-        folio: registro.folio,
+        supabaseAdmin,
+        archivo:
+          comprobante,
+
+        folio:
+          registro.folio,
+
         nombreBazar,
+
         nombreBase:
           "COMPROBANTE_DOMICILIO",
       });
@@ -408,26 +592,33 @@ export async function POST(
     );
 
     /*
-     * Guardar las rutas internas del bucket.
-     * No son rutas de Windows ni URLs públicas.
+     * Guardar rutas privadas
+     * del Storage.
      */
     const {
-      error: errorActualizacion,
-    } = await supabaseAdmin
-      .from("bazares")
-      .update({
-        ine_frente_archivo:
-          documentoIne.ruta,
+      error:
+        errorActualizacion,
+    } =
+      await supabaseAdmin
+        .from("bazares")
+        .update({
+          ine_frente_archivo:
+            documentoIne.ruta,
 
-        comprobante_domicilio_archivo:
-          documentoComprobante.ruta,
+          comprobante_domicilio_archivo:
+            documentoComprobante.ruta,
 
-        fecha_actualizacion:
-          new Date().toISOString(),
-      })
-      .eq("id", registro.id);
+          fecha_actualizacion:
+            new Date().toISOString(),
+        })
+        .eq(
+          "id",
+          registro.id
+        );
 
-    if (errorActualizacion) {
+    if (
+      errorActualizacion
+    ) {
       console.error(
         "Error actualizando las rutas:",
         errorActualizacion
@@ -444,11 +635,14 @@ export async function POST(
       mensaje:
         "Registro enviado correctamente. VIPACK revisará la información proporcionada.",
 
-      id: registro.id,
+      id:
+        registro.id,
 
-      folio: registro.folio,
+      folio:
+        registro.folio,
 
-      bucket: BUCKET_DOCUMENTOS,
+      bucket:
+        BUCKET_DOCUMENTOS,
 
       carpeta:
         `${registro.folio}_${limpiarNombre(
@@ -468,24 +662,43 @@ export async function POST(
     );
 
     /*
-     * Si algún archivo fue subido antes del
-     * error, se elimina del bucket.
+     * Limpiar documentos que sí
+     * alcanzaron a subir.
      */
-    await eliminarDocumentos(
-      documentosSubidos
-    );
+    if (
+      supabaseAdmin &&
+      documentosSubidos.length >
+        0
+    ) {
+      await eliminarDocumentos({
+        supabaseAdmin,
+        rutas:
+          documentosSubidos,
+      });
+    }
 
     /*
-     * Eliminar el registro incompleto.
+     * Eliminar registro incompleto.
      */
-    if (registroCreadoId) {
-      const { error: errorEliminar } =
+    if (
+      supabaseAdmin &&
+      registroCreadoId
+    ) {
+      const {
+        error:
+          errorEliminar,
+      } =
         await supabaseAdmin
           .from("bazares")
           .delete()
-          .eq("id", registroCreadoId);
+          .eq(
+            "id",
+            registroCreadoId
+          );
 
-      if (errorEliminar) {
+      if (
+        errorEliminar
+      ) {
         console.error(
           "No fue posible eliminar el registro incompleto:",
           errorEliminar
@@ -502,7 +715,9 @@ export async function POST(
             ? error.message
             : "No fue posible completar el registro.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
@@ -514,6 +729,7 @@ export async function GET() {
     mensaje:
       "La API de registro de bazares está funcionando con Supabase Storage.",
 
-    bucket: BUCKET_DOCUMENTOS,
+    bucket:
+      BUCKET_DOCUMENTOS,
   });
 }

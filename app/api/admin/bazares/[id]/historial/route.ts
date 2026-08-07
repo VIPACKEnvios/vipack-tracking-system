@@ -1,7 +1,5 @@
-import {
-  NextResponse,
-} from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import { NextResponse } from "next/server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +15,9 @@ export async function GET(
   contexto: ContextoRuta
 ) {
   try {
+    const supabaseAdmin =
+      getSupabaseAdmin();
+
     const { id } = await contexto.params;
 
     if (!id) {

@@ -1,12 +1,24 @@
-import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import {
+  NextRequest,
+  NextResponse,
+} from "next/server";
+
+import {
+  getSupabaseAdmin,
+} from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest
+) {
   try {
-    const { searchParams } = new URL(request.url);
+    const supabaseAdmin =
+      getSupabaseAdmin();
+
+    const { searchParams } =
+      new URL(request.url);
 
     const busqueda = String(
       searchParams.get("buscar") || ""
@@ -34,7 +46,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data, error } = await consulta;
+    const {
+      data,
+      error,
+    } = await consulta;
 
     if (error) {
       console.error(
@@ -48,7 +63,9 @@ export async function GET(request: NextRequest) {
           error:
             "No fue posible consultar los bazares registrados.",
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
@@ -56,17 +73,20 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      encontrado: bazares.length > 0,
+      encontrado:
+        bazares.length > 0,
       bazares,
-      total: bazares.length,
+      total:
+        bazares.length,
+
       mensaje:
         bazares.length > 0
           ? busqueda
             ? "Se encontraron bazares registrados."
             : "Lista de bazares registrados."
           : busqueda
-            ? "No se encontró un bazar activo con ese nombre."
-            : "Todavía no hay bazares activos.",
+          ? "No se encontró un bazar activo con ese nombre."
+          : "Todavía no hay bazares activos.",
     });
   } catch (error) {
     console.error(
@@ -82,7 +102,9 @@ export async function GET(request: NextRequest) {
             ? error.message
             : "No fue posible realizar la consulta.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }

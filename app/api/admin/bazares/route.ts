@@ -1,5 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import {
+  NextRequest,
+  NextResponse,
+} from "next/server";
+
+import {
+  getSupabaseAdmin,
+} from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,12 +17,25 @@ const ESTADOS_VALIDOS = [
   "suspendido",
 ];
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest
+) {
   try {
-    const { searchParams } = new URL(request.url);
+    const supabaseAdmin =
+      getSupabaseAdmin();
 
-    const busqueda = searchParams.get("buscar")?.trim() || "";
-    const estado = searchParams.get("estado")?.trim() || "";
+    const { searchParams } =
+      new URL(request.url);
+
+    const busqueda =
+      searchParams
+        .get("buscar")
+        ?.trim() || "";
+
+    const estado =
+      searchParams
+        .get("estado")
+        ?.trim() || "";
 
     let consulta = supabaseAdmin
       .from("bazares")
@@ -45,29 +64,47 @@ export async function GET(request: NextRequest) {
         ascending: false,
       });
 
-    if (estado && ESTADOS_VALIDOS.includes(estado)) {
-      consulta = consulta.eq("estado", estado);
+    if (
+      estado &&
+      ESTADOS_VALIDOS.includes(estado)
+    ) {
+      consulta =
+        consulta.eq(
+          "estado",
+          estado
+        );
     }
 
     if (busqueda) {
-      const textoSeguro = busqueda
-        .replace(/[%(),]/g, " ")
-        .trim();
+      const textoSeguro =
+        busqueda
+          .replace(
+            /[%(),]/g,
+            " "
+          )
+          .trim();
 
-      consulta = consulta.or(
-        [
-          `folio.ilike.%${textoSeguro}%`,
-          `nombre_bazar.ilike.%${textoSeguro}%`,
-          `nombre_responsable.ilike.%${textoSeguro}%`,
-          `telefono.ilike.%${textoSeguro}%`,
-        ].join(",")
-      );
+      consulta =
+        consulta.or(
+          [
+            `folio.ilike.%${textoSeguro}%`,
+            `nombre_bazar.ilike.%${textoSeguro}%`,
+            `nombre_responsable.ilike.%${textoSeguro}%`,
+            `telefono.ilike.%${textoSeguro}%`,
+          ].join(",")
+        );
     }
 
-    const { data, error } = await consulta;
+    const {
+      data,
+      error,
+    } = await consulta;
 
     if (error) {
-      console.error("Error consultando bazares:", error);
+      console.error(
+        "Error consultando bazares:",
+        error
+      );
 
       return NextResponse.json(
         {
@@ -75,17 +112,23 @@ export async function GET(request: NextRequest) {
           error:
             "No fue posible consultar los bazares registrados.",
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
     return NextResponse.json({
       success: true,
       bazares: data || [],
-      total: data?.length || 0,
+      total:
+        data?.length || 0,
     });
   } catch (error) {
-    console.error("Error en API administrativa:", error);
+    console.error(
+      "Error en API administrativa:",
+      error
+    );
 
     return NextResponse.json(
       {
@@ -95,7 +138,9 @@ export async function GET(request: NextRequest) {
             ? error.message
             : "No fue posible cargar los bazares.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }

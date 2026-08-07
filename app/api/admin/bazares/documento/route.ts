@@ -2,7 +2,10 @@ import {
   NextRequest,
   NextResponse,
 } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+
+import {
+  getSupabaseAdmin,
+} from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,7 +13,8 @@ export const dynamic = "force-dynamic";
 const BUCKET_DOCUMENTOS =
   "documentos-bazares";
 
-const DURACION_URL_SEGUNDOS = 60 * 5;
+const DURACION_URL_SEGUNDOS =
+  60 * 5;
 
 function limpiarRuta(valor: string) {
   return valor
@@ -22,11 +26,16 @@ export async function GET(
   request: NextRequest
 ) {
   try {
+    const supabaseAdmin =
+      getSupabaseAdmin();
+
     const { searchParams } =
       new URL(request.url);
 
     const ruta = limpiarRuta(
-      String(searchParams.get("ruta") || "")
+      String(
+        searchParams.get("ruta") || ""
+      )
     );
 
     if (!ruta) {
@@ -36,7 +45,9 @@ export async function GET(
           error:
             "No se recibió la ruta del documento.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -51,7 +62,9 @@ export async function GET(
           error:
             "La ruta del documento no es válida.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -65,7 +78,10 @@ export async function GET(
         DURACION_URL_SEGUNDOS
       );
 
-    if (error || !data?.signedUrl) {
+    if (
+      error ||
+      !data?.signedUrl
+    ) {
       console.error(
         "Error generando URL firmada:",
         error
@@ -78,7 +94,9 @@ export async function GET(
             error?.message ||
             "No fue posible abrir el documento.",
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
@@ -102,7 +120,9 @@ export async function GET(
             ? error.message
             : "No fue posible consultar el documento.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }

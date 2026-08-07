@@ -2,7 +2,7 @@ import {
   NextRequest,
   NextResponse,
 } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,6 +67,9 @@ export async function PATCH(
   contexto: ContextoRuta
 ) {
   try {
+    const supabaseAdmin =
+      getSupabaseAdmin();
+
     const { id } = await contexto.params;
 
     if (!id) {
@@ -140,7 +143,8 @@ export async function PATCH(
     }
 
     /*
-     * Consultar el estado actual antes de modificarlo.
+     * Consultar el estado actual antes
+     * de modificarlo.
      */
     const {
       data: bazarActual,
@@ -183,7 +187,8 @@ export async function PATCH(
       return NextResponse.json(
         {
           success: false,
-          error: `El bazar ya se encuentra en estado ${estado}.`,
+          error:
+            `El bazar ya se encuentra en estado ${estado}.`,
         },
         { status: 409 }
       );
@@ -206,8 +211,8 @@ export async function PATCH(
     };
 
     /*
-     * Estos datos se guardan cuando el
-     * expediente es aprobado.
+     * Guardar firma cuando el
+     * expediente se aprueba.
      */
     if (estado === "activo") {
       cambios.aprobado_por =
@@ -261,7 +266,8 @@ export async function PATCH(
     }
 
     /*
-     * Registrar el movimiento en la bitácora.
+     * Registrar el movimiento en
+     * la bitácora.
      */
     const {
       error: errorHistorial,
@@ -294,8 +300,8 @@ export async function PATCH(
       );
 
       /*
-       * Revertir el cambio si no fue posible
-       * guardar el historial.
+       * Revertir el cambio si no
+       * se pudo guardar el historial.
        */
       const {
         error: errorReversion,
@@ -346,7 +352,8 @@ export async function PATCH(
           fechaMovimiento,
       },
 
-      mensaje: `El bazar cambió de ${bazar.estado} a ${estado}.`,
+      mensaje:
+        `El bazar cambió de ${bazar.estado} a ${estado}.`,
     });
   } catch (error) {
     console.error(

@@ -2,7 +2,10 @@ import {
   NextRequest,
   NextResponse,
 } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+
+import {
+  getSupabaseAdmin,
+} from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -83,11 +86,6 @@ function obtenerEstado(
     : "activo";
 }
 
-/**
- * Solo agrega al objeto los campos que tienen
- * información. Así no reemplazamos datos existentes
- * con cadenas vacías.
- */
 function crearCambios(
   registro: RegistroImportacion
 ) {
@@ -106,7 +104,9 @@ function crearCambios(
   ];
 
   for (const campo of camposTexto) {
-    const valor = limpiarTexto(registro[campo]);
+    const valor = limpiarTexto(
+      registro[campo]
+    );
 
     if (valor) {
       cambios[campo] =
@@ -217,6 +217,9 @@ export async function POST(
   request: NextRequest
 ) {
   try {
+    const supabaseAdmin =
+      getSupabaseAdmin();
+
     const cuerpo = await request.json();
 
     const registros: RegistroImportacion[] =
@@ -231,7 +234,9 @@ export async function POST(
           error:
             "No se recibieron registros para importar.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -242,29 +247,33 @@ export async function POST(
           error:
             "Solo se permiten hasta 500 registros por importación.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    const { data, error } =
-      await supabaseAdmin
-        .from("bazares")
-        .select(`
-          id,
-          nombre_bazar,
-          telefono,
-          nombre_responsable,
-          direccion,
-          correo,
-          productos,
-          facebook,
-          referencia_1_nombre,
-          referencia_1_telefono,
-          referencia_2_nombre,
-          referencia_2_telefono,
-          estado,
-          observaciones
-        `);
+    const {
+      data,
+      error,
+    } = await supabaseAdmin
+      .from("bazares")
+      .select(`
+        id,
+        nombre_bazar,
+        telefono,
+        nombre_responsable,
+        direccion,
+        correo,
+        productos,
+        facebook,
+        referencia_1_nombre,
+        referencia_1_telefono,
+        referencia_2_nombre,
+        referencia_2_telefono,
+        estado,
+        observaciones
+      `);
 
     if (error) {
       console.error(
@@ -295,11 +304,6 @@ export async function POST(
       mensaje: string;
     }> = [];
 
-    /*
-     * También agregamos a este arreglo los registros
-     * nuevos conforme se crean, para evitar duplicados
-     * dentro del mismo archivo.
-     */
     const listaComparacion = [
       ...bazaresExistentes,
     ];
@@ -322,7 +326,10 @@ export async function POST(
         detalles.push({
           nombre_bazar:
             "Registro sin nombre",
-          resultado: "omitido",
+
+          resultado:
+            "omitido",
+
           mensaje:
             "No contiene nombre del bazar.",
         });
@@ -357,11 +364,15 @@ export async function POST(
             crearCambios(registro);
 
           const {
-            error: errorActualizacion,
+            error:
+              errorActualizacion,
           } = await supabaseAdmin
             .from("bazares")
             .update(cambios)
-            .eq("id", existente.id);
+            .eq(
+              "id",
+              existente.id
+            );
 
           if (errorActualizacion) {
             throw new Error(
@@ -377,8 +388,12 @@ export async function POST(
           actualizados++;
 
           detalles.push({
-            nombre_bazar: nombreBazar,
-            resultado: "actualizado",
+            nombre_bazar:
+              nombreBazar,
+
+            resultado:
+              "actualizado",
+
             mensaje:
               "El bazar ya existía y se actualizó sin borrar sus documentos.",
           });
@@ -387,7 +402,9 @@ export async function POST(
         }
 
         const registroNuevo =
-          prepararRegistroNuevo(registro);
+          prepararRegistroNuevo(
+            registro
+          );
 
         const {
           data: nuevoBazar,
@@ -395,7 +412,9 @@ export async function POST(
         } = await supabaseAdmin
           .from("bazares")
           .insert(registroNuevo)
-          .select("id, nombre_bazar, telefono")
+          .select(
+            "id, nombre_bazar, telefono"
+          )
           .single();
 
         if (
@@ -409,31 +428,45 @@ export async function POST(
         }
 
         listaComparacion.push({
-          id: nuevoBazar.id,
+          id:
+            nuevoBazar.id,
+
           nombre_bazar:
             nuevoBazar.nombre_bazar,
+
           telefono:
             nuevoBazar.telefono,
+
           nombre_responsable:
             registroNuevo.nombre_responsable,
+
           direccion:
             registroNuevo.direccion,
+
           correo:
             registroNuevo.correo,
+
           productos:
             registroNuevo.productos,
+
           facebook:
             registroNuevo.facebook,
+
           referencia_1_nombre:
             registroNuevo.referencia_1_nombre,
+
           referencia_1_telefono:
             registroNuevo.referencia_1_telefono,
+
           referencia_2_nombre:
             registroNuevo.referencia_2_nombre,
+
           referencia_2_telefono:
             registroNuevo.referencia_2_telefono,
+
           estado:
             registroNuevo.estado,
+
           observaciones:
             registroNuevo.observaciones,
         });
@@ -441,12 +474,18 @@ export async function POST(
         nuevos++;
 
         detalles.push({
-          nombre_bazar: nombreBazar,
-          resultado: "nuevo",
+          nombre_bazar:
+            nombreBazar,
+
+          resultado:
+            "nuevo",
+
           mensaje:
             "Bazar agregado correctamente.",
         });
-      } catch (errorRegistro) {
+      } catch (
+        errorRegistro
+      ) {
         errores++;
 
         console.error(
@@ -455,10 +494,15 @@ export async function POST(
         );
 
         detalles.push({
-          nombre_bazar: nombreBazar,
-          resultado: "error",
+          nombre_bazar:
+            nombreBazar,
+
+          resultado:
+            "error",
+
           mensaje:
-            errorRegistro instanceof Error
+            errorRegistro instanceof
+            Error
               ? errorRegistro.message
               : "No fue posible importar el registro.",
         });
@@ -469,10 +513,15 @@ export async function POST(
       success: true,
 
       resumen: {
-        recibidos: registros.length,
+        recibidos:
+          registros.length,
+
         nuevos,
+
         actualizados,
+
         omitidos,
+
         errores,
       },
 
@@ -493,15 +542,36 @@ export async function POST(
             ? error.message
             : "No fue posible completar la importación.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
 
 export async function GET() {
-  return NextResponse.json({
-    success: true,
-    mensaje:
-      "La API de importación de bazares está funcionando.",
-  });
+  try {
+    // Solo comprobamos que la configuración
+    // pueda inicializarse correctamente.
+    getSupabaseAdmin();
+
+    return NextResponse.json({
+      success: true,
+      mensaje:
+        "La API de importación de bazares está funcionando.",
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "La API no está configurada correctamente.",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
 }
