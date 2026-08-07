@@ -1,6 +1,102 @@
 "use client";
 
+import {
+  useEffect,
+  useState,
+} from "react";
+
+type Bazar = {
+  id: string;
+  estado: string | null;
+};
+
 export default function DashboardPage() {
+  const [cargando, setCargando] =
+    useState(true);
+
+  const [totalBazares, setTotalBazares] =
+    useState(0);
+
+  const [bazaresActivos, setBazaresActivos] =
+    useState(0);
+
+  const [
+    bazaresPendientes,
+    setBazaresPendientes,
+  ] = useState(0);
+
+  useEffect(() => {
+    async function cargarResumen() {
+      try {
+        const respuesta = await fetch(
+          "/api/admin/bazares",
+          {
+            cache: "no-store",
+          }
+        );
+
+        const resultado =
+          await respuesta.json();
+
+        if (
+          !respuesta.ok ||
+          !resultado.success
+        ) {
+          throw new Error(
+            resultado.error ||
+              "No fue posible cargar los bazares."
+          );
+        }
+
+        const bazares: Bazar[] =
+          resultado.bazares || [];
+
+        const activos =
+          bazares.filter(
+            (bazar) =>
+              String(
+                bazar.estado || ""
+              )
+                .trim()
+                .toLowerCase() ===
+              "activo"
+          ).length;
+
+        const pendientes =
+          bazares.filter(
+            (bazar) =>
+              String(
+                bazar.estado || ""
+              )
+                .trim()
+                .toLowerCase() ===
+              "pendiente"
+          ).length;
+
+        setTotalBazares(
+          bazares.length
+        );
+
+        setBazaresActivos(
+          activos
+        );
+
+        setBazaresPendientes(
+          pendientes
+        );
+      } catch (error) {
+        console.error(
+          "Error cargando resumen del dashboard:",
+          error
+        );
+      } finally {
+        setCargando(false);
+      }
+    }
+
+    cargarResumen();
+  }, []);
+
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-slate-100 via-white to-blue-50 p-5 md:p-8">
       <div className="mx-auto max-w-7xl">
@@ -45,7 +141,11 @@ export default function DashboardPage() {
         <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <TarjetaResumen
             titulo="Bazares registrados"
-            cantidad="2"
+            cantidad={
+              cargando
+                ? "..."
+                : String(totalBazares)
+            }
             descripcion="Total de registros"
             icono={<IconoUsuarios />}
             claseIcono="bg-blue-600 text-white"
@@ -55,7 +155,11 @@ export default function DashboardPage() {
 
           <TarjetaResumen
             titulo="Bazares activos"
-            cantidad="1"
+            cantidad={
+              cargando
+                ? "..."
+                : String(bazaresActivos)
+            }
             descripcion="Aprobados actualmente"
             icono={<IconoActivo />}
             claseIcono="bg-emerald-600 text-white"
@@ -65,7 +169,13 @@ export default function DashboardPage() {
 
           <TarjetaResumen
             titulo="Pendientes"
-            cantidad="1"
+            cantidad={
+              cargando
+                ? "..."
+                : String(
+                    bazaresPendientes
+                  )
+            }
             descripcion="Esperando revisión"
             icono={<IconoReloj />}
             claseIcono="bg-amber-500 text-white"
@@ -115,7 +225,9 @@ export default function DashboardPage() {
                 </div>
 
                 <span className="rounded-xl bg-amber-100 px-4 py-2 text-3xl font-black text-amber-800">
-                  1
+                  {cargando
+                    ? "..."
+                    : bazaresPendientes}
                 </span>
               </div>
 
@@ -282,7 +394,9 @@ function Actividad({
   claseFondo: string;
 }) {
   return (
-    <div className={`flex items-start gap-4 rounded-2xl p-4 ${claseFondo}`}>
+    <div
+      className={`flex items-start gap-4 rounded-2xl p-4 ${claseFondo}`}
+    >
       <span
         className={`mt-2 h-3 w-3 shrink-0 rounded-full ${clasePunto}`}
       />
@@ -317,7 +431,11 @@ function IconoEstado() {
 function IconoUsuarios() {
   return (
     <IconoBase>
-      <circle cx="9" cy="8" r="3" />
+      <circle
+        cx="9"
+        cy="8"
+        r="3"
+      />
       <path d="M3 20a6 6 0 0 1 12 0" />
       <path d="M16 5a3 3 0 0 1 0 6" />
       <path d="M18 14a5 5 0 0 1 3 6" />
@@ -328,7 +446,11 @@ function IconoUsuarios() {
 function IconoActivo() {
   return (
     <IconoBase>
-      <circle cx="12" cy="12" r="9" />
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+      />
       <path d="m8 12 3 3 5-6" />
     </IconoBase>
   );
@@ -337,7 +459,11 @@ function IconoActivo() {
 function IconoReloj() {
   return (
     <IconoBase>
-      <circle cx="12" cy="12" r="9" />
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+      />
       <path d="M12 7v5l3 2" />
     </IconoBase>
   );
@@ -346,10 +472,34 @@ function IconoReloj() {
 function IconoCuadricula() {
   return (
     <IconoBase>
-      <rect x="3" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="3" width="7" height="7" rx="1" />
-      <rect x="3" y="14" width="7" height="7" rx="1" />
-      <rect x="14" y="14" width="7" height="7" rx="1" />
+      <rect
+        x="3"
+        y="3"
+        width="7"
+        height="7"
+        rx="1"
+      />
+      <rect
+        x="14"
+        y="3"
+        width="7"
+        height="7"
+        rx="1"
+      />
+      <rect
+        x="3"
+        y="14"
+        width="7"
+        height="7"
+        rx="1"
+      />
+      <rect
+        x="14"
+        y="14"
+        width="7"
+        height="7"
+        rx="1"
+      />
     </IconoBase>
   );
 }
@@ -365,7 +515,8 @@ function IconoActividad() {
 function IconoBase({
   children,
 }: {
-  children: React.ReactNode;
+  children:
+    React.ReactNode;
 }) {
   return (
     <svg
