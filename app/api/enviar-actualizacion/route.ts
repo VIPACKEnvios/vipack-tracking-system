@@ -26,7 +26,6 @@ function limpiarTelefono(valor: unknown) {
     return "";
   }
 
-  // Ya viene como 521 + 10 dígitos
   if (
     telefono.startsWith("521") &&
     telefono.length === 13
@@ -34,7 +33,6 @@ function limpiarTelefono(valor: unknown) {
     return telefono;
   }
 
-  // Viene como 52 + 10 dígitos
   if (
     telefono.startsWith("52") &&
     telefono.length === 12
@@ -42,7 +40,6 @@ function limpiarTelefono(valor: unknown) {
     return `521${telefono.slice(2)}`;
   }
 
-  // Solo 10 dígitos
   if (telefono.length === 10) {
     return `521${telefono}`;
   }
@@ -61,12 +58,6 @@ function obtenerEstado(envio: Envio) {
 
 export async function POST(request: Request) {
   try {
-    /*
-     * Variables de entorno.
-     *
-     * Se leen dentro del POST para evitar que
-     * Vercel falle durante npm run build.
-     */
     const twilioAccountSid =
       process.env.TWILIO_ACCOUNT_SID;
 
@@ -82,14 +73,7 @@ export async function POST(request: Request) {
     const supabaseServiceRoleKey =
       process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    /*
-     * Validar configuración de Supabase.
-     */
     if (!supabaseUrl) {
-      console.error(
-        "Falta NEXT_PUBLIC_SUPABASE_URL"
-      );
-
       return NextResponse.json(
         {
           success: false,
@@ -101,10 +85,6 @@ export async function POST(request: Request) {
     }
 
     if (!supabaseServiceRoleKey) {
-      console.error(
-        "Falta SUPABASE_SERVICE_ROLE_KEY"
-      );
-
       return NextResponse.json(
         {
           success: false,
@@ -115,9 +95,6 @@ export async function POST(request: Request) {
       );
     }
 
-    /*
-     * Validar configuración de Twilio.
-     */
     if (!twilioAccountSid) {
       return NextResponse.json(
         {
@@ -151,10 +128,9 @@ export async function POST(request: Request) {
       );
     }
 
-    /*
-     * Crear clientes únicamente cuando
-     * realmente se ejecuta esta API.
-     */
+    // IMPORTANTE:
+    // Supabase y Twilio se crean dentro del POST,
+    // no cuando Vercel carga el archivo.
     const supabase = createClient(
       supabaseUrl,
       supabaseServiceRoleKey,
@@ -171,9 +147,6 @@ export async function POST(request: Request) {
       twilioAuthToken
     );
 
-    /*
-     * Leer ID del envío.
-     */
     const cuerpo = await request.json();
 
     const id = cuerpo?.id;
@@ -188,9 +161,6 @@ export async function POST(request: Request) {
       );
     }
 
-    /*
-     * Buscar envío.
-     */
     const {
       data: envioData,
       error: errorEnvio,
@@ -227,15 +197,6 @@ export async function POST(request: Request) {
     const estadoActual =
       obtenerEstado(envio);
 
-    console.log("DEBUG TELEFONO:", {
-      original: envio.telefono_whatsapp,
-      limpio: telefono,
-      destino: `whatsapp:+${telefono}`,
-    });
-
-    /*
-     * Validación para WhatsApp México.
-     */
     if (
       !telefono ||
       telefono.length !== 13 ||
@@ -264,9 +225,6 @@ export async function POST(request: Request) {
       );
     }
 
-    /*
-     * Enviar plantilla de WhatsApp.
-     */
     const message =
       await client.messages.create({
         from: fromWhatsApp,
@@ -308,9 +266,6 @@ export async function POST(request: Request) {
       from: message.from,
     });
 
-    /*
-     * Guardar actualización en Supabase.
-     */
     const {
       error: updateError,
     } = await supabase
@@ -333,19 +288,18 @@ export async function POST(request: Request) {
         updateError
       );
 
-      /*
-       * El WhatsApp ya salió.
-       * No devolvemos error total para no
-       * provocar un segundo envío accidental.
-       */
       return NextResponse.json({
         success: true,
+
         warning:
           "El WhatsApp fue enviado, pero no se pudo guardar la actualización en Supabase.",
+
         sid: message.sid,
         status: message.status,
+
         telefono:
           `whatsapp:+${telefono}`,
+
         estado: estadoActual,
       });
     }
