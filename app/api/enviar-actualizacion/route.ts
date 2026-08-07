@@ -2,32 +2,47 @@ import { NextResponse } from "next/server";
 import twilio from "twilio";
 import { createClient } from "@supabase/supabase-js";
 
-const client = twilio(
-  process.env.TWILIO_ACCOUNT_SID!,
-  process.env.TWILIO_AUTH_TOKEN!
-);
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+type Envio = {
+  id: string | number;
+  cliente?: string | null;
+  telefono_whatsapp?: string | null;
+  pedido?: string | null;
+  guia?: string | null;
+  paqueteria?: string | null;
+  estado_17track?: string | null;
+  estatus_actual?: string | null;
+  ultimo_estado_enviado?: string | null;
+};
 
-function limpiarTelefono(to: any) {
-  let telefono = String(to || "").replace(/\D/g, "").trim();
+function limpiarTelefono(valor: unknown) {
+  const telefono = String(valor || "")
+    .replace(/\D/g, "")
+    .trim();
 
-  if (!telefono) return "";
+  if (!telefono) {
+    return "";
+  }
 
-  // Correcto WhatsApp México: 521 + 10 dígitos
-  if (telefono.startsWith("521") && telefono.length === 13) {
+  // Ya viene como 521 + 10 dígitos
+  if (
+    telefono.startsWith("521") &&
+    telefono.length === 13
+  ) {
     return telefono;
   }
 
-  // Si viene como 52 + 10 dígitos, convertir a 521 + 10 dígitos
-  if (telefono.startsWith("52") && telefono.length === 12) {
+  // Viene como 52 + 10 dígitos
+  if (
+    telefono.startsWith("52") &&
+    telefono.length === 12
+  ) {
     return `521${telefono.slice(2)}`;
   }
 
-  // Si viene solo 10 dígitos
+  // Solo 10 dígitos
   if (telefono.length === 10) {
     return `521${telefono}`;
   }
@@ -35,7 +50,7 @@ function limpiarTelefono(to: any) {
   return telefono;
 }
 
-function obtenerEstado(envio: any) {
+function obtenerEstado(envio: Envio) {
   return String(
     envio.estado_17track ||
       envio.estatus_actual ||
@@ -44,88 +59,173 @@ function obtenerEstado(envio: any) {
   ).trim();
 }
 
-function mensajePorEstado(envio: any) {
-  const estadoActual = obtenerEstado(envio);
-  const estado = estadoActual.toLowerCase();
-
-  let textoEstado = "tu envío ha sido actualizado.";
-
-  if (estado.includes("entregado") || estado.includes("delivered")) {
-    textoEstado = "tu paquete aparece como ENTREGADO ✅";
-  } else if (
-    estado.includes("transito") ||
-    estado.includes("tránsito") ||
-    estado.includes("in transit")
-  ) {
-    textoEstado = "tu paquete ya va EN TRÁNSITO 🚚";
-  } else if (
-    estado.includes("enviado") ||
-    estado.includes("shipped") ||
-    estado.includes("picked")
-  ) {
-    textoEstado = "tu paquete ya fue ENVIADO 📦";
-  } else if (estado.includes("pendiente")) {
-    textoEstado = "tu guía sigue en estado PENDIENTE ⏳";
-  }
-
-  return `📦 VIPACK Envíos
-
-Hola ${envio.cliente || "cliente"} 👋
-
-Te compartimos una actualización de tu envío:
-
-${textoEstado}
-
-🔢 Guía: ${envio.guia || "sin guía"}
-🚚 Paquetería: ${envio.paqueteria || "sin paquetería"}
-📍 Estado actual: ${estadoActual || "sin estado"}
-
-Gracias por confiar en VIPACK 💜`;
-}
-
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const { id } = await req.json();
+    /*
+     * Variables de entorno.
+     *
+     * Se leen dentro del POST para evitar que
+     * Vercel falle durante npm run build.
+     */
+    const twilioAccountSid =
+      process.env.TWILIO_ACCOUNT_SID;
 
-    if (!id) {
-      return NextResponse.json(
-        { success: false, error: "Falta el ID del envío" },
-        { status: 400 }
+    const twilioAuthToken =
+      process.env.TWILIO_AUTH_TOKEN;
+
+    const fromWhatsApp =
+      process.env.TWILIO_WHATSAPP_FROM;
+
+    const supabaseUrl =
+      process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+    const supabaseServiceRoleKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    /*
+     * Validar configuración de Supabase.
+     */
+    if (!supabaseUrl) {
+      console.error(
+        "Falta NEXT_PUBLIC_SUPABASE_URL"
       );
-    }
 
-    const fromWhatsApp = process.env.TWILIO_WHATSAPP_FROM;
-
-    if (!fromWhatsApp) {
       return NextResponse.json(
         {
           success: false,
-          error: "Falta configurar TWILIO_WHATSAPP_FROM en .env.local",
+          error:
+            "Falta configurar NEXT_PUBLIC_SUPABASE_URL.",
         },
         { status: 500 }
       );
     }
 
-    const { data: envio, error } = await supabase
+    if (!supabaseServiceRoleKey) {
+      console.error(
+        "Falta SUPABASE_SERVICE_ROLE_KEY"
+      );
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Falta configurar SUPABASE_SERVICE_ROLE_KEY.",
+        },
+        { status: 500 }
+      );
+    }
+
+    /*
+     * Validar configuración de Twilio.
+     */
+    if (!twilioAccountSid) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Falta configurar TWILIO_ACCOUNT_SID.",
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!twilioAuthToken) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Falta configurar TWILIO_AUTH_TOKEN.",
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!fromWhatsApp) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Falta configurar TWILIO_WHATSAPP_FROM.",
+        },
+        { status: 500 }
+      );
+    }
+
+    /*
+     * Crear clientes únicamente cuando
+     * realmente se ejecuta esta API.
+     */
+    const supabase = createClient(
+      supabaseUrl,
+      supabaseServiceRoleKey,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+
+    const client = twilio(
+      twilioAccountSid,
+      twilioAuthToken
+    );
+
+    /*
+     * Leer ID del envío.
+     */
+    const cuerpo = await request.json();
+
+    const id = cuerpo?.id;
+
+    if (!id) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Falta el ID del envío.",
+        },
+        { status: 400 }
+      );
+    }
+
+    /*
+     * Buscar envío.
+     */
+    const {
+      data: envioData,
+      error: errorEnvio,
+    } = await supabase
       .from("envios")
       .select("*")
       .eq("id", id)
       .single();
 
-    if (error || !envio) {
+    if (errorEnvio || !envioData) {
+      console.error(
+        "Error consultando envío:",
+        errorEnvio
+      );
+
       return NextResponse.json(
         {
           success: false,
-          error: "No se encontró el envío",
-          detalle: error?.message || null,
+          error: "No se encontró el envío.",
+          detalle:
+            errorEnvio?.message || null,
           id,
         },
         { status: 404 }
       );
     }
 
-    const telefono = limpiarTelefono(envio.telefono_whatsapp);
-    const estadoActual = obtenerEstado(envio);
+    const envio = envioData as Envio;
+
+    const telefono = limpiarTelefono(
+      envio.telefono_whatsapp
+    );
+
+    const estadoActual =
+      obtenerEstado(envio);
 
     console.log("DEBUG TELEFONO:", {
       original: envio.telefono_whatsapp,
@@ -133,11 +233,20 @@ export async function POST(req: Request) {
       destino: `whatsapp:+${telefono}`,
     });
 
-    if (!telefono || telefono.length !== 13 || !telefono.startsWith("521")) {
+    /*
+     * Validación para WhatsApp México.
+     */
+    if (
+      !telefono ||
+      telefono.length !== 13 ||
+      !telefono.startsWith("521")
+    ) {
       return NextResponse.json(
         {
           success: false,
-          error: `Teléfono inválido para WhatsApp México: ${envio.telefono_whatsapp}`,
+          error: `Teléfono inválido para WhatsApp México: ${
+            envio.telefono_whatsapp || ""
+          }`,
           telefono_limpio: telefono,
         },
         { status: 400 }
@@ -149,26 +258,48 @@ export async function POST(req: Request) {
         {
           success: false,
           error:
-            "El envío no tiene estado_17track. Escribe Enviado, En tránsito o Entregado antes de mandar.",
+            "El envío no tiene un estado para enviar.",
         },
         { status: 400 }
       );
     }
 
-    const mensaje = mensajePorEstado(envio);
+    /*
+     * Enviar plantilla de WhatsApp.
+     */
+    const message =
+      await client.messages.create({
+        from: fromWhatsApp,
 
-    const message = await client.messages.create({
-  from: fromWhatsApp,
-  to: `whatsapp:+${telefono}`,
-  contentSid: "HX23277e717da845d5b292d5c196900566",
-  contentVariables: JSON.stringify({
-    "1": String(envio.cliente || "Cliente"),
-    "2": String(envio.pedido || "Sin pedido"),
-    "3": String(envio.paqueteria || "Sin paquetería"),
-    "4": String(envio.guia || "Sin guía"),
-    "5": String(estadoActual || "Sin estado"),
-  }),
-});
+        to: `whatsapp:+${telefono}`,
+
+        contentSid:
+          "HX23277e717da845d5b292d5c196900566",
+
+        contentVariables:
+          JSON.stringify({
+            "1": String(
+              envio.cliente || "Cliente"
+            ),
+
+            "2": String(
+              envio.pedido || "Sin pedido"
+            ),
+
+            "3": String(
+              envio.paqueteria ||
+                "Sin paquetería"
+            ),
+
+            "4": String(
+              envio.guia || "Sin guía"
+            ),
+
+            "5": String(
+              estadoActual || "Sin estado"
+            ),
+          }),
+      });
 
     console.log("TWILIO RESPUESTA:", {
       sid: message.sid,
@@ -177,37 +308,77 @@ export async function POST(req: Request) {
       from: message.from,
     });
 
-    const { error: updateError } = await supabase
+    /*
+     * Guardar actualización en Supabase.
+     */
+    const {
+      error: updateError,
+    } = await supabase
       .from("envios")
       .update({
-        ultimo_whatsapp: `Actualización enviada: ${estadoActual}`,
-        ultimo_estado_enviado: estadoActual,
-        fecha_envio: new Date().toISOString(),
+        ultimo_whatsapp:
+          `Actualización enviada: ${estadoActual}`,
+
+        ultimo_estado_enviado:
+          estadoActual,
+
+        fecha_envio:
+          new Date().toISOString(),
       })
       .eq("id", id);
 
     if (updateError) {
-      console.error("Error actualizando Supabase:", updateError);
+      console.error(
+        "Error actualizando Supabase:",
+        updateError
+      );
+
+      /*
+       * El WhatsApp ya salió.
+       * No devolvemos error total para no
+       * provocar un segundo envío accidental.
+       */
+      return NextResponse.json({
+        success: true,
+        warning:
+          "El WhatsApp fue enviado, pero no se pudo guardar la actualización en Supabase.",
+        sid: message.sid,
+        status: message.status,
+        telefono:
+          `whatsapp:+${telefono}`,
+        estado: estadoActual,
+      });
     }
 
     return NextResponse.json({
       success: true,
-      message: "WhatsApp de actualización enviado correctamente",
+
+      message:
+        "WhatsApp de actualización enviado correctamente.",
+
       sid: message.sid,
       status: message.status,
-      telefono: `whatsapp:+${telefono}`,
+
+      telefono:
+        `whatsapp:+${telefono}`,
+
       estado: estadoActual,
     });
-  } catch (error: any) {
-    console.error("Error enviar actualización:", error);
+  } catch (error: unknown) {
+    console.error(
+      "Error enviar actualización:",
+      error
+    );
+
+    const mensaje =
+      error instanceof Error
+        ? error.message
+        : "Error desconocido.";
 
     return NextResponse.json(
       {
         success: false,
-        error: error.message,
-        code: error.code || null,
-        moreInfo: error.moreInfo || null,
-        status: error.status || null,
+        error: mensaje,
       },
       { status: 500 }
     );
