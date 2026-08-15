@@ -309,6 +309,46 @@ export default function GuiasPage() {
       }
 
       try {
+        /*
+         * IMPORTANTE PARA EL HISTORIAL:
+         * Primero guardamos el envío en Supabase.
+         * Después intentamos enviar WhatsApp.
+         *
+         * Así nunca tendremos un WhatsApp enviado
+         * sin que exista su registro histórico.
+         */
+        const fechaOriginal = new Date().toISOString();
+
+        const { data: envioCreado, error: insertError } = await supabase
+          .from("envios")
+          .insert([
+            {
+              cliente: cliente.cliente,
+              telefono_whatsapp: telefonoLimpio,
+              pedido: cliente.pedido,
+              guia: guiaLimpia,
+              paqueteria: cliente.paqueteria,
+              pdf: pdfUrl,
+              estatus_actual: "Pendiente de WhatsApp",
+              ultimo_whatsapp: "",
+              ultimo_estado_enviado: "",
+              entregado: false,
+              fecha_envio: fechaOriginal,
+              fecha_ultima_revision: fechaOriginal,
+            },
+          ])
+          .select("id")
+          .single();
+
+        if (insertError || !envioCreado) {
+          nuevosLogs.push(
+            `❌ NO se envió a ${cliente.cliente}: primero debe guardarse el historial en Supabase. ${
+              insertError?.message || "No se obtuvo el ID del envío"
+            }`
+          );
+          continue;
+        }
+
         const response = await fetch("/api/send-whatsapp", {
           method: "POST",
           headers: {
@@ -325,49 +365,42 @@ export default function GuiasPage() {
         });
 
         const data = await response.json();
+        const fechaRevision = new Date().toISOString();
 
         if (data.success) {
           cliente.enviado = "SI";
 
-          const { error: insertError } = await supabase.from("envios").insert([
-            {
-              cliente: cliente.cliente,
-              telefono_whatsapp: telefonoLimpio,
-              pedido: cliente.pedido,
-              guia: guiaLimpia,
-              paqueteria: cliente.paqueteria,
-              pdf: pdfUrl,
+          const { error: updateError } = await supabase
+            .from("envios")
+            .update({
               estatus_actual: "Enviado",
               ultimo_whatsapp: "Guía enviada",
-              entregado: false,
-              fecha_envio: new Date().toISOString(),
-            },
-          ]);
+              fecha_ultima_revision: fechaRevision,
+            })
+            .eq("id", envioCreado.id);
 
-          if (insertError) {
+          if (updateError) {
             nuevosLogs.push(
-              `⚠️ WhatsApp enviado a ${cliente.cliente}, pero NO se guardó en Supabase: ${insertError.message}`
+              `⚠️ WhatsApp enviado a ${cliente.cliente}. El historial existe, pero falló la actualización del estado: ${updateError.message}`
             );
           } else {
-            nuevosLogs.push(`✅ WhatsApp enviado y guardado: ${cliente.cliente}`);
+            nuevosLogs.push(
+              `✅ WhatsApp enviado y guardado: ${cliente.cliente} (ID ${envioCreado.id})`
+            );
           }
         } else {
-          await supabase.from("envios").insert([
-            {
-              cliente: cliente.cliente,
-              telefono_whatsapp: telefonoLimpio,
-              pedido: cliente.pedido,
-              guia: guiaLimpia,
-              paqueteria: cliente.paqueteria,
-              pdf: pdfUrl,
+          await supabase
+            .from("envios")
+            .update({
               estatus_actual: "Error WhatsApp",
               ultimo_whatsapp: data.error || "Error al enviar guía",
-              entregado: false,
-              fecha_envio: new Date().toISOString(),
-            },
-          ]);
+              fecha_ultima_revision: fechaRevision,
+            })
+            .eq("id", envioCreado.id);
 
-          nuevosLogs.push(`❌ Error con ${cliente.cliente}: ${data.error}`);
+          nuevosLogs.push(
+            `❌ Error con ${cliente.cliente}: ${data.error || "Error al enviar WhatsApp"}. El registro se conservó en el historial.`
+          );
         }
       } catch (error: any) {
         nuevosLogs.push(

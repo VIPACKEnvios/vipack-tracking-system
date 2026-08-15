@@ -678,7 +678,12 @@ export async function POST(
     }
 
     /*
-     * Eliminar registro incompleto.
+     * IMPORTANTE:
+     * Nunca eliminamos el registro de Supabase.
+     *
+     * Si algo falla después de crear el registro,
+     * lo conservamos para mantener el historial
+     * y lo marcamos para revisión.
      */
     if (
       supabaseAdmin &&
@@ -686,22 +691,28 @@ export async function POST(
     ) {
       const {
         error:
-          errorEliminar,
+          errorMarcar,
       } =
         await supabaseAdmin
           .from("bazares")
-          .delete()
+          .update({
+            estado:
+              "error_registro",
+
+            fecha_actualizacion:
+              new Date().toISOString(),
+          })
           .eq(
             "id",
             registroCreadoId
           );
 
       if (
-        errorEliminar
+        errorMarcar
       ) {
         console.error(
-          "No fue posible eliminar el registro incompleto:",
-          errorEliminar
+          "No fue posible marcar el registro incompleto para revisión:",
+          errorMarcar
         );
       }
     }

@@ -921,3 +921,4 @@ function ResultadoBadge({
     </span>
   );
 }
+2

@@ -44,20 +44,6 @@ export default function EnviosPage() {
     );
   };
 
-  const entregadoMasDe2Dias = (envio: any) => {
-    const estado = textoNormalizado(envio.estatus_actual);
-
-    if (estado !== "Entregado") return false;
-    if (!envio.fecha_ultima_revision) return false;
-
-    const fecha = new Date(envio.fecha_ultima_revision);
-    const ahora = new Date();
-    const diferenciaDias =
-      (ahora.getTime() - fecha.getTime()) / (1000 * 60 * 60 * 24);
-
-    return diferenciaDias > 2;
-  };
-
   const cargarEnvios = async () => {
     setCargando(true);
 
@@ -83,7 +69,6 @@ export default function EnviosPage() {
     const estado = textoNormalizado(envio.estatus_actual);
 
     if (!mostrarEntregados && estado === "Entregado") return false;
-    if (entregadoMasDe2Dias(envio)) return false;
 
     const textoBusqueda = busqueda.toLowerCase().trim();
 
@@ -97,6 +82,7 @@ export default function EnviosPage() {
       ${envio.guia}
       ${envio.paqueteria}
       ${envio.estatus_actual}
+      ${envio.fecha_envio}
     `.toLowerCase();
 
     return contenido.includes(textoBusqueda);
@@ -408,7 +394,7 @@ export default function EnviosPage() {
               Tabla de envíos VIPACK
             </h1>
             <p style={{ marginTop: "5px", color: "#555" }}>
-              Buscador, productividad y seguimiento manual con WhatsApp.
+              Buscador, historial completo, productividad y seguimiento manual con WhatsApp.
             </p>
           </div>
 
@@ -506,7 +492,7 @@ export default function EnviosPage() {
               checked={mostrarEntregados}
               onChange={(e) => setMostrarEntregados(e.target.checked)}
             />
-            Mostrar entregados recientes
+            Mostrar historial de entregados
           </label>
 
           <button
@@ -664,7 +650,7 @@ export default function EnviosPage() {
         )}
 
         <p style={{ color: "#555", fontWeight: "bold" }}>
-          Nota: los entregados con más de 2 días se ocultan automáticamente.
+          Nota: activa "Mostrar historial de entregados" para ver todos los envíos entregados, sin límite de antigüedad.
         </p>
 
         {cargando ? (
@@ -687,6 +673,7 @@ export default function EnviosPage() {
                   <th style={th}>Guía</th>
                   <th style={th}>Paquetería</th>
                   <th style={th}>Estado</th>
+                  <th style={th}>Fecha envío</th>
                   <th style={th}>Último WhatsApp</th>
                   <th style={th}>Última actualización</th>
                   <th style={th}>Acciones</th>
@@ -720,6 +707,16 @@ export default function EnviosPage() {
                         >
                           {estadoActual}
                         </span>
+                      </td>
+
+                      <td style={td}>
+                        {envio.fecha_envio
+                          ? new Date(envio.fecha_envio).toLocaleDateString("es-MX", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                            })
+                          : "Sin fecha"}
                       </td>
 
                       <td style={td}>{envio.ultimo_whatsapp}</td>
