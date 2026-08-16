@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export function middleware(request: NextRequest) {
-  const auth =
-    request.cookies.get("vipack-auth")?.value;
-
+export function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   /*
-   * PÁGINAS PÚBLICAS
+   * RUTAS PÚBLICAS
    */
   const isPublicPage =
     path === "/login" ||
@@ -18,34 +15,28 @@ export function middleware(request: NextRequest) {
   /*
    * APIs PÚBLICAS
    *
-   * IMPORTANTE:
-   * TrackingMore necesita entrar al webhook
-   * sin tener la cookie vipack-auth.
-   *
-   * La seguridad del webhook se controla con:
-   * TRACKINGMORE_WEBHOOK_SECRET
+   * TrackingMore debe poder entrar sin cookie.
+   * El webhook se protege con
+   * TRACKINGMORE_WEBHOOK_SECRET.
    */
   const isPublicApi =
     path === "/api/login" ||
     path.startsWith("/api/registro-bazar") ||
     path.startsWith("/api/consulta-bazares") ||
-    path === "/api/trackingmore/webhook";
+    path.startsWith("/api/trackingmore/");
 
-  /*
-   * Permitir páginas y APIs públicas.
-   */
   if (isPublicPage || isPublicApi) {
     return NextResponse.next();
   }
 
+  const auth =
+    request.cookies.get("vipack-auth")?.value;
+
   /*
-   * Para APIs privadas sin sesión,
-   * devolver 401 en vez de redirigir al login.
+   * APIs privadas:
+   * devolver 401, nunca redirigir.
    */
-  if (
-    path.startsWith("/api/") &&
-    !auth
-  ) {
+  if (path.startsWith("/api/") && !auth) {
     return NextResponse.json(
       {
         success: false,
@@ -58,8 +49,8 @@ export function middleware(request: NextRequest) {
   }
 
   /*
-   * Para páginas privadas sin sesión,
-   * enviar al login.
+   * Páginas privadas:
+   * mandar a login.
    */
   if (!auth) {
     return NextResponse.redirect(
