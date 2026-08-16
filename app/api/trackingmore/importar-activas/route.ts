@@ -1,26 +1,18 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-function obtenerCourier(paqueteria: string) {
-  const p = String(paqueteria || "").toUpperCase();
-
-  if (p.includes("ESTAFETA")) return "estafetausa";
-  if (p.includes("DHL")) return "dhl";
-
-  return null;
-}
+const GUIAS_A_IMPORTAR = [
+  "0719047999",
+  "3147524939",
+  "1521564080",
+  "3859051942",
+  "3279305628",
+];
 
 export async function POST(request: Request) {
   try {
-    // Protección para que nadie pueda ejecutar la importación públicamente
     const url = new URL(request.url);
     const secret = url.searchParams.get("secret");
 
@@ -47,53 +39,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // Buscar únicamente envíos que todavía pueden tener movimiento
-    const { data: envios, error } = await supabase
-      .from("envios")
-      .select("id, guia, paqueteria, estatus_actual")
-      .in("estatus_actual", [
-        "Enviado",
-        "Recolectado",
-        "En tránsito",
-        "En reparto",
-        "En espera",
-      ])
-      .order("id", { ascending: false });
+    const resultados = [];
 
-    if (error) {
-      throw error;
-    }
-
-    const resultados: any[] = [];
-
-    for (const envio of envios || []) {
-      const guia = String(envio.guia || "")
-        .replace(/\s+/g, "")
-        .trim();
-
-      const courier = obtenerCourier(envio.paqueteria);
-
-      if (!guia) {
-        resultados.push({
-          id: envio.id,
-          estado: "omitida",
-          motivo: "Sin guía",
-        });
-
-        continue;
-      }
-
-      if (!courier) {
-        resultados.push({
-          id: envio.id,
-          guia,
-          estado: "omitida",
-          motivo: `Paquetería no compatible: ${envio.paqueteria}`,
-        });
-
-        continue;
-      }
-
+    for (const guia of GUIAS_A_IMPORTAR) {
       try {
         const response = await fetch(
           "https://api.trackingmore.com/v4/trackings/create",
@@ -107,7 +55,7 @@ export async function POST(request: Request) {
             },
             body: JSON.stringify({
               tracking_number: guia,
-              courier_code: courier,
+              courier_code: "estafetausa",
               order_number: guia,
             }),
           }
@@ -115,10 +63,6 @@ export async function POST(request: Request) {
 
         const data = await response.json();
 
-        /*
-         * TrackingMore puede responder que la guía ya existe.
-         * No lo consideramos un problema para esta importación.
-         */
         const mensaje = String(
           data?.meta?.message || ""
         ).toLowerCase();
@@ -127,66 +71,62 @@ export async function POST(request: Request) {
           mensaje.includes("exist") ||
           mensaje.includes("duplicate");
 
-        if (response.ok || data?.meta?.code === 200) {
+        if (
+          response.ok ||
+          data?.meta?.code === 200
+        ) {
           resultados.push({
-            id: envio.id,
             guia,
-            courier,
             estado: "registrada",
+            respuesta: data?.meta?.message,
           });
         } else if (duplicada) {
           resultados.push({
-            id: envio.id,
             guia,
-            courier,
             estado: "ya_existia",
           });
         } else {
           resultados.push({
-            id: envio.id,
             guia,
-            courier,
             estado: "error",
             respuesta: data,
           });
         }
-      } catch (trackingError: any) {
+      } catch (error: any) {
         resultados.push({
-          id: envio.id,
           guia,
-          courier,
           estado: "error",
           error:
-            trackingError?.message ||
+            error?.message ||
             "Error desconocido",
         });
       }
     }
 
-    const resumen = {
-      total: resultados.length,
-      registradas: resultados.filter(
-        (r) => r.estado === "registrada"
-      ).length,
-      ya_existian: resultados.filter(
-        (r) => r.estado === "ya_existia"
-      ).length,
-      omitidas: resultados.filter(
-        (r) => r.estado === "omitida"
-      ).length,
-      errores: resultados.filter(
-        (r) => r.estado === "error"
-      ).length,
-    };
-
     return NextResponse.json({
       success: true,
-      resumen,
+
+      resumen: {
+        total: resultados.length,
+
+        registradas: resultados.filter(
+          (r) => r.estado === "registrada"
+        ).length,
+
+        ya_existian: resultados.filter(
+          (r) => r.estado === "ya_existia"
+        ).length,
+
+        errores: resultados.filter(
+          (r) => r.estado === "error"
+        ).length,
+      },
+
       resultados,
     });
   } catch (error: any) {
     console.error(
-      "Error importando guías a TrackingMore:",
+      "Error importando guías:",
       error
     );
 
