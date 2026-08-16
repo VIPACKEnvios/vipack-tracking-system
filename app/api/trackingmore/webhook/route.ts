@@ -4,6 +4,7 @@ import twilio from "twilio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const ACTUALIZACION_TEMPLATE =
   "HX23277e717da845d5b292d5c196900566";
@@ -397,10 +398,31 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
-  return NextResponse.json({
-    success: true,
-    servicio: "VIPACK TrackingMore Webhook",
-    estado: "activo",
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      Allow: "GET, POST, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+      "Cache-Control": "no-store",
+    },
   });
+}
+
+export async function GET() {
+  return NextResponse.json(
+    {
+      success: true,
+      servicio: "VIPACK TrackingMore Webhook",
+      estado: "activo",
+      metodos: ["GET", "POST", "OPTIONS"],
+    },
+    {
+      headers: {
+        Allow: "GET, POST, OPTIONS",
+        "Cache-Control": "no-store",
+      },
+    }
+  );
 }
