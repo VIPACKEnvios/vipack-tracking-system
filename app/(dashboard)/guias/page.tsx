@@ -349,6 +349,66 @@ export default function GuiasPage() {
           continue;
         }
 
+        /*
+         * REGISTRAR AUTOMÁTICAMENTE EN TRACKINGMORE
+         *
+         * Por ahora solo usamos TrackingMore para:
+         * - ESTAFETA
+         * - DHL
+         *
+         * Si TrackingMore falla, NO borramos el envío
+         * ni detenemos el envío de WhatsApp.
+         */
+        const paqueteriaTracking = String(
+          cliente.paqueteria || ""
+        ).toUpperCase();
+
+        const usarTrackingMore =
+          paqueteriaTracking.includes("ESTAFETA") ||
+          paqueteriaTracking.includes("DHL");
+
+        if (usarTrackingMore) {
+          try {
+            const trackingResponse = await fetch(
+              "/api/trackingmore/register",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  guia: guiaLimpia,
+                  paqueteria: cliente.paqueteria,
+                }),
+              }
+            );
+
+            const trackingData =
+              await trackingResponse.json();
+
+            if (trackingData.success) {
+              nuevosLogs.push(
+                `📍 TrackingMore registrado: ${cliente.cliente} - ${guiaLimpia}`
+              );
+            } else {
+              nuevosLogs.push(
+                `⚠️ El envío quedó guardado, pero TrackingMore no pudo registrarlo: ${
+                  trackingData.error ||
+                  trackingData.meta?.message ||
+                  "Error desconocido"
+                }`
+              );
+            }
+          } catch (trackingError: any) {
+            nuevosLogs.push(
+              `⚠️ El envío quedó guardado, pero falló la conexión con TrackingMore: ${
+                trackingError?.message ||
+                "Error desconocido"
+              }`
+            );
+          }
+        }
+
         const response = await fetch("/api/send-whatsapp", {
           method: "POST",
           headers: {
