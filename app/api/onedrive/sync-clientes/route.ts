@@ -192,6 +192,7 @@ export async function POST() {
         .select(
           "id, id_cliente, nombre, carpeta_cliente, onedrive_folder_id"
         )
+        .eq("activo", true)
         .order("id_cliente", {
           ascending: true,
         });
