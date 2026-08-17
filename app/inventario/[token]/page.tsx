@@ -372,22 +372,26 @@ export default function InventarioClientePage() {
           onClick={cerrarGaleria}
         >
           <div
-            className="grid h-[100dvh] w-full grid-rows-[64px_minmax(0,1fr)_52px] sm:grid-rows-[72px_minmax(0,1fr)_56px]"
+            className="mx-auto grid h-[100dvh] w-full max-w-[1600px] grid-rows-[64px_minmax(0,1fr)_48px] sm:grid-rows-[72px_minmax(0,1fr)_52px]"
             onClick={(event) => event.stopPropagation()}
             onTouchStart={(event) => {
-              inicioTouchX.current = event.touches[0]?.clientX ?? null;
+              inicioTouchX.current =
+                event.touches[0]?.clientX ?? null;
             }}
             onTouchEnd={(event) => {
               if (inicioTouchX.current === null) return;
 
-              const fin = event.changedTouches[0]?.clientX;
+              const fin =
+                event.changedTouches[0]?.clientX;
 
               if (typeof fin !== "number") {
                 inicioTouchX.current = null;
                 return;
               }
 
-              const diferencia = fin - inicioTouchX.current;
+              const diferencia =
+                fin - inicioTouchX.current;
+
               inicioTouchX.current = null;
 
               if (Math.abs(diferencia) < 50) return;
@@ -399,11 +403,12 @@ export default function InventarioClientePage() {
               }
             }}
           >
-            <div className="flex items-center justify-between gap-3 px-4 pt-[env(safe-area-inset-top)] text-white sm:px-6">
+            <div className="flex items-center justify-between gap-3 px-4 pt-[max(8px,env(safe-area-inset-top))] text-white sm:px-8">
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold sm:text-base">
                   {imagenSeleccionada.nombre}
                 </p>
+
                 <p className="mt-0.5 text-xs text-white/65">
                   {fotoActiva + 1} de {imagenes.length}
                 </p>
@@ -419,12 +424,12 @@ export default function InventarioClientePage() {
               </button>
             </div>
 
-            <div className="relative min-h-0 overflow-hidden px-3 py-3 sm:px-20 sm:py-4">
-              <div className="flex h-full w-full items-center justify-center overflow-hidden">
+            <div className="relative min-h-0 overflow-hidden px-2 py-2 sm:px-6 sm:py-3 lg:px-20">
+              <div className="flex h-full w-full items-center justify-center">
                 <img
                   src={srcImagen(imagenSeleccionada)}
                   alt={imagenSeleccionada.nombre}
-                  className="max-h-[calc(100dvh-150px)] max-w-full select-none rounded-lg object-contain shadow-2xl sm:max-h-[calc(100dvh-160px)] sm:rounded-xl"
+                  className="max-h-full max-w-full select-none rounded-lg object-contain shadow-2xl sm:rounded-xl"
                   draggable={false}
                 />
               </div>
@@ -434,7 +439,7 @@ export default function InventarioClientePage() {
                   <button
                     type="button"
                     onClick={fotoAnterior}
-                    className="absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-2xl text-white backdrop-blur transition active:scale-95 hover:bg-black/75 sm:left-5 sm:h-14 sm:w-14 sm:text-3xl"
+                    className="absolute left-2 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-2xl text-white backdrop-blur transition active:scale-95 hover:bg-black/80 sm:left-4 sm:h-12 sm:w-12 sm:text-3xl lg:left-8"
                     aria-label="Foto anterior"
                   >
                     ‹
@@ -443,7 +448,7 @@ export default function InventarioClientePage() {
                   <button
                     type="button"
                     onClick={fotoSiguiente}
-                    className="absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-2xl text-white backdrop-blur transition active:scale-95 hover:bg-black/75 sm:right-5 sm:h-14 sm:w-14 sm:text-3xl"
+                    className="absolute right-2 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-2xl text-white backdrop-blur transition active:scale-95 hover:bg-black/80 sm:right-4 sm:h-12 sm:w-12 sm:text-3xl lg:right-8"
                     aria-label="Foto siguiente"
                   >
                     ›
@@ -452,10 +457,20 @@ export default function InventarioClientePage() {
               )}
             </div>
 
-            <div className="flex items-center justify-center gap-3 border-t border-white/10 bg-black/30 px-4 pb-[env(safe-area-inset-bottom)] text-xs text-white/65 sm:text-sm">
-              <span>{formatearFecha(imagenSeleccionada.modificado)}</span>
+            <div className="flex items-center justify-center gap-3 border-t border-white/10 bg-black/30 px-4 pb-[max(8px,env(safe-area-inset-bottom))] text-xs text-white/65 sm:text-sm">
+              <span>
+                {formatearFecha(
+                  imagenSeleccionada.modificado
+                )}
+              </span>
+
               <span>•</span>
-              <span>{formatearTamaño(imagenSeleccionada.tamaño)}</span>
+
+              <span>
+                {formatearTamaño(
+                  imagenSeleccionada.tamaño
+                )}
+              </span>
             </div>
           </div>
         </div>
