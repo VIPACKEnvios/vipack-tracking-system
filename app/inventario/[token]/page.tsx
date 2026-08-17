@@ -49,6 +49,43 @@ function formatearTamaño(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function obtenerClaveMes(fecha: string | null) {
+  if (!fecha) return null;
+
+  const date = new Date(fecha);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return `${date.getFullYear()}-${String(
+    date.getMonth() + 1
+  ).padStart(2, "0")}`;
+}
+
+function formatearMes(clave: string) {
+  const [year, month] = clave
+    .split("-")
+    .map(Number);
+
+  const date = new Date(
+    year,
+    month - 1,
+    1
+  );
+
+  const texto =
+    new Intl.DateTimeFormat("es-MX", {
+      month: "long",
+      year: "numeric",
+    }).format(date);
+
+  return (
+    texto.charAt(0).toUpperCase() +
+    texto.slice(1)
+  );
+}
+
 export default function InventarioClientePage() {
   const params = useParams();
 
@@ -67,6 +104,9 @@ export default function InventarioClientePage() {
 
   const [fotoActiva, setFotoActiva] =
     useState<number | null>(null);
+
+  const [mesActivo, setMesActivo] =
+    useState<string>("");
 
   const inicioTouchX = useRef<number | null>(null);
 
@@ -109,19 +149,70 @@ export default function InventarioClientePage() {
     (item) => !item.mime_type?.startsWith("image/")
   );
 
+  const mesesDisponibles = Array.from(
+    new Set(
+      imagenes
+        .map((item) =>
+          obtenerClaveMes(item.modificado)
+        )
+        .filter(
+          (mes): mes is string =>
+            Boolean(mes)
+        )
+    )
+  ).sort((a, b) =>
+    b.localeCompare(a)
+  );
+
+  const imagenesFiltradas =
+    !mesActivo || mesActivo === "todos"
+      ? imagenes
+      : imagenes.filter(
+          (item) =>
+            obtenerClaveMes(
+              item.modificado
+            ) === mesActivo
+        );
+
   const cerrarGaleria = () => setFotoActiva(null);
+
+  useEffect(() => {
+    if (mesesDisponibles.length === 0) {
+      setMesActivo("todos");
+      return;
+    }
+
+    setMesActivo((actual) => {
+      if (
+        actual &&
+        (
+          actual === "todos" ||
+          mesesDisponibles.includes(actual)
+        )
+      ) {
+        return actual;
+      }
+
+      return mesesDisponibles[0];
+    });
+  }, [data?.cliente?.id_cliente, mesesDisponibles.join("|")]);
+
+  const cambiarMes = (mes: string) => {
+    setMesActivo(mes);
+    setFotoActiva(null);
+  };
 
   const fotoAnterior = () => {
     setFotoActiva((actual) => {
       if (actual === null) return null;
-      return actual === 0 ? imagenes.length - 1 : actual - 1;
+      return actual === 0 ? imagenesFiltradas.length - 1 : actual - 1;
     });
   };
 
   const fotoSiguiente = () => {
     setFotoActiva((actual) => {
       if (actual === null) return null;
-      return actual === imagenes.length - 1 ? 0 : actual + 1;
+      return actual === imagenesFiltradas.length - 1 ? 0 : actual + 1;
     });
   };
 
@@ -143,7 +234,7 @@ export default function InventarioClientePage() {
       document.body.style.overflow = overflowAnterior;
       window.removeEventListener("keydown", manejarTeclado);
     };
-  }, [fotoActiva, imagenes.length]);
+  }, [fotoActiva, imagenesFiltradas.length]);
 
   if (loading) {
     return (
@@ -183,7 +274,9 @@ export default function InventarioClientePage() {
   }
 
   const imagenSeleccionada =
-    fotoActiva !== null ? imagenes[fotoActiva] : null;
+    fotoActiva !== null
+      ? imagenesFiltradas[fotoActiva]
+      : null;
 
   const srcImagen = (item: InventarioItem) =>
     `/api/inventario/${encodeURIComponent(
@@ -255,7 +348,7 @@ export default function InventarioClientePage() {
           </div>
 
           <div className="mt-8">
-            <div className="mb-5 flex items-end justify-between gap-3">
+            <div className="mb-4 flex items-end justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-400 sm:text-sm">
                   Evidencias
@@ -267,17 +360,76 @@ export default function InventarioClientePage() {
               </div>
 
               <p className="shrink-0 pb-1 text-xs font-semibold text-slate-500 sm:text-sm">
-                {imagenes.length} fotos
+                {imagenesFiltradas.length} fotos
               </p>
             </div>
+
+            {imagenes.length > 0 && (
+              <div className="-mx-1 mb-5 overflow-x-auto px-1 pb-1">
+                <div className="flex min-w-max gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      cambiarMes("todos")
+                    }
+                    className={`rounded-full border px-4 py-2 text-xs font-bold transition sm:text-sm ${
+                      mesActivo === "todos"
+                        ? "border-[#072c74] bg-[#072c74] text-white"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-[#072c74] hover:text-[#072c74]"
+                    }`}
+                  >
+                    Todos
+                    <span className="ml-2 opacity-70">
+                      {imagenes.length}
+                    </span>
+                  </button>
+
+                  {mesesDisponibles.map(
+                    (mes) => {
+                      const cantidad =
+                        imagenes.filter(
+                          (item) =>
+                            obtenerClaveMes(
+                              item.modificado
+                            ) === mes
+                        ).length;
+
+                      return (
+                        <button
+                          key={mes}
+                          type="button"
+                          onClick={() =>
+                            cambiarMes(mes)
+                          }
+                          className={`rounded-full border px-4 py-2 text-xs font-bold transition sm:text-sm ${
+                            mesActivo === mes
+                              ? "border-[#072c74] bg-[#072c74] text-white"
+                              : "border-slate-200 bg-white text-slate-600 hover:border-[#072c74] hover:text-[#072c74]"
+                          }`}
+                        >
+                          {formatearMes(mes)}
+                          <span className="ml-2 opacity-70">
+                            {cantidad}
+                          </span>
+                        </button>
+                      );
+                    }
+                  )}
+                </div>
+              </div>
+            )}
 
             {imagenes.length === 0 ? (
               <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">
                 Aún no hay fotos disponibles.
               </div>
+            ) : imagenesFiltradas.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">
+                No hay fotos disponibles en este mes.
+              </div>
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
-                {imagenes.map((item, index) => (
+                {imagenesFiltradas.map((item, index) => (
                   <article
                     key={item.id}
                     className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md sm:rounded-3xl"
@@ -410,7 +562,7 @@ export default function InventarioClientePage() {
                 </p>
 
                 <p className="mt-0.5 text-xs text-white/65">
-                  {fotoActiva + 1} de {imagenes.length}
+                  {fotoActiva + 1} de {imagenesFiltradas.length}
                 </p>
               </div>
 
@@ -434,7 +586,7 @@ export default function InventarioClientePage() {
                 />
               </div>
 
-              {imagenes.length > 1 && (
+              {imagenesFiltradas.length > 1 && (
                 <>
                   <button
                     type="button"
