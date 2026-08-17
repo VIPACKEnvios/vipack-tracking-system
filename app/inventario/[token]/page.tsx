@@ -1,275 +1,334 @@
-  "use client";
+"use client";
 
-    import { useEffect, useState } from "react";
-    import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 
-    type InventarioItem = {
-    id: string;
+type InventarioItem = {
+  id: string;
+  nombre: string;
+  tipo: string;
+  mime_type: string | null;
+  tamaño: number;
+  modificado: string | null;
+  webUrl: string | null;
+};
+
+type InventarioResponse = {
+  success: boolean;
+  cliente?: {
+    id_cliente: number;
     nombre: string;
-    tipo: string;
-    mime_type: string | null;
-    tamaño: number;
-    modificado: string | null;
-    webUrl: string | null;
+    carpeta: string;
+  };
+  total?: number;
+  inventario?: InventarioItem[];
+  error?: string;
+};
+
+function formatearFecha(fecha: string | null) {
+  if (!fecha) return "";
+
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(fecha));
+}
+
+function formatearTamaño(bytes: number) {
+  if (!bytes) return "";
+
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+export default function InventarioClientePage() {
+  const params = useParams();
+
+  const token =
+    typeof params.token === "string"
+      ? params.token
+      : Array.isArray(params.token)
+      ? params.token[0]
+      : "";
+
+  const [data, setData] =
+    useState<InventarioResponse | null>(null);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [fotoActiva, setFotoActiva] =
+    useState<number | null>(null);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    const cargarInventario = async () => {
+      try {
+        setLoading(true);
+
+        const response = await fetch(
+          `/api/inventario/${encodeURIComponent(
+            token
+          )}`,
+          {
+            cache: "no-store",
+          }
+        );
+
+        const result = await response.json();
+
+        setData(result);
+      } catch {
+        setData({
+          success: false,
+          error:
+            "No se pudo cargar el inventario.",
+        });
+      } finally {
+        setLoading(false);
+      }
     };
 
-    type InventarioResponse = {
-    success: boolean;
-    cliente?: {
-        id_cliente: number;
-        nombre: string;
-        carpeta: string;
+    cargarInventario();
+  }, [token]);
+
+  const inventario =
+    data?.inventario || [];
+
+  const imagenes =
+    inventario.filter(
+      (item) =>
+        item.mime_type?.startsWith("image/")
+    );
+
+  const otrosArchivos =
+    inventario.filter(
+      (item) =>
+        !item.mime_type?.startsWith("image/")
+    );
+
+  const cerrarGaleria = () => {
+    setFotoActiva(null);
+  };
+
+  const fotoAnterior = () => {
+    setFotoActiva((actual) => {
+      if (actual === null) return null;
+
+      return actual === 0
+        ? imagenes.length - 1
+        : actual - 1;
+    });
+  };
+
+  const fotoSiguiente = () => {
+    setFotoActiva((actual) => {
+      if (actual === null) return null;
+
+      return actual === imagenes.length - 1
+        ? 0
+        : actual + 1;
+    });
+  };
+
+  useEffect(() => {
+    if (fotoActiva === null) {
+      return;
+    }
+
+    const manejarTeclado = (
+      event: KeyboardEvent
+    ) => {
+      if (event.key === "Escape") {
+        cerrarGaleria();
+      }
+
+      if (event.key === "ArrowLeft") {
+        fotoAnterior();
+      }
+
+      if (event.key === "ArrowRight") {
+        fotoSiguiente();
+      }
     };
-    total?: number;
-    inventario?: InventarioItem[];
-    error?: string;
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener(
+      "keydown",
+      manejarTeclado
+    );
+
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener(
+        "keydown",
+        manejarTeclado
+      );
     };
+  }, [fotoActiva, imagenes.length]);
 
-    function formatearFecha(fecha: string | null) {
-    if (!fecha) return "";
-
-    return new Intl.DateTimeFormat("es-MX", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-    }).format(new Date(fecha));
-    }
-
-    function formatearTamaño(bytes: number) {
-    if (!bytes) return "";
-
-    if (bytes < 1024) {
-        return `${bytes} B`;
-    }
-
-    if (bytes < 1024 * 1024) {
-        return `${(bytes / 1024).toFixed(1)} KB`;
-    }
-
-    return `${(
-        bytes /
-        1024 /
-        1024
-    ).toFixed(1)} MB`;
-    }
-
-    export default function InventarioClientePage() {
-    const params = useParams();
-
-    const token =
-        typeof params.token === "string"
-        ? params.token
-        : Array.isArray(params.token)
-        ? params.token[0]
-        : "";
-
-    const [data, setData] =
-        useState<InventarioResponse | null>(null);
-
-    const [loading, setLoading] =
-        useState(true);
-
-    useEffect(() => {
-        if (!token) {
-        return;
-        }
-
-        const cargarInventario =
-        async () => {
-            try {
-            setLoading(true);
-
-            const response =
-                await fetch(
-                `/api/inventario/${encodeURIComponent(
-                    token
-                )}`,
-                {
-                    cache: "no-store",
-                }
-                );
-
-            const result =
-                await response.json();
-
-            setData(result);
-            } catch {
-            setData({
-                success: false,
-                error:
-                "No se pudo cargar el inventario.",
-            });
-            } finally {
-            setLoading(false);
-            }
-        };
-
-        cargarInventario();
-    }, [token]);
-
-    if (loading) {
-        return (
-        <main className="min-h-screen bg-slate-50">
-            <div className="mx-auto flex min-h-screen max-w-7xl items-center justify-center px-6">
-            <div className="text-center">
-                <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-[#072c74]" />
-
-                <p className="mt-5 text-lg font-semibold text-slate-600">
-                Cargando inventario...
-                </p>
-            </div>
-            </div>
-        </main>
-        );
-    }
-
-    if (
-        !data ||
-        !data.success
-    ) {
-        return (
-        <main className="min-h-screen bg-slate-50">
-            <div className="mx-auto flex min-h-screen max-w-xl items-center justify-center px-6">
-            <div className="w-full rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-50 text-3xl">
-                !
-                </div>
-
-                <h1 className="mt-5 text-2xl font-black text-slate-900">
-                Inventario no disponible
-                </h1>
-
-                <p className="mt-3 text-slate-500">
-                {data?.error ||
-                    "No fue posible abrir este inventario."}
-                </p>
-            </div>
-            </div>
-        </main>
-        );
-    }
-
-    const inventario =
-        data.inventario || [];
-
-    const imagenes =
-        inventario.filter(
-        (item) =>
-            item.mime_type?.startsWith(
-            "image/"
-            )
-        );
-
-    const otrosArchivos =
-        inventario.filter(
-        (item) =>
-            !item.mime_type?.startsWith(
-            "image/"
-            )
-        );
-
+  if (loading) {
     return (
-        <main className="min-h-screen bg-slate-50">
+      <main className="min-h-screen bg-slate-50">
+        <div className="mx-auto flex min-h-screen max-w-7xl items-center justify-center px-6">
+          <div className="text-center">
+            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-[#072c74]" />
+
+            <p className="mt-5 text-lg font-semibold text-slate-600">
+              Cargando inventario...
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!data || !data.success) {
+    return (
+      <main className="min-h-screen bg-slate-50">
+        <div className="mx-auto flex min-h-screen max-w-xl items-center justify-center px-6">
+          <div className="w-full rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-50 text-3xl">
+              !
+            </div>
+
+            <h1 className="mt-5 text-2xl font-black text-slate-900">
+              Inventario no disponible
+            </h1>
+
+            <p className="mt-3 text-slate-500">
+              {data?.error ||
+                "No fue posible abrir este inventario."}
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  const imagenSeleccionada =
+    fotoActiva !== null
+      ? imagenes[fotoActiva]
+      : null;
+
+  return (
+    <>
+      <main className="min-h-screen bg-slate-50">
         <header className="bg-[#072c74] text-white shadow-sm">
-            <div className="mx-auto max-w-7xl px-5 py-6 sm:px-8">
+          <div className="mx-auto max-w-7xl px-5 py-6 sm:px-8">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
+              <div>
                 <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-200">
-                    VIPACK Envíos
+                  VIPACK Envíos
                 </p>
 
                 <h1 className="mt-1 text-3xl font-black sm:text-4xl">
-                    Mi inventario
+                  Mi inventario
                 </h1>
-                </div>
+              </div>
 
-                <div className="rounded-2xl bg-white/10 px-5 py-3 text-sm font-semibold backdrop-blur">
+              <div className="rounded-2xl bg-white/10 px-5 py-3 text-sm font-semibold backdrop-blur">
                 Cliente #
                 {String(
-                    data.cliente
-                    ?.id_cliente || ""
-                ).padStart(
-                    5,
-                    "0"
-                )}
-                </div>
+                  data.cliente?.id_cliente || ""
+                ).padStart(5, "0")}
+              </div>
             </div>
-            </div>
+          </div>
         </header>
 
         <section className="mx-auto max-w-7xl px-5 py-7 sm:px-8">
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
             <p className="text-sm font-bold uppercase tracking-wider text-slate-400">
-                Inventario de
+              Inventario de
             </p>
 
             <h2 className="mt-2 text-2xl font-black text-slate-900 sm:text-3xl">
-                {data.cliente?.nombre}
+              {data.cliente?.nombre}
             </h2>
 
             <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div className="rounded-2xl bg-slate-50 p-5">
+              <div className="rounded-2xl bg-slate-50 p-5">
                 <p className="text-sm font-semibold text-slate-500">
-                    Archivos
+                  Archivos
                 </p>
 
                 <p className="mt-1 text-3xl font-black text-[#072c74]">
-                    {data.total || 0}
+                  {data.total || 0}
                 </p>
-                </div>
+              </div>
 
-                <div className="rounded-2xl bg-slate-50 p-5">
+              <div className="rounded-2xl bg-slate-50 p-5">
                 <p className="text-sm font-semibold text-slate-500">
-                    Fotos
+                  Fotos
                 </p>
 
                 <p className="mt-1 text-3xl font-black text-[#072c74]">
-                    {imagenes.length}
+                  {imagenes.length}
                 </p>
-                </div>
+              </div>
 
-                <div className="rounded-2xl bg-slate-50 p-5">
+              <div className="rounded-2xl bg-slate-50 p-5">
                 <p className="text-sm font-semibold text-slate-500">
-                    Otros archivos
+                  Otros archivos
                 </p>
 
                 <p className="mt-1 text-3xl font-black text-[#072c74]">
-                    {otrosArchivos.length}
+                  {otrosArchivos.length}
                 </p>
-                </div>
+              </div>
             </div>
-            </div>
+          </div>
 
-            <div className="mt-8">
+          <div className="mt-8">
             <div className="mb-5 flex items-end justify-between gap-4">
-                <div>
+              <div>
                 <p className="text-sm font-bold uppercase tracking-wider text-slate-400">
-                    Evidencias
+                  Evidencias
                 </p>
 
                 <h2 className="mt-1 text-2xl font-black text-slate-900">
-                    Fotos de recolección
+                  Fotos de recolección
                 </h2>
-                </div>
+              </div>
 
-                <p className="text-sm font-semibold text-slate-500">
+              <p className="text-sm font-semibold text-slate-500">
                 {imagenes.length} fotos
-                </p>
+              </p>
             </div>
 
             {imagenes.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center text-slate-500">
+              <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center text-slate-500">
                 Aún no hay fotos disponibles.
-                </div>
+              </div>
             ) : (
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {imagenes.map(
-                    (item) => (
+                  (item, index) => (
                     <article
-                        key={item.id}
-                        className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                      key={item.id}
+                      className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md"
                     >
-                        <div className="flex aspect-square items-center justify-center overflow-hidden bg-slate-100">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFotoActiva(index)
+                        }
+                        className="block w-full cursor-zoom-in overflow-hidden bg-slate-100 text-left"
+                        aria-label={`Abrir foto ${item.nombre}`}
+                      >
+                        <div className="flex aspect-square items-center justify-center overflow-hidden">
                           <img
                             src={`/api/inventario/${encodeURIComponent(
                               token
@@ -277,95 +336,185 @@
                               item.id
                             )}`}
                             alt={item.nombre}
-                            className="h-full w-full object-cover"
+                            className="h-full w-full object-cover transition duration-300 hover:scale-[1.03]"
                             loading="lazy"
                           />
                         </div>
+                      </button>
 
-                        <div className="p-5">
+                      <div className="p-5">
                         <p className="truncate font-bold text-slate-900">
-                            {item.nombre}
+                          {item.nombre}
                         </p>
 
                         <div className="mt-3 flex items-center justify-between gap-3 text-xs font-medium text-slate-500">
-                            <span>
+                          <span>
                             {formatearFecha(
-                                item.modificado
+                              item.modificado
                             )}
-                            </span>
+                          </span>
 
-                            <span>
+                          <span>
                             {formatearTamaño(
-                                item.tamaño
+                              item.tamaño
                             )}
-                            </span>
+                          </span>
                         </div>
-                        </div>
+                      </div>
                     </article>
-                    )
+                  )
                 )}
-                </div>
+              </div>
             )}
-            </div>
+          </div>
 
-            {otrosArchivos.length >
-            0 && (
+          {otrosArchivos.length > 0 && (
             <div className="mt-10">
-                <p className="text-sm font-bold uppercase tracking-wider text-slate-400">
+              <p className="text-sm font-bold uppercase tracking-wider text-slate-400">
                 Documentos
-                </p>
+              </p>
 
-                <h2 className="mt-1 text-2xl font-black text-slate-900">
+              <h2 className="mt-1 text-2xl font-black text-slate-900">
                 Otros archivos
-                </h2>
+              </h2>
 
-                <div className="mt-5 space-y-3">
+              <div className="mt-5 space-y-3">
                 {otrosArchivos.map(
-                    (item) => (
+                  (item) => (
                     <a
-                        key={item.id}
-                        href={
-                        item.webUrl ||
-                        "#"
-                        }
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-[#072c74]"
+                      key={item.id}
+                      href={
+                        item.webUrl || "#"
+                      }
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-[#072c74]"
                     >
-                        <div className="min-w-0">
+                      <div className="min-w-0">
                         <p className="truncate font-bold text-slate-900">
-                            {
-                            item.nombre
-                            }
+                          {item.nombre}
                         </p>
 
                         <p className="mt-1 text-sm text-slate-500">
-                            {formatearFecha(
+                          {formatearFecha(
                             item.modificado
-                            )}
+                          )}
                         </p>
-                        </div>
+                      </div>
 
-                        <span className="shrink-0 text-sm font-bold text-[#072c74]">
+                      <span className="shrink-0 text-sm font-bold text-[#072c74]">
                         Abrir
-                        </span>
+                      </span>
                     </a>
-                    )
+                  )
                 )}
-                </div>
+              </div>
             </div>
-            )}
+          )}
 
-            <footer className="mt-12 border-t border-slate-200 py-8 text-center">
+          <footer className="mt-12 border-t border-slate-200 py-8 text-center">
             <p className="text-sm text-slate-500">
-                Inventario administrado por
-                <span className="font-bold text-[#072c74]">
+              Inventario administrado por
+              <span className="font-bold text-[#072c74]">
                 {" "}
                 VIPACK Envíos
-                </span>
+              </span>
             </p>
-            </footer>
+          </footer>
         </section>
-        </main>
-    );
-    }
+      </main>
+
+      {imagenSeleccionada &&
+        fotoActiva !== null && (
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-3 sm:p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Galería de fotos"
+            onClick={cerrarGaleria}
+          >
+            <div
+              className="relative flex h-full w-full max-w-7xl flex-col"
+              onClick={(event) =>
+                event.stopPropagation()
+              }
+            >
+              <div className="flex items-center justify-between gap-4 px-2 py-2 text-white">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold sm:text-base">
+                    {imagenSeleccionada.nombre}
+                  </p>
+
+                  <p className="mt-1 text-xs text-white/60">
+                    {fotoActiva + 1} de{" "}
+                    {imagenes.length}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={cerrarGaleria}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-2xl font-light text-white transition hover:bg-white/20"
+                  aria-label="Cerrar galería"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="relative flex min-h-0 flex-1 items-center justify-center">
+                {imagenes.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={fotoAnterior}
+                    className="absolute left-1 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-black/45 text-3xl text-white backdrop-blur transition hover:bg-black/70 sm:left-4 sm:h-14 sm:w-14"
+                    aria-label="Foto anterior"
+                  >
+                    ‹
+                  </button>
+                )}
+
+                <img
+                  src={`/api/inventario/${encodeURIComponent(
+                    token
+                  )}/archivo/${encodeURIComponent(
+                    imagenSeleccionada.id
+                  )}`}
+                  alt={
+                    imagenSeleccionada.nombre
+                  }
+                  className="max-h-full max-w-full rounded-xl object-contain shadow-2xl"
+                />
+
+                {imagenes.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={fotoSiguiente}
+                    className="absolute right-1 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-black/45 text-3xl text-white backdrop-blur transition hover:bg-black/70 sm:right-4 sm:h-14 sm:w-14"
+                    aria-label="Foto siguiente"
+                  >
+                    ›
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center justify-center gap-4 py-3 text-xs text-white/60 sm:text-sm">
+                <span>
+                  {formatearFecha(
+                    imagenSeleccionada.modificado
+                  )}
+                </span>
+
+                <span>•</span>
+
+                <span>
+                  {formatearTamaño(
+                    imagenSeleccionada.tamaño
+                  )}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+    </>
+  );
+}
