@@ -47,7 +47,7 @@ export async function POST() {
     );
 
     /*
-     * 1. Obtener conexión guardada de OneDrive
+     * 1. Obtener conexión guardada
      */
     const {
       data: conexion,
@@ -88,7 +88,7 @@ export async function POST() {
     }
 
     /*
-     * 2. Renovar access_token
+     * 2. Renovar access token
      */
     const tokenResponse = await fetch(
       "https://login.microsoftonline.com/consumers/oauth2/v2.0/token",
@@ -157,7 +157,7 @@ export async function POST() {
     }
 
     /*
-     * Microsoft puede rotar el refresh token.
+     * Microsoft puede rotar refresh_token
      */
     if (
       newRefreshToken &&
@@ -180,8 +180,7 @@ export async function POST() {
     }
 
     /*
-     * 3. Leer carpetas reales de:
-     * Envios/Recoleccion por cliente
+     * 3. Leer carpetas reales
      */
     const ruta =
       "Envios/Recoleccion por cliente";
@@ -232,8 +231,7 @@ export async function POST() {
         : [];
 
     /*
-     * 4. Obtener los 100 clientes
-     * de Supabase
+     * 4. Obtener clientes Supabase
      */
     const {
       data: clientes,
@@ -264,43 +262,128 @@ export async function POST() {
     }
 
     /*
-     * Función simple para evitar errores
-     * por espacios al inicio/final.
-     *
-     * No cambiamos nombres ni acentos.
+     * Normalización mínima.
+     * Solo trim + minúsculas.
+     * No cambiamos datos guardados.
      */
     const normalizar = (
       valor: unknown
     ) =>
       String(
         valor || ""
-      ).trim();
+      )
+        .trim()
+        .toLocaleLowerCase("es");
 
     const resultados: any[] = [];
 
     /*
-     * 5. Buscar coincidencia exacta
-     * carpeta_cliente = nombre de carpeta en OneDrive
+     * 5. Sincronizar
+     *
+     * PRIORIDAD:
+     * A) buscar por prefijo 00001, 00002...
+     * B) si no encuentra, comparar nombre completo
      */
     for (
       const cliente of
         clientes || []
     ) {
-      const nombreCarpeta =
+      const prefijo =
+        String(
+          cliente.id_cliente
+        ).padStart(
+          5,
+          "0"
+        );
+
+      const nombreEsperado =
         normalizar(
           cliente.carpeta_cliente
         );
 
-      const carpetaEncontrada =
-        carpetas.find(
-          (carpeta: any) =>
-            normalizar(
-              carpeta.name
-            ) ===
-            nombreCarpeta
+      /*
+       * A. Buscar por número de cliente
+       */
+      let coincidenciasPorId =
+        carpetas.filter(
+          (carpeta: any) => {
+            const nombre =
+              String(
+                carpeta.name || ""
+              ).trim();
+
+            return (
+              nombre === prefijo ||
+              nombre.startsWith(
+                `${prefijo} `
+              )
+            );
+          }
         );
 
-      if (!carpetaEncontrada) {
+      let carpetaEncontrada:
+        | any
+        | null = null;
+
+      let metodo:
+        | "id_cliente"
+        | "nombre_exacto"
+        | null = null;
+
+      /*
+       * Solo aceptamos coincidencia por ID
+       * cuando hay exactamente una carpeta.
+       *
+       * Si hubiera dos carpetas con el mismo
+       * prefijo, no elegimos una al azar.
+       */
+      if (
+        coincidenciasPorId.length ===
+        1
+      ) {
+        carpetaEncontrada =
+          coincidenciasPorId[0];
+
+        metodo =
+          "id_cliente";
+      }
+
+      /*
+       * B. Respaldo:
+       * coincidencia por nombre completo
+       */
+      if (
+        !carpetaEncontrada
+      ) {
+        const coincidenciasNombre =
+          carpetas.filter(
+            (carpeta: any) =>
+              normalizar(
+                carpeta.name
+              ) ===
+              nombreEsperado
+          );
+
+        if (
+          coincidenciasNombre.length ===
+          1
+        ) {
+          carpetaEncontrada =
+            coincidenciasNombre[0];
+
+          metodo =
+            "nombre_exacto";
+        }
+      }
+
+      /*
+       * Si hay más de una carpeta
+       * con el mismo prefijo, lo reportamos.
+       */
+      if (
+        coincidenciasPorId.length >
+        1
+      ) {
         resultados.push({
           id_cliente:
             cliente.id_cliente,
@@ -312,6 +395,40 @@ export async function POST() {
             cliente.carpeta_cliente,
 
           estado:
+            "duplicado_onedrive",
+
+          coincidencias:
+            coincidenciasPorId.map(
+              (item: any) => ({
+                id:
+                  item.id,
+                nombre:
+                  item.name,
+              })
+            ),
+        });
+
+        continue;
+      }
+
+      /*
+       * Sin carpeta encontrada
+       */
+      if (!carpetaEncontrada) {
+        resultados.push({
+          id_cliente:
+            cliente.id_cliente,
+
+          nombre:
+            cliente.nombre,
+
+          carpeta_cliente:
+            cliente.carpeta_cliente,
+
+          prefijo_buscado:
+            prefijo,
+
+          estado:
             "sin_coincidencia",
         });
 
@@ -319,8 +436,7 @@ export async function POST() {
       }
 
       /*
-       * Si ya tiene el mismo folder_id,
-       * no hacemos update innecesario.
+       * Ya estaba sincronizado
        */
       if (
         cliente.onedrive_folder_id ===
@@ -336,8 +452,13 @@ export async function POST() {
           carpeta_cliente:
             cliente.carpeta_cliente,
 
+          carpeta_onedrive:
+            carpetaEncontrada.name,
+
           onedrive_folder_id:
             carpetaEncontrada.id,
+
+          metodo,
 
           estado:
             "ya_sincronizado",
@@ -346,6 +467,9 @@ export async function POST() {
         continue;
       }
 
+      /*
+       * Guardar folder id
+       */
       const {
         error: updateError,
       } = await supabase
@@ -395,14 +519,22 @@ export async function POST() {
         carpeta_cliente:
           cliente.carpeta_cliente,
 
+        carpeta_onedrive:
+          carpetaEncontrada.name,
+
         onedrive_folder_id:
           carpetaEncontrada.id,
+
+        metodo,
 
         estado:
           "sincronizado",
       });
     }
 
+    /*
+     * 6. Resumen
+     */
     const resumen = {
       total_clientes:
         resultados.length,
@@ -426,6 +558,13 @@ export async function POST() {
           (item) =>
             item.estado ===
             "sin_coincidencia"
+        ).length,
+
+      duplicados_onedrive:
+        resultados.filter(
+          (item) =>
+            item.estado ===
+            "duplicado_onedrive"
         ).length,
 
       errores:
