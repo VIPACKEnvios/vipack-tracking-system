@@ -171,6 +171,9 @@ export default function InventariosAdminPage() {
   const inputArchivos =
     useRef<HTMLInputElement | null>(null);
 
+  const inicioPanelRef =
+    useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     const cargarClientes = async () => {
       try {
@@ -584,7 +587,10 @@ export default function InventariosAdminPage() {
 
   return (
     <div className="min-h-full bg-slate-100 px-4 py-6 md:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
+      <div
+        ref={inicioPanelRef}
+        className="mx-auto max-w-7xl"
+      >
         <div>
           <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-700">
             Operación interna
@@ -600,7 +606,13 @@ export default function InventariosAdminPage() {
         </div>
 
         <div className="mt-6 grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
-          <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+          <section
+            className={`rounded-3xl border border-slate-200 bg-white p-4 shadow-sm ${
+              clienteSeleccionado
+                ? "hidden xl:block"
+                : "block"
+            }`}
+          >
             <div className="relative">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                 <IconoBuscar />
@@ -628,7 +640,7 @@ export default function InventariosAdminPage() {
               </span>
             </div>
 
-            <div className="mt-3 max-h-[620px] space-y-2 overflow-y-auto pr-1">
+            <div className="mt-3 max-h-[58vh] space-y-2 overflow-y-auto pr-1 xl:max-h-[620px]">
               {cargando && (
                 <div className="rounded-2xl bg-slate-50 p-5 text-center text-sm font-semibold text-slate-500">
                   Cargando clientes...
@@ -667,6 +679,25 @@ export default function InventariosAdminPage() {
                         );
                         setArchivos([]);
                         setMensaje("");
+
+                        window.setTimeout(
+                          () => {
+                            if (
+                              window.innerWidth <
+                              1280
+                            ) {
+                              inicioPanelRef.current?.scrollIntoView(
+                                {
+                                  behavior:
+                                    "smooth",
+                                  block:
+                                    "start",
+                                }
+                              );
+                            }
+                          },
+                          60
+                        );
                       }}
                       className={`w-full rounded-2xl border p-3 text-left transition ${
                         activo
@@ -721,7 +752,13 @@ export default function InventariosAdminPage() {
             </div>
           </section>
 
-          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+          <section
+            className={`rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-6 ${
+              clienteSeleccionado
+                ? "block"
+                : "hidden xl:block"
+            }`}
+          >
             {!clienteSeleccionado ? (
               <div className="flex min-h-[520px] items-center justify-center">
                 <div className="max-w-md text-center">
@@ -740,6 +777,35 @@ export default function InventariosAdminPage() {
               </div>
             ) : (
               <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setClienteSeleccionado(
+                      null
+                    );
+                    setArchivos([]);
+                    setMensaje("");
+
+                    window.setTimeout(
+                      () => {
+                        inicioPanelRef.current?.scrollIntoView(
+                          {
+                            behavior:
+                              "smooth",
+                            block:
+                              "start",
+                          }
+                        );
+                      },
+                      50
+                    );
+                  }}
+                  className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-black text-[#072c74] transition hover:bg-slate-100 xl:hidden"
+                >
+                  <span aria-hidden="true">←</span>
+                  Cambiar cliente
+                </button>
+
                 <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-start md:justify-between">
                   <div>
                     <p className="text-xs font-black uppercase tracking-[0.15em] text-cyan-700">
@@ -772,9 +838,9 @@ export default function InventariosAdminPage() {
                   </button>
                 </div>
 
-                <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <p className="text-xs font-bold text-slate-500">
+                <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
+                  <div className="min-w-0 rounded-2xl bg-slate-50 p-3 sm:p-4">
+                    <p className="text-[10px] font-bold leading-tight text-slate-500 sm:text-xs">
                       Carpeta OneDrive
                     </p>
                     <p
@@ -790,8 +856,8 @@ export default function InventariosAdminPage() {
                     </p>
                   </div>
 
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <p className="text-xs font-bold text-slate-500">
+                  <div className="min-w-0 rounded-2xl bg-slate-50 p-3 sm:p-4">
+                    <p className="text-[10px] font-bold leading-tight text-slate-500 sm:text-xs">
                       Archivos
                     </p>
                     <p className="mt-2 text-2xl font-black text-[#072c74]">
@@ -802,8 +868,8 @@ export default function InventariosAdminPage() {
                     </p>
                   </div>
 
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <p className="text-xs font-bold text-slate-500">
+                  <div className="min-w-0 rounded-2xl bg-slate-50 p-3 sm:p-4">
+                    <p className="text-[10px] font-bold leading-tight text-slate-500 sm:text-xs">
                       Acceso cliente
                     </p>
                     <p
@@ -825,7 +891,7 @@ export default function InventariosAdminPage() {
                     event.preventDefault()
                   }
                   onDrop={manejarDrop}
-                  className="mt-6 rounded-3xl border-2 border-dashed border-cyan-200 bg-cyan-50/40 p-6 text-center transition hover:border-cyan-400"
+                  className="mt-5 rounded-3xl border-2 border-dashed border-cyan-200 bg-cyan-50/40 p-4 text-center transition hover:border-cyan-400 sm:mt-6 sm:p-6"
                 >
                   <input
                     ref={inputArchivos}
