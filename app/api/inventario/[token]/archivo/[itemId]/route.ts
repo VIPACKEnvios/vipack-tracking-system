@@ -12,14 +12,30 @@ type RouteContext = {
   }>;
 };
 
+async function leerJsonSeguro(
+  response: Response
+) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(
   request: Request,
   context: RouteContext
 ) {
   try {
-    const { token, itemId } = await context.params;
+    const {
+      token,
+      itemId,
+    } = await context.params;
 
-    if (!token || !itemId) {
+    if (
+      !token ||
+      !itemId
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -58,16 +74,19 @@ export async function GET(
       );
     }
 
-    const supabase = createClient(
-      supabaseUrl,
-      supabaseServiceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
+    const supabase =
+      createClient(
+        supabaseUrl,
+        supabaseServiceRoleKey,
+        {
+          auth: {
+            autoRefreshToken:
+              false,
+            persistSession:
+              false,
+          },
+        }
+      );
 
     /*
      * 1. Buscar cliente por token.
@@ -76,7 +95,9 @@ export async function GET(
       data: cliente,
       error: clienteError,
     } = await supabase
-      .from("clientes_inventario")
+      .from(
+        "clientes_inventario"
+      )
       .select(
         `
         id,
@@ -86,8 +107,14 @@ export async function GET(
         activo
         `
       )
-      .eq("token_inventario", token)
-      .eq("activo", true)
+      .eq(
+        "token_inventario",
+        token
+      )
+      .eq(
+        "activo",
+        true
+      )
       .maybeSingle();
 
     if (clienteError) {
@@ -114,7 +141,9 @@ export async function GET(
       );
     }
 
-    if (!cliente.onedrive_folder_id) {
+    if (
+      !cliente.onedrive_folder_id
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -132,13 +161,18 @@ export async function GET(
       data: conexion,
       error: conexionError,
     } = await supabase
-      .from("onedrive_connections")
+      .from(
+        "onedrive_connections"
+      )
       .select(
         "id, refresh_token"
       )
-      .order("id", {
-        ascending: false,
-      })
+      .order(
+        "id",
+        {
+          ascending: false,
+        }
+      )
       .limit(1)
       .maybeSingle();
 
@@ -155,7 +189,9 @@ export async function GET(
       );
     }
 
-    if (!conexion?.refresh_token) {
+    if (
+      !conexion?.refresh_token
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -169,41 +205,48 @@ export async function GET(
     /*
      * 3. Renovar access_token.
      */
-    const tokenResponse = await fetch(
-      "https://login.microsoftonline.com/consumers/oauth2/v2.0/token",
-      {
-        method: "POST",
+    const tokenResponse =
+      await fetch(
+        "https://login.microsoftonline.com/consumers/oauth2/v2.0/token",
+        {
+          method: "POST",
 
-        headers: {
-          "Content-Type":
-            "application/x-www-form-urlencoded",
-        },
+          headers: {
+            "Content-Type":
+              "application/x-www-form-urlencoded",
+          },
 
-        body: new URLSearchParams({
-          client_id:
-            clientId,
+          body:
+            new URLSearchParams({
+              client_id:
+                clientId,
 
-          client_secret:
-            clientSecret,
+              client_secret:
+                clientSecret,
 
-          grant_type:
-            "refresh_token",
+              grant_type:
+                "refresh_token",
 
-          refresh_token:
-            conexion.refresh_token,
+              refresh_token:
+                conexion.refresh_token,
 
-          scope:
-            "openid profile offline_access User.Read Files.ReadWrite",
-        }),
+              scope:
+                "openid profile offline_access User.Read Files.ReadWrite",
+            }),
 
-        cache: "no-store",
-      }
-    );
+          cache:
+            "no-store",
+        }
+      );
 
     const tokenData =
-      await tokenResponse.json();
+      await leerJsonSeguro(
+        tokenResponse
+      );
 
-    if (!tokenResponse.ok) {
+    if (
+      !tokenResponse.ok
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -243,21 +286,39 @@ export async function GET(
       newRefreshToken !==
         conexion.refresh_token
     ) {
-      await supabase
-        .from("onedrive_connections")
+      const {
+        error: updateTokenError,
+      } = await supabase
+        .from(
+          "onedrive_connections"
+        )
         .update({
           refresh_token:
             newRefreshToken,
 
           updated_at:
-            new Date().toISOString(),
+            new Date()
+              .toISOString(),
         })
-        .eq("id", conexion.id);
+        .eq(
+          "id",
+          conexion.id
+        );
+
+      if (updateTokenError) {
+        console.error(
+          "No se pudo guardar refresh_token rotado:",
+          updateTokenError
+        );
+      }
     }
 
     /*
      * 4. Validar que itemId pertenezca
      * realmente a la carpeta del cliente.
+     *
+     * También obtenemos mimeType para
+     * distinguir videos de imágenes.
      */
     const childrenUrl =
       `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(
@@ -279,9 +340,13 @@ export async function GET(
       );
 
     const childrenData =
-      await childrenResponse.json();
+      await leerJsonSeguro(
+        childrenResponse
+      );
 
-    if (!childrenResponse.ok) {
+    if (
+      !childrenResponse.ok
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -304,8 +369,11 @@ export async function GET(
     const archivo =
       items.find(
         (item: any) =>
-          item?.id === itemId &&
-          Boolean(item?.file)
+          item?.id ===
+            itemId &&
+          Boolean(
+            item?.file
+          )
       );
 
     if (!archivo) {
@@ -319,12 +387,191 @@ export async function GET(
       );
     }
 
+    const mimeType =
+      String(
+        archivo?.file?.mimeType ||
+          ""
+      ).toLowerCase();
+
+    const esVideo =
+      mimeType.startsWith(
+        "video/"
+      );
+
     /*
-     * 5. Intentar obtener thumbnail.
+     * 5A. VIDEOS
      *
-     * Esto resuelve el problema de HEIC:
-     * el navegador recibe una vista previa
-     * generada por OneDrive.
+     * Para videos NO usamos thumbnail.
+     *
+     * Tampoco descargamos el video completo
+     * a Vercel porque puede pesar cientos
+     * de MB.
+     *
+     * Pedimos /content a Microsoft Graph
+     * con redirect:"manual". Graph devuelve
+     * una URL temporal preautorizada.
+     *
+     * Redirigimos el navegador directamente
+     * a esa URL para que el <video> pueda:
+     *
+     * - reproducir;
+     * - pausar;
+     * - adelantar;
+     * - retroceder;
+     * - usar byte ranges;
+     * - abrir pantalla completa.
+     */
+    if (esVideo) {
+      const contentUrl =
+        `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(
+          itemId
+        )}/content`;
+
+      const contentResponse =
+        await fetch(
+          contentUrl,
+          {
+            method: "GET",
+
+            headers: {
+              Authorization:
+                `Bearer ${accessToken}`,
+            },
+
+            redirect:
+              "manual",
+
+            cache:
+              "no-store",
+          }
+        );
+
+      if (
+        contentResponse.status >=
+          300 &&
+        contentResponse.status <
+          400
+      ) {
+        const location =
+          contentResponse.headers.get(
+            "location"
+          );
+
+        if (!location) {
+          return NextResponse.json(
+            {
+              success: false,
+              error:
+                "OneDrive no devolvió la URL temporal del video.",
+            },
+            { status: 502 }
+          );
+        }
+
+        return NextResponse.redirect(
+          location,
+          {
+            status: 302,
+
+            headers: {
+              "Cache-Control":
+                "private, no-store, max-age=0",
+            },
+          }
+        );
+      }
+
+      /*
+       * Respaldo por si Microsoft
+       * devuelve contenido directamente.
+       */
+      if (
+        contentResponse.ok &&
+        contentResponse.body
+      ) {
+        const headers =
+          new Headers();
+
+        headers.set(
+          "Content-Type",
+          contentResponse.headers.get(
+            "content-type"
+          ) ||
+            mimeType ||
+            "video/mp4"
+        );
+
+        const contentLength =
+          contentResponse.headers.get(
+            "content-length"
+          );
+
+        if (contentLength) {
+          headers.set(
+            "Content-Length",
+            contentLength
+          );
+        }
+
+        const acceptRanges =
+          contentResponse.headers.get(
+            "accept-ranges"
+          );
+
+        if (acceptRanges) {
+          headers.set(
+            "Accept-Ranges",
+            acceptRanges
+          );
+        }
+
+        headers.set(
+          "Cache-Control",
+          "private, no-store, max-age=0"
+        );
+
+        headers.set(
+          "Content-Disposition",
+          `inline; filename*=UTF-8''${encodeURIComponent(
+            archivo.name
+          )}`
+        );
+
+        return new Response(
+          contentResponse.body,
+          {
+            status:
+              contentResponse.status,
+            headers,
+          }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "No se pudo obtener el video desde OneDrive.",
+        },
+        {
+          status:
+            contentResponse.status >=
+              400 &&
+            contentResponse.status <
+              600
+              ? contentResponse.status
+              : 502,
+        }
+      );
+    }
+
+    /*
+     * 5B. IMÁGENES
+     *
+     * Conservamos exactamente el comportamiento
+     * que ya tenías para HEIC y otras fotos:
+     * primero intentamos thumbnail generado
+     * por OneDrive.
      */
     const thumbnailUrl =
       `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(
@@ -352,7 +599,9 @@ export async function GET(
      * Si Microsoft sí generó thumbnail,
      * lo usamos.
      */
-    if (thumbnailResponse.ok) {
+    if (
+      thumbnailResponse.ok
+    ) {
       const thumbnailBuffer =
         await thumbnailResponse.arrayBuffer();
 
@@ -389,7 +638,7 @@ export async function GET(
     }
 
     /*
-     * 6. Respaldo:
+     * 6. Respaldo para imágenes/documentos:
      * si Microsoft no tiene thumbnail,
      * devolvemos el archivo original.
      */
@@ -415,7 +664,9 @@ export async function GET(
         }
       );
 
-    if (!contentResponse.ok) {
+    if (
+      !contentResponse.ok
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -460,7 +711,9 @@ export async function GET(
         },
       }
     );
-  } catch (error: unknown) {
+  } catch (
+    error: unknown
+  ) {
     console.error(
       "Error archivo inventario:",
       error
