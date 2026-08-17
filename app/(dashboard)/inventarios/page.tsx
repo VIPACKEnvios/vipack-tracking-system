@@ -360,9 +360,29 @@ export default function InventariosAdminPage() {
       !data.success ||
       !data.uploadUrl
     ) {
+      let detalle = "";
+
+      if (
+        typeof data.detalle ===
+        "string"
+      ) {
+        detalle = data.detalle;
+      } else if (data.detalle) {
+        try {
+          detalle =
+            JSON.stringify(
+              data.detalle
+            );
+        } catch {
+          detalle = "";
+        }
+      }
+
       throw new Error(
-        data.error ||
-          "No se pudo preparar la subida."
+        detalle
+          ? `${data.error || "No se pudo preparar la subida."} — ${detalle}`
+          : data.error ||
+              "No se pudo preparar la subida."
       );
     }
 
@@ -586,10 +606,10 @@ export default function InventariosAdminPage() {
   }
 
   return (
-    <div className="min-h-full bg-slate-100 px-4 py-6 md:px-6 lg:px-8">
+    <div className="min-h-full overflow-x-hidden bg-slate-100 px-3 py-5 sm:px-4 sm:py-6 md:px-6 lg:px-8">
       <div
         ref={inicioPanelRef}
-        className="mx-auto max-w-7xl"
+        className="mx-auto w-full min-w-0 max-w-7xl"
       >
         <div>
           <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-700">
@@ -605,7 +625,7 @@ export default function InventariosAdminPage() {
           </p>
         </div>
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
+        <div className="mt-5 grid min-w-0 gap-5 sm:mt-6 sm:gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
           <section
             className={`rounded-3xl border border-slate-200 bg-white p-4 shadow-sm ${
               clienteSeleccionado
@@ -753,7 +773,7 @@ export default function InventariosAdminPage() {
           </section>
 
           <section
-            className={`rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-6 ${
+            className={`min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 md:p-6 ${
               clienteSeleccionado
                 ? "block"
                 : "hidden xl:block"
@@ -806,13 +826,13 @@ export default function InventariosAdminPage() {
                   Cambiar cliente
                 </button>
 
-                <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-start md:justify-between">
-                  <div>
+                <div className="flex min-w-0 flex-col gap-3 border-b border-slate-200 pb-5 md:flex-row md:items-start md:justify-between md:gap-4">
+                  <div className="min-w-0">
                     <p className="text-xs font-black uppercase tracking-[0.15em] text-cyan-700">
                       Cliente seleccionado
                     </p>
 
-                    <h2 className="mt-1 text-2xl font-black text-slate-950">
+                    <h2 className="mt-1 break-words text-xl font-black leading-tight text-slate-950 sm:text-2xl">
                       {
                         clienteSeleccionado.nombre
                       }
@@ -832,13 +852,13 @@ export default function InventariosAdminPage() {
                         clienteSeleccionado
                       )
                     }
-                    className="rounded-xl border border-[#072c74] px-4 py-2.5 text-sm font-black text-[#072c74] transition hover:bg-[#072c74] hover:text-white"
+                    className="w-full shrink-0 rounded-xl border border-[#072c74] px-4 py-2.5 text-sm font-black text-[#072c74] transition hover:bg-[#072c74] hover:text-white md:w-auto"
                   >
                     Ver inventario
                   </button>
                 </div>
 
-                <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
+                <div className="mt-5 grid grid-cols-1 gap-2 min-[430px]:grid-cols-3 sm:gap-3">
                   <div className="min-w-0 rounded-2xl bg-slate-50 p-3 sm:p-4">
                     <p className="text-[10px] font-bold leading-tight text-slate-500 sm:text-xs">
                       Carpeta OneDrive
@@ -891,7 +911,7 @@ export default function InventariosAdminPage() {
                     event.preventDefault()
                   }
                   onDrop={manejarDrop}
-                  className="mt-5 rounded-3xl border-2 border-dashed border-cyan-200 bg-cyan-50/40 p-4 text-center transition hover:border-cyan-400 sm:mt-6 sm:p-6"
+                  className="mt-5 min-w-0 overflow-hidden rounded-3xl border-2 border-dashed border-cyan-200 bg-cyan-50/40 p-4 text-center transition hover:border-cyan-400 sm:mt-6 sm:p-6"
                 >
                   <input
                     ref={inputArchivos}
@@ -912,7 +932,7 @@ export default function InventariosAdminPage() {
                     Subir evidencia
                   </h3>
 
-                  <p className="mt-1 text-sm text-slate-500">
+                  <p className="mx-auto mt-1 max-w-md break-words text-sm leading-5 text-slate-500">
                     Arrastra fotos o videos aquí, o selecciónalos desde tu computadora.
                   </p>
 
@@ -921,7 +941,7 @@ export default function InventariosAdminPage() {
                     onClick={() =>
                       inputArchivos.current?.click()
                     }
-                    className="mt-4 rounded-xl bg-[#072c74] px-5 py-3 text-sm font-black text-white shadow-md transition hover:bg-[#0a3b8f]"
+                    className="mt-4 w-full rounded-xl bg-[#072c74] px-5 py-3 text-sm font-black text-white shadow-md transition hover:bg-[#0a3b8f] sm:w-auto"
                   >
                     Seleccionar archivos
                   </button>
@@ -930,7 +950,7 @@ export default function InventariosAdminPage() {
                 {archivos.length >
                   0 && (
                   <div className="mt-6">
-                    <div className="flex items-center justify-between">
+                    <div className="flex min-w-0 items-center justify-between gap-2">
                       <h3 className="font-black text-slate-900">
                         Archivos seleccionados
                       </h3>
@@ -947,20 +967,20 @@ export default function InventariosAdminPage() {
                             key={
                               item.id
                             }
-                            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3"
+                            className="flex min-w-0 items-start gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:items-center sm:gap-3"
                           >
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-cyan-700 shadow-sm">
                               <IconoImagen />
                             </div>
 
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-black text-slate-900">
+                              <p className="break-all text-sm font-black leading-5 text-slate-900 sm:truncate">
                                 {
                                   item.archivo.name
                                 }
                               </p>
 
-                              <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
                                 <span>
                                   {formatearTamaño(
                                     item.archivo.size
@@ -997,13 +1017,13 @@ export default function InventariosAdminPage() {
                               )}
 
                               {item.error && (
-                                <p className="mt-2 text-xs font-semibold text-red-600">
+                                <p className="mt-2 break-words text-xs font-semibold leading-5 text-red-600">
                                   {item.error}
                                 </p>
                               )}
                             </div>
 
-                            <div className="shrink-0 text-xs font-black text-slate-500">
+                            <div className="shrink-0 pt-0.5 text-xs font-black text-slate-500">
                               {item.estado ===
                               "subiendo"
                                 ? `${item.progreso}%`
@@ -1031,12 +1051,12 @@ export default function InventariosAdminPage() {
                 )}
 
                 {mensaje && (
-                  <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-700">
+                  <div className="mt-5 break-words rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold leading-5 text-slate-700">
                     {mensaje}
                   </div>
                 )}
 
-                <div className="mt-6 flex justify-end">
+                <div className="mt-6 flex min-w-0 justify-end">
                   <button
                     type="button"
                     disabled={
@@ -1048,7 +1068,7 @@ export default function InventariosAdminPage() {
                     onClick={
                       subirEvidencias
                     }
-                    className="rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-6 py-3 text-sm font-black text-white shadow-lg transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-6 py-3 text-sm font-black text-white shadow-lg transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                   >
                     {subiendo
                       ? "Subiendo a OneDrive..."
