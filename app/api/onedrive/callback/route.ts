@@ -51,10 +51,6 @@ export async function GET(request: Request) {
     const clientSecret =
       process.env.ONEDRIVE_CLIENT_SECRET;
 
-    /*
-     * Para cuentas personales Microsoft usamos
-     * el endpoint common.
-     */
     if (!clientId || !clientSecret) {
       return NextResponse.json(
         {
@@ -75,7 +71,10 @@ export async function GET(request: Request) {
     const supabaseServiceRoleKey =
       process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!supabaseUrl || !supabaseServiceRoleKey) {
+    if (
+      !supabaseUrl ||
+      !supabaseServiceRoleKey
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -87,7 +86,6 @@ export async function GET(request: Request) {
     }
 
     /*
-     * IMPORTANTE:
      * Esta conexión usa SERVICE ROLE.
      * Solamente existe en el servidor.
      */
@@ -106,10 +104,13 @@ export async function GET(request: Request) {
       "https://vipack-envios.com/api/onedrive/callback";
 
     /*
-     * 5. Cambiar el código recibido por tokens
+     * 5. Cambiar el código recibido por tokens.
+     *
+     * Como estamos conectando un OneDrive
+     * PERSONAL de Microsoft, usamos consumers.
      */
     const tokenResponse = await fetch(
-      "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+      "https://login.microsoftonline.com/consumers/oauth2/v2.0/token",
       {
         method: "POST",
 
@@ -124,7 +125,6 @@ export async function GET(request: Request) {
           grant_type: "authorization_code",
           code,
           redirect_uri: redirectUri,
-
           scope:
             "openid profile offline_access User.Read Files.ReadWrite",
         }),
@@ -210,7 +210,9 @@ export async function GET(request: Request) {
     }
 
     const driveId =
-      String(driveData?.id || "").trim();
+      String(
+        driveData?.id || ""
+      ).trim();
 
     const driveType =
       String(
@@ -219,8 +221,8 @@ export async function GET(request: Request) {
 
     const ownerName =
       String(
-        driveData?.owner?.user?.displayName ||
-          ""
+        driveData?.owner?.user
+          ?.displayName || ""
       ).trim();
 
     if (!driveId) {
@@ -235,8 +237,7 @@ export async function GET(request: Request) {
     }
 
     /*
-     * 7. Ver si esta cuenta de OneDrive
-     * ya estaba conectada anteriormente.
+     * 7. Ver si esta cuenta ya estaba conectada
      */
     const {
       data: conexiones,
@@ -263,7 +264,8 @@ export async function GET(request: Request) {
           success: false,
           error:
             "No se pudo consultar la conexión de OneDrive en Supabase.",
-          detalle: searchError.message,
+          detalle:
+            searchError.message,
         },
         { status: 500 }
       );
@@ -276,12 +278,7 @@ export async function GET(request: Request) {
         : null;
 
     /*
-     * 8. Si ya existe:
-     * actualizarla.
-     *
-     * Si Microsoft por alguna razón no manda
-     * un refresh_token nuevo, conservamos el
-     * que ya estaba guardado.
+     * 8. Actualizar conexión existente
      */
     if (conexionExistente) {
       const tokenAGuardar =
@@ -304,13 +301,18 @@ export async function GET(request: Request) {
       } = await supabase
         .from("onedrive_connections")
         .update({
-          provider: "microsoft",
+          provider:
+            "microsoft",
+
           drive_type:
             driveType || null,
+
           owner_name:
             ownerName || null,
+
           refresh_token:
             tokenAGuardar,
+
           updated_at:
             new Date().toISOString(),
         })
@@ -338,9 +340,8 @@ export async function GET(request: Request) {
       }
     } else {
       /*
-       * Primera conexión.
-       * Aquí sí necesitamos obligatoriamente
-       * el refresh_token.
+       * Primera conexión:
+       * necesitamos refresh_token.
        */
       if (!refreshToken) {
         return NextResponse.json(
@@ -397,12 +398,7 @@ export async function GET(request: Request) {
     }
 
     /*
-     * 9. RESPUESTA FINAL
-     *
-     * Nunca devolvemos:
-     * - access_token
-     * - refresh_token
-     * - client_secret
+     * 9. Nunca devolvemos tokens
      */
     return NextResponse.json({
       success: true,

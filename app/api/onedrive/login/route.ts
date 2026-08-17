@@ -5,15 +5,15 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const clientId = process.env.ONEDRIVE_CLIENT_ID;
-    const tenantId = process.env.ONEDRIVE_TENANT_ID;
+    const clientId =
+      process.env.ONEDRIVE_CLIENT_ID;
 
-    if (!clientId || !tenantId) {
+    if (!clientId) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "Faltan ONEDRIVE_CLIENT_ID u ONEDRIVE_TENANT_ID.",
+            "Falta ONEDRIVE_CLIENT_ID.",
         },
         { status: 500 }
       );
@@ -30,19 +30,22 @@ export async function GET() {
       "Files.ReadWrite",
     ].join(" ");
 
-    const params = new URLSearchParams({
-      client_id: clientId,
-      response_type: "code",
-      redirect_uri: redirectUri,
-      response_mode: "query",
-      scope: scopes,
-      prompt: "consent",
-    });
+    const params =
+      new URLSearchParams({
+        client_id: clientId,
+        response_type: "code",
+        redirect_uri: redirectUri,
+        response_mode: "query",
+        scope: scopes,
+        prompt: "consent",
+      });
 
     const authorizeUrl =
-      `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params.toString()}`;
+      `https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?${params.toString()}`;
 
-    return NextResponse.redirect(authorizeUrl);
+    return NextResponse.redirect(
+      authorizeUrl
+    );
   } catch (error: unknown) {
     return NextResponse.json(
       {
