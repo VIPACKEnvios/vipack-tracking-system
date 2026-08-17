@@ -225,7 +225,7 @@ export default function InventarioClientePage() {
             </h2>
 
             <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-4">
-              <div className="rounded-2xl bg-slate-50 p-3 sm:p-5">
+              <div className="min-w-0 rounded-2xl bg-slate-50 p-3 sm:p-5">
                 <p className="text-[11px] font-semibold text-slate-500 sm:text-sm">
                   Archivos
                 </p>
@@ -234,7 +234,7 @@ export default function InventarioClientePage() {
                 </p>
               </div>
 
-              <div className="rounded-2xl bg-slate-50 p-3 sm:p-5">
+              <div className="min-w-0 rounded-2xl bg-slate-50 p-3 sm:p-5">
                 <p className="text-[11px] font-semibold text-slate-500 sm:text-sm">
                   Fotos
                 </p>
@@ -243,7 +243,7 @@ export default function InventarioClientePage() {
                 </p>
               </div>
 
-              <div className="rounded-2xl bg-slate-50 p-3 sm:p-5">
+              <div className="min-w-0 rounded-2xl bg-slate-50 p-3 sm:p-5">
                 <p className="text-[11px] font-semibold leading-tight text-slate-500 sm:text-sm">
                   Otros archivos
                 </p>
