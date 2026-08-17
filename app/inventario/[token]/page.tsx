@@ -86,6 +86,27 @@ function formatearMes(clave: string) {
   );
 }
 
+function formatearMesCorto(clave: string) {
+  const [year, month] = clave
+    .split("-")
+    .map(Number);
+
+  const date = new Date(
+    year,
+    month - 1,
+    1
+  );
+
+  const texto =
+    new Intl.DateTimeFormat("es-MX", {
+      month: "short",
+    })
+      .format(date)
+      .replace(".", "");
+
+  return `${texto.charAt(0).toUpperCase()}${texto.slice(1)} ${year}`;
+}
+
 export default function InventarioClientePage() {
   const params = useParams();
 
@@ -365,57 +386,73 @@ export default function InventarioClientePage() {
             </div>
 
             {imagenes.length > 0 && (
-              <div className="-mx-1 mb-5 overflow-x-auto px-1 pb-1">
-                <div className="flex min-w-max gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      cambiarMes("todos")
-                    }
-                    className={`rounded-full border px-4 py-2 text-xs font-bold transition sm:text-sm ${
+              <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <button
+                  type="button"
+                  onClick={() =>
+                    cambiarMes("todos")
+                  }
+                  className={`w-full rounded-2xl border px-4 py-3 text-left transition sm:w-auto sm:min-w-[150px] ${
+                    mesActivo === "todos"
+                      ? "border-[#072c74] bg-[#072c74] text-white"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-[#072c74]"
+                  }`}
+                >
+                  <span className="block text-sm font-bold">
+                    Todos
+                  </span>
+
+                  <span
+                    className={`mt-1 block text-xs font-semibold ${
                       mesActivo === "todos"
-                        ? "border-[#072c74] bg-[#072c74] text-white"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-[#072c74] hover:text-[#072c74]"
+                        ? "text-white/70"
+                        : "text-slate-400"
                     }`}
                   >
-                    Todos
-                    <span className="ml-2 opacity-70">
-                      {imagenes.length}
-                    </span>
-                  </button>
+                    {imagenes.length} fotos
+                  </span>
+                </button>
 
-                  {mesesDisponibles.map(
-                    (mes) => {
-                      const cantidad =
-                        imagenes.filter(
-                          (item) =>
-                            obtenerClaveMes(
-                              item.modificado
-                            ) === mes
-                        ).length;
+                {mesesDisponibles.map(
+                  (mes) => {
+                    const cantidad =
+                      imagenes.filter(
+                        (item) =>
+                          obtenerClaveMes(
+                            item.modificado
+                          ) === mes
+                      ).length;
 
-                      return (
-                        <button
-                          key={mes}
-                          type="button"
-                          onClick={() =>
-                            cambiarMes(mes)
-                          }
-                          className={`rounded-full border px-4 py-2 text-xs font-bold transition sm:text-sm ${
+                    return (
+                      <button
+                        key={mes}
+                        type="button"
+                        onClick={() =>
+                          cambiarMes(mes)
+                        }
+                        className={`w-full rounded-2xl border px-4 py-3 text-left transition sm:w-auto sm:min-w-[150px] ${
+                          mesActivo === mes
+                            ? "border-[#072c74] bg-[#072c74] text-white"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-[#072c74]"
+                        }`}
+                      >
+                        <span className="block text-sm font-bold">
+                          {formatearMes(mes)}
+                        </span>
+
+                        <span
+                          className={`mt-1 block text-xs font-semibold ${
                             mesActivo === mes
-                              ? "border-[#072c74] bg-[#072c74] text-white"
-                              : "border-slate-200 bg-white text-slate-600 hover:border-[#072c74] hover:text-[#072c74]"
+                              ? "text-white/70"
+                              : "text-slate-400"
                           }`}
                         >
-                          {formatearMes(mes)}
-                          <span className="ml-2 opacity-70">
-                            {cantidad}
-                          </span>
-                        </button>
-                      );
-                    }
-                  )}
-                </div>
+                          {cantidad} fotos
+                        </span>
+                      </button>
+                    );
+                  }
+                )}
               </div>
             )}
 
