@@ -18,12 +18,27 @@ export function proxy(request: NextRequest) {
    * TrackingMore debe poder entrar sin cookie.
    * El webhook se protege con
    * TRACKINGMORE_WEBHOOK_SECRET.
+   *
+   * OneDrive:
+   * estas rutas necesitan poder recibir
+   * llamadas externas / callbacks sin cookie.
    */
   const isPublicApi =
     path === "/api/login" ||
     path.startsWith("/api/registro-bazar") ||
     path.startsWith("/api/consulta-bazares") ||
-    path.startsWith("/api/trackingmore/");
+    path.startsWith("/api/trackingmore/") ||
+
+    /*
+     * Microsoft OAuth
+     */
+    path === "/api/onedrive/login" ||
+    path === "/api/onedrive/callback" ||
+
+    /*
+     * Sincronización inicial de clientes
+     */
+    path === "/api/onedrive/sync-clientes";
 
   if (isPublicPage || isPublicApi) {
     return NextResponse.next();
