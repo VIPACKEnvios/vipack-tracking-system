@@ -537,19 +537,19 @@ export default function InventarioClientePage() {
           <div className="absolute -right-12 -top-14 h-52 w-52 rounded-full bg-blue-400/10 blur-2xl" />
           <div className="absolute right-20 top-10 h-28 w-28 rotate-12 rounded-3xl border border-blue-200/10 bg-blue-300/5" />
 
-          <div className="relative mx-auto max-w-6xl px-5 pb-12 pt-7 sm:px-8 sm:pb-16 sm:pt-10">
+          <div className="relative mx-auto max-w-6xl px-4 pb-9 pt-6 sm:px-8 sm:pb-16 sm:pt-10">
             <div className="flex items-start justify-between gap-5">
               <div>
                 <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.24em] text-blue-100 sm:text-sm">
-                  <IconoCaja className="h-5 w-5" />
+                  <IconoCaja className="h-4 w-4 sm:h-5 sm:w-5" />
                   VIPACK Envíos
                 </div>
 
-                <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">
+                <h1 className="mt-1.5 text-[34px] font-black leading-none tracking-tight sm:mt-2 sm:text-5xl lg:text-6xl">
                   Mi inventario
                 </h1>
 
-                <div className="mt-5 flex w-full max-w-md items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-4 py-3.5 backdrop-blur sm:px-5">
+                <div className="mt-4 flex w-full max-w-md items-center gap-2.5 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur sm:mt-5 sm:gap-3 sm:px-5 sm:py-3.5">
                   <IconoUsuario />
                   <span className="text-sm font-bold sm:text-base">
                     Cliente #
@@ -571,15 +571,15 @@ export default function InventarioClientePage() {
           </div>
         </header>
 
-        <section className="relative mx-auto -mt-7 max-w-6xl px-4 pb-10 sm:-mt-10 sm:px-8">
-          <div className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-xl shadow-slate-200/60 sm:p-8">
+        <section className="relative mx-auto -mt-5 max-w-6xl px-3.5 pb-10 sm:-mt-10 sm:px-8">
+          <div className="rounded-[26px] border border-slate-200/80 bg-white p-4.5 shadow-xl shadow-slate-200/60 sm:rounded-[28px] sm:p-8">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-400 sm:text-sm">
                   Inventario de
                 </p>
 
-                <h2 className="mt-2 break-words text-3xl font-black leading-tight text-slate-900 sm:text-4xl">
+                <h2 className="mt-1.5 break-words text-[27px] font-black leading-[1.08] text-slate-900 sm:mt-2 sm:text-4xl">
                   {
                     data.cliente
                       ?.nombre
@@ -594,15 +594,15 @@ export default function InventarioClientePage() {
               </div>
             </div>
 
-            <div className="mt-7 grid grid-cols-3 gap-2.5 sm:gap-4">
-              <div className="rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 to-white p-3 sm:p-5">
-                <div className="flex items-center gap-2 text-violet-600">
-                  <IconoDocumento className="h-6 w-6 shrink-0 sm:h-8 sm:w-8" />
+            <div className="mt-5 grid grid-cols-3 gap-2 sm:mt-7 sm:gap-4">
+              <div className="min-w-0 rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 to-white p-2.5 sm:p-5">
+                <div className="flex flex-col items-start gap-1.5 text-violet-600 sm:flex-row sm:items-center sm:gap-2">
+                  <IconoDocumento className="h-5 w-5 shrink-0 sm:h-8 sm:w-8" />
                   <div className="min-w-0">
-                    <p className="truncate text-[10px] font-black uppercase tracking-wide text-slate-500 sm:text-sm">
+                    <p className="min-h-[22px] text-[9px] font-black uppercase leading-[1.05] tracking-[0.02em] text-slate-500 sm:min-h-0 sm:text-sm sm:leading-normal">
                       Archivos
                     </p>
-                    <p className="mt-0.5 text-2xl font-black text-violet-600 sm:text-4xl">
+                    <p className="mt-0.5 text-[26px] font-black leading-none text-violet-600 sm:text-4xl">
                       {
                         data.total ||
                         0
@@ -612,14 +612,14 @@ export default function InventarioClientePage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-3 sm:p-5">
-                <div className="flex items-center gap-2 text-emerald-600">
-                  <IconoImagen className="h-6 w-6 shrink-0 sm:h-8 sm:w-8" />
+              <div className="min-w-0 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-2.5 sm:p-5">
+                <div className="flex flex-col items-start gap-1.5 text-emerald-600 sm:flex-row sm:items-center sm:gap-2">
+                  <IconoImagen className="h-5 w-5 shrink-0 sm:h-8 sm:w-8" />
                   <div className="min-w-0">
-                    <p className="truncate text-[10px] font-black uppercase tracking-wide text-slate-500 sm:text-sm">
+                    <p className="min-h-[22px] text-[9px] font-black uppercase leading-[1.05] tracking-[0.02em] text-slate-500 sm:min-h-0 sm:text-sm sm:leading-normal">
                       Fotos
                     </p>
-                    <p className="mt-0.5 text-2xl font-black text-emerald-600 sm:text-4xl">
+                    <p className="mt-0.5 text-[26px] font-black leading-none text-emerald-600 sm:text-4xl">
                       {
                         imagenes.length
                       }
@@ -628,14 +628,14 @@ export default function InventarioClientePage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white p-3 sm:p-5">
-                <div className="flex items-center gap-2 text-amber-500">
-                  <IconoCarpeta className="h-6 w-6 shrink-0 sm:h-8 sm:w-8" />
+              <div className="min-w-0 rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white p-2.5 sm:p-5">
+                <div className="flex flex-col items-start gap-1.5 text-amber-500 sm:flex-row sm:items-center sm:gap-2">
+                  <IconoCarpeta className="h-5 w-5 shrink-0 sm:h-8 sm:w-8" />
                   <div className="min-w-0">
-                    <p className="truncate text-[10px] font-black uppercase tracking-wide text-slate-500 sm:text-sm">
+                    <p className="min-h-[22px] text-[9px] font-black uppercase leading-[1.05] tracking-[0.02em] text-slate-500 sm:min-h-0 sm:text-sm sm:leading-normal">
                       Otros archivos
                     </p>
-                    <p className="mt-0.5 text-2xl font-black text-amber-500 sm:text-4xl">
+                    <p className="mt-0.5 text-[26px] font-black leading-none text-amber-500 sm:text-4xl">
                       {
                         otrosArchivos.length
                       }
@@ -646,8 +646,8 @@ export default function InventarioClientePage() {
             </div>
           </div>
 
-          <div className="mt-8">
-            <div className="flex items-end justify-between gap-3">
+          <div className="mt-6 sm:mt-8">
+            <div className="flex items-end justify-between gap-2 sm:gap-3">
               <div>
                 <div className="flex items-center gap-2 text-[#0a3183]">
                   <IconoCamara />
@@ -656,18 +656,18 @@ export default function InventarioClientePage() {
                   </p>
                 </div>
 
-                <h2 className="mt-1 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
+                <h2 className="mt-1 whitespace-nowrap text-[25px] font-black leading-none tracking-tight text-slate-900 sm:text-4xl">
                   Fotos de recolección
                 </h2>
               </div>
 
-              <div className="rounded-2xl bg-blue-50 px-4 py-2.5 text-center">
-                <span className="block text-xl font-black text-blue-600">
+              <div className="shrink-0 rounded-2xl bg-blue-50 px-3 py-2 text-center sm:px-4 sm:py-2.5">
+                <span className="block text-lg font-black leading-none text-blue-600 sm:text-xl">
                   {
                     imagenesFiltradas.length
                   }
                 </span>
-                <span className="text-[10px] font-bold uppercase tracking-wide text-blue-500">
+                <span className="mt-1 block text-[9px] font-bold uppercase tracking-wide text-blue-500 sm:text-[10px]">
                   fotos
                 </span>
               </div>
@@ -675,8 +675,8 @@ export default function InventarioClientePage() {
 
             {imagenes.length >
               0 && (
-              <div className="mt-5 rounded-[22px] border border-slate-200 bg-white p-2.5 shadow-md shadow-slate-200/40">
-                <div className="flex w-full gap-2">
+              <div className="mt-4 rounded-[20px] border border-slate-200 bg-white p-2 shadow-md shadow-slate-200/40 sm:mt-5 sm:rounded-[22px] sm:p-2.5">
+                <div className="flex w-full gap-1.5 sm:gap-2">
                   <button
                     type="button"
                     onClick={() =>
@@ -684,15 +684,15 @@ export default function InventarioClientePage() {
                         "todos"
                       )
                     }
-                    className={`min-w-0 flex-1 rounded-2xl border px-2 py-2.5 text-center transition ${
+                    className={`min-w-0 flex-1 rounded-xl border px-1.5 py-2 text-center transition sm:rounded-2xl sm:px-2 sm:py-2.5 ${
                       mesActivo ===
                       "todos"
                         ? "border-[#0a3183] bg-[#0a3183] text-white shadow-md"
                         : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50/40"
                     }`}
                   >
-                    <span className="mx-auto mb-1 flex h-5 w-5 items-center justify-center sm:h-6 sm:w-6">
-                      <IconoCuadricula className="h-5 w-5" />
+                    <span className="mx-auto mb-0.5 flex h-4 w-4 items-center justify-center sm:mb-1 sm:h-6 sm:w-6">
+                      <IconoCuadricula className="h-4 w-4 sm:h-5 sm:w-5" />
                     </span>
                     <span className="block truncate text-[10px] font-black sm:text-sm">
                       Todos
@@ -733,15 +733,15 @@ export default function InventarioClientePage() {
                               mes
                             )
                           }
-                          className={`min-w-0 flex-1 rounded-2xl border px-1.5 py-2.5 text-center transition ${
+                          className={`min-w-0 flex-1 rounded-xl border px-1 py-2 text-center transition sm:rounded-2xl sm:px-1.5 sm:py-2.5 ${
                             mesActivo ===
                             mes
                               ? "border-[#0a3183] bg-[#0a3183] text-white shadow-md"
                               : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50/40"
                           }`}
                         >
-                          <span className="mx-auto mb-1 flex h-5 w-5 items-center justify-center text-blue-500 sm:h-6 sm:w-6">
-                            <IconoCalendario className="h-5 w-5" />
+                          <span className="mx-auto mb-0.5 flex h-4 w-4 items-center justify-center text-blue-500 sm:mb-1 sm:h-6 sm:w-6">
+                            <IconoCalendario className="h-4 w-4 sm:h-5 sm:w-5" />
                           </span>
 
                           <span className="block truncate text-[9px] font-black sm:hidden">
@@ -787,7 +787,7 @@ export default function InventarioClientePage() {
                 No hay fotos disponibles en este mes.
               </div>
             ) : (
-              <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:mt-6 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
                 {imagenesFiltradas.map(
                   (
                     item,
@@ -797,7 +797,7 @@ export default function InventarioClientePage() {
                       key={
                         item.id
                       }
-                      className="group min-w-0 overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-md shadow-slate-200/50 transition hover:-translate-y-1 hover:shadow-xl"
+                      className="group min-w-0 overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-md shadow-slate-200/50 transition hover:-translate-y-1 hover:shadow-xl sm:rounded-[22px]"
                     >
                       <button
                         type="button"
@@ -833,7 +833,7 @@ export default function InventarioClientePage() {
                         </div>
                       </button>
 
-                      <div className="p-3.5 sm:p-4">
+                      <div className="p-3 sm:p-4">
                         <p className="truncate text-sm font-black text-slate-900 sm:text-base">
                           {
                             item.nombre
@@ -915,7 +915,7 @@ export default function InventarioClientePage() {
             </div>
           )}
 
-          <div className="mt-10 overflow-hidden rounded-[26px] bg-gradient-to-r from-violet-600 via-blue-600 to-sky-500 p-5 text-white shadow-xl shadow-blue-200/50 sm:p-6">
+          <div className="mt-8 overflow-hidden rounded-[24px] bg-gradient-to-r from-violet-600 via-blue-600 to-sky-500 p-4 text-white shadow-xl shadow-blue-200/50 sm:mt-10 sm:rounded-[26px] sm:p-6">
             <div className="flex items-center justify-between gap-5">
               <div>
                 <p className="text-lg font-black sm:text-xl">
