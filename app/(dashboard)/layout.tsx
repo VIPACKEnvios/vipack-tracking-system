@@ -59,6 +59,15 @@ const menuBazares: EnlaceMenu[] = [
   },
 ];
 
+
+const menuInventario: EnlaceMenu[] = [
+  {
+    etiqueta: "Inventarios",
+    href: "/inventarios",
+    icono: <IconoInventario />,
+  },
+];
+
 export default function DashboardLayout({
   children,
 }: {
@@ -105,6 +114,13 @@ export default function DashboardLayout({
             <GrupoMenu
               titulo="Bazares"
               enlaces={menuBazares}
+              pathname={pathname}
+              contraido={menuContraido}
+            />
+
+            <GrupoMenu
+              titulo="Inventario"
+              enlaces={menuInventario}
               pathname={pathname}
               contraido={menuContraido}
             />
@@ -178,6 +194,13 @@ export default function DashboardLayout({
                 <GrupoMenu
                   titulo="Bazares"
                   enlaces={menuBazares}
+                  pathname={pathname}
+                  contraido={false}
+                />
+
+                <GrupoMenu
+                  titulo="Inventario"
+                  enlaces={menuInventario}
                   pathname={pathname}
                   contraido={false}
                 />
@@ -535,6 +558,17 @@ function IconoCaja() {
       <path d="M4 8h16v12H4V8Z" />
       <path d="M8 8V4h8v4" />
       <path d="M9 13h6" />
+    </IconoBase>
+  );
+}
+
+function IconoInventario() {
+  return (
+    <IconoBase>
+      <path d="M4 7 12 3l8 4-8 4-8-4Z" />
+      <path d="M4 7v10l8 4 8-4V7" />
+      <path d="M12 11v10" />
+      <path d="M8 9v4l4 2 4-2V9" />
     </IconoBase>
   );
 }

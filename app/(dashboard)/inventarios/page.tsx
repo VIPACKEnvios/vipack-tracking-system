@@ -1,0 +1,999 @@
+"use client";
+
+import {
+  ChangeEvent,
+  DragEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+type ClienteInventario = {
+  id: number;
+  id_cliente: number;
+  nombre: string;
+  carpeta_cliente: string | null;
+  onedrive_folder_id: string | null;
+  token_inventario: string | null;
+  activo: boolean;
+  total_archivos?: number;
+};
+
+type RespuestaClientes = {
+  success: boolean;
+  clientes?: ClienteInventario[];
+  error?: string;
+};
+
+type RespuestaSesionCarga = {
+  success: boolean;
+  uploadUrl?: string;
+  expirationDateTime?: string | null;
+  error?: string;
+  detalle?: unknown;
+};
+
+type ArchivoPendiente = {
+  id: string;
+  archivo: File;
+  progreso: number;
+  estado:
+    | "pendiente"
+    | "subiendo"
+    | "completado"
+    | "error";
+  error?: string;
+};
+
+function numeroCliente(valor: number) {
+  return `#${String(valor).padStart(5, "0")}`;
+}
+
+function formatearTamaño(bytes: number) {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function IconoBuscar() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-4-4" />
+    </svg>
+  );
+}
+
+function IconoSubir() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className="h-6 w-6"
+      aria-hidden="true"
+    >
+      <path d="M12 16V4" />
+      <path d="m7 9 5-5 5 5" />
+      <path d="M5 20h14" />
+    </svg>
+  );
+}
+
+function IconoCarpeta() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <path d="M3 7h7l2 2h9v10H3V7Z" />
+    </svg>
+  );
+}
+
+function IconoImagen() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="9" cy="9" r="1.5" />
+      <path d="m5 18 5-5 3 3 2-2 4 4" />
+    </svg>
+  );
+}
+
+function IconoCerrar() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <path d="m6 6 12 12" />
+      <path d="m18 6-12 12" />
+    </svg>
+  );
+}
+
+export default function InventariosAdminPage() {
+  const [clientes, setClientes] =
+    useState<ClienteInventario[]>([]);
+
+  const [cargando, setCargando] =
+    useState(true);
+
+  const [error, setError] =
+    useState("");
+
+  const [busqueda, setBusqueda] =
+    useState("");
+
+  const [clienteSeleccionado, setClienteSeleccionado] =
+    useState<ClienteInventario | null>(null);
+
+  const [archivos, setArchivos] =
+    useState<ArchivoPendiente[]>([]);
+
+  const [subiendo, setSubiendo] =
+    useState(false);
+
+  const [mensaje, setMensaje] =
+    useState("");
+
+  const inputArchivos =
+    useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const cargarClientes = async () => {
+      try {
+        setCargando(true);
+        setError("");
+
+        const response = await fetch(
+          "/api/inventarios/clientes",
+          {
+            cache: "no-store",
+          }
+        );
+
+        const data: RespuestaClientes =
+          await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(
+            data.error ||
+              "No se pudieron cargar los clientes."
+          );
+        }
+
+        setClientes(
+          Array.isArray(data.clientes)
+            ? data.clientes
+            : []
+        );
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "No se pudieron cargar los clientes."
+        );
+      } finally {
+        setCargando(false);
+      }
+    };
+
+    cargarClientes();
+  }, []);
+
+  const clientesFiltrados =
+    useMemo(() => {
+      const texto =
+        busqueda.trim().toLowerCase();
+
+      if (!texto) {
+        return clientes;
+      }
+
+      return clientes.filter((cliente) => {
+        const numero =
+          String(cliente.id_cliente);
+
+        const nombre =
+          cliente.nombre.toLowerCase();
+
+        const carpeta =
+          (cliente.carpeta_cliente || "")
+            .toLowerCase();
+
+        return (
+          numero.includes(texto) ||
+          nombre.includes(texto) ||
+          carpeta.includes(texto)
+        );
+      });
+    }, [clientes, busqueda]);
+
+  function agregarArchivos(
+    lista: FileList | File[]
+  ) {
+    const nuevos = Array.from(lista)
+      .filter((archivo) => {
+        return (
+          archivo.type.startsWith("image/") ||
+          archivo.type.startsWith("video/")
+        );
+      })
+      .map((archivo) => ({
+        id: `${archivo.name}-${archivo.size}-${archivo.lastModified}-${Math.random()}`,
+        archivo,
+        progreso: 0,
+        estado: "pendiente" as const,
+      }));
+
+    if (nuevos.length === 0) {
+      setMensaje(
+        "Selecciona únicamente fotos o videos."
+      );
+      return;
+    }
+
+    setMensaje("");
+    setArchivos((actuales) => [
+      ...actuales,
+      ...nuevos,
+    ]);
+  }
+
+  function manejarInput(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
+    if (!event.target.files) {
+      return;
+    }
+
+    agregarArchivos(
+      event.target.files
+    );
+
+    event.target.value = "";
+  }
+
+  function manejarDrop(
+    event: DragEvent<HTMLDivElement>
+  ) {
+    event.preventDefault();
+
+    if (
+      event.dataTransfer.files.length
+    ) {
+      agregarArchivos(
+        event.dataTransfer.files
+      );
+    }
+  }
+
+  function quitarArchivo(
+    id: string
+  ) {
+    setArchivos((actuales) =>
+      actuales.filter(
+        (item) => item.id !== id
+      )
+    );
+  }
+
+  function actualizarArchivo(
+    id: string,
+    cambios: Partial<ArchivoPendiente>
+  ) {
+    setArchivos((actuales) =>
+      actuales.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              ...cambios,
+            }
+          : item
+      )
+    );
+  }
+
+  async function crearSesionCarga(
+    cliente: ClienteInventario,
+    item: ArchivoPendiente
+  ) {
+    const response = await fetch(
+      "/api/inventarios/subir",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+        body: JSON.stringify({
+          id_cliente:
+            cliente.id_cliente,
+          nombre_archivo:
+            item.archivo.name,
+          tamaño:
+            item.archivo.size,
+        }),
+      }
+    );
+
+    const data: RespuestaSesionCarga =
+      await response.json();
+
+    if (
+      !response.ok ||
+      !data.success ||
+      !data.uploadUrl
+    ) {
+      throw new Error(
+        data.error ||
+          "No se pudo preparar la subida."
+      );
+    }
+
+    return data.uploadUrl;
+  }
+
+  async function subirArchivoPorPartes(
+    item: ArchivoPendiente,
+    uploadUrl: string
+  ) {
+    /*
+     * 5 MiB.
+     * Es múltiplo exacto de 320 KiB,
+     * como requiere Microsoft Graph.
+     */
+    const chunkSize =
+      5 * 1024 * 1024;
+
+    const total =
+      item.archivo.size;
+
+    let inicio = 0;
+
+    while (inicio < total) {
+      const finExclusivo =
+        Math.min(
+          inicio + chunkSize,
+          total
+        );
+
+      const bloque =
+        item.archivo.slice(
+          inicio,
+          finExclusivo
+        );
+
+      const finInclusivo =
+        finExclusivo - 1;
+
+      const response = await fetch(
+        uploadUrl,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Length":
+              String(bloque.size),
+            "Content-Range":
+              `bytes ${inicio}-${finInclusivo}/${total}`,
+          },
+          body: bloque,
+        }
+      );
+
+      if (
+        response.status !== 200 &&
+        response.status !== 201 &&
+        response.status !== 202
+      ) {
+        let detalle = "";
+
+        try {
+          const errorData =
+            await response.json();
+
+          detalle =
+            errorData?.error?.message ||
+            errorData?.error ||
+            "";
+        } catch {
+          detalle =
+            await response.text();
+        }
+
+        throw new Error(
+          detalle ||
+            `OneDrive devolvió HTTP ${response.status}.`
+        );
+      }
+
+      inicio =
+        finExclusivo;
+
+      const progreso =
+        Math.min(
+          100,
+          Math.round(
+            (inicio / total) *
+              100
+          )
+        );
+
+      actualizarArchivo(
+        item.id,
+        {
+          progreso,
+          estado:
+            progreso === 100
+              ? "completado"
+              : "subiendo",
+        }
+      );
+    }
+  }
+
+  async function subirEvidencias() {
+    if (!clienteSeleccionado) {
+      setMensaje(
+        "Selecciona un cliente."
+      );
+      return;
+    }
+
+    if (
+      !clienteSeleccionado.onedrive_folder_id
+    ) {
+      setMensaje(
+        "Este cliente todavía no tiene carpeta de OneDrive vinculada."
+      );
+      return;
+    }
+
+    if (archivos.length === 0) {
+      setMensaje(
+        "Selecciona al menos una foto o video."
+      );
+      return;
+    }
+
+    try {
+      setSubiendo(true);
+      setMensaje("");
+
+      let subidos = 0;
+      let errores = 0;
+
+      /*
+       * Subimos uno por uno para no saturar
+       * el navegador ni OneDrive.
+       */
+      for (const item of archivos) {
+        try {
+          actualizarArchivo(
+            item.id,
+            {
+              progreso: 0,
+              estado:
+                "subiendo",
+              error:
+                undefined,
+            }
+          );
+
+          const uploadUrl =
+            await crearSesionCarga(
+              clienteSeleccionado,
+              item
+            );
+
+          await subirArchivoPorPartes(
+            item,
+            uploadUrl
+          );
+
+          actualizarArchivo(
+            item.id,
+            {
+              progreso: 100,
+              estado:
+                "completado",
+            }
+          );
+
+          subidos += 1;
+        } catch (err) {
+          errores += 1;
+
+          actualizarArchivo(
+            item.id,
+            {
+              estado: "error",
+              error:
+                err instanceof Error
+                  ? err.message
+                  : "Error desconocido.",
+            }
+          );
+        }
+      }
+
+      if (
+        errores === 0
+      ) {
+        setMensaje(
+          `${subidos} archivo(s) subido(s) correctamente a OneDrive.`
+        );
+      } else {
+        setMensaje(
+          `${subidos} archivo(s) subido(s) y ${errores} con error. Revisa los archivos marcados.`
+        );
+      }
+    } finally {
+      setSubiendo(false);
+    }
+  }
+
+  function abrirInventario(
+    cliente: ClienteInventario
+  ) {
+    if (!cliente.token_inventario) {
+      setMensaje(
+        "Este cliente todavía no tiene token de inventario."
+      );
+      return;
+    }
+
+    window.open(
+      `/inventario/${cliente.token_inventario}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
+  return (
+    <div className="min-h-full bg-slate-100 px-4 py-6 md:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-700">
+            Operación interna
+          </p>
+
+          <h1 className="mt-1 text-3xl font-black text-slate-950">
+            Inventarios
+          </h1>
+
+          <p className="mt-2 max-w-3xl text-sm text-slate-600">
+            Selecciona un cliente, revisa su carpeta vinculada y sube fotos o videos de evidencia directamente a su inventario.
+          </p>
+        </div>
+
+        <div className="mt-6 grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
+          <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                <IconoBuscar />
+              </span>
+
+              <input
+                value={busqueda}
+                onChange={(event) =>
+                  setBusqueda(
+                    event.target.value
+                  )
+                }
+                placeholder="Buscar cliente..."
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-medium text-slate-800 outline-none transition focus:border-cyan-500 focus:bg-white"
+              />
+            </div>
+
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-sm font-black text-slate-800">
+                Clientes activos
+              </p>
+
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
+                {clientesFiltrados.length}
+              </span>
+            </div>
+
+            <div className="mt-3 max-h-[620px] space-y-2 overflow-y-auto pr-1">
+              {cargando && (
+                <div className="rounded-2xl bg-slate-50 p-5 text-center text-sm font-semibold text-slate-500">
+                  Cargando clientes...
+                </div>
+              )}
+
+              {!cargando && error && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+                  {error}
+                </div>
+              )}
+
+              {!cargando &&
+                !error &&
+                clientesFiltrados.length ===
+                  0 && (
+                  <div className="rounded-2xl bg-slate-50 p-5 text-center text-sm font-semibold text-slate-500">
+                    No se encontraron clientes.
+                  </div>
+                )}
+
+              {clientesFiltrados.map(
+                (cliente) => {
+                  const activo =
+                    clienteSeleccionado
+                      ?.id ===
+                    cliente.id;
+
+                  return (
+                    <button
+                      key={cliente.id}
+                      type="button"
+                      onClick={() => {
+                        setClienteSeleccionado(
+                          cliente
+                        );
+                        setArchivos([]);
+                        setMensaje("");
+                      }}
+                      className={`w-full rounded-2xl border p-3 text-left transition ${
+                        activo
+                          ? "border-cyan-500 bg-cyan-50 shadow-sm"
+                          : "border-slate-200 bg-white hover:border-cyan-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                            activo
+                              ? "bg-cyan-600 text-white"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          <IconoCarpeta />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-black text-cyan-700">
+                              {numeroCliente(
+                                cliente.id_cliente
+                              )}
+                            </p>
+
+                            <span
+                              className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                                cliente.onedrive_folder_id
+                                  ? "bg-emerald-500"
+                                  : "bg-amber-400"
+                              }`}
+                            />
+                          </div>
+
+                          <p className="mt-1 truncate text-sm font-black text-slate-900">
+                            {
+                              cliente.nombre
+                            }
+                          </p>
+
+                          <p className="mt-1 truncate text-xs text-slate-500">
+                            {cliente.carpeta_cliente ||
+                              "Sin carpeta"}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                }
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+            {!clienteSeleccionado ? (
+              <div className="flex min-h-[520px] items-center justify-center">
+                <div className="max-w-md text-center">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-700">
+                    <IconoImagen />
+                  </div>
+
+                  <h2 className="mt-5 text-2xl font-black text-slate-900">
+                    Selecciona un cliente
+                  </h2>
+
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                    Elige un cliente de la lista para consultar su carpeta y subir evidencias.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.15em] text-cyan-700">
+                      Cliente seleccionado
+                    </p>
+
+                    <h2 className="mt-1 text-2xl font-black text-slate-950">
+                      {
+                        clienteSeleccionado.nombre
+                      }
+                    </h2>
+
+                    <p className="mt-1 text-sm font-bold text-slate-500">
+                      {numeroCliente(
+                        clienteSeleccionado.id_cliente
+                      )}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      abrirInventario(
+                        clienteSeleccionado
+                      )
+                    }
+                    className="rounded-xl border border-[#072c74] px-4 py-2.5 text-sm font-black text-[#072c74] transition hover:bg-[#072c74] hover:text-white"
+                  >
+                    Ver inventario
+                  </button>
+                </div>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-xs font-bold text-slate-500">
+                      Carpeta OneDrive
+                    </p>
+                    <p
+                      className={`mt-2 text-sm font-black ${
+                        clienteSeleccionado.onedrive_folder_id
+                          ? "text-emerald-600"
+                          : "text-amber-600"
+                      }`}
+                    >
+                      {clienteSeleccionado.onedrive_folder_id
+                        ? "Vinculada"
+                        : "Sin vincular"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-xs font-bold text-slate-500">
+                      Archivos
+                    </p>
+                    <p className="mt-2 text-2xl font-black text-[#072c74]">
+                      {
+                        clienteSeleccionado.total_archivos ??
+                        "—"
+                      }
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-xs font-bold text-slate-500">
+                      Acceso cliente
+                    </p>
+                    <p
+                      className={`mt-2 text-sm font-black ${
+                        clienteSeleccionado.token_inventario
+                          ? "text-emerald-600"
+                          : "text-amber-600"
+                      }`}
+                    >
+                      {clienteSeleccionado.token_inventario
+                        ? "Disponible"
+                        : "Sin token"}
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  onDragOver={(event) =>
+                    event.preventDefault()
+                  }
+                  onDrop={manejarDrop}
+                  className="mt-6 rounded-3xl border-2 border-dashed border-cyan-200 bg-cyan-50/40 p-6 text-center transition hover:border-cyan-400"
+                >
+                  <input
+                    ref={inputArchivos}
+                    type="file"
+                    multiple
+                    accept="image/*,video/*"
+                    onChange={
+                      manejarInput
+                    }
+                    className="hidden"
+                  />
+
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-lg">
+                    <IconoSubir />
+                  </div>
+
+                  <h3 className="mt-4 text-lg font-black text-slate-950">
+                    Subir evidencia
+                  </h3>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Arrastra fotos o videos aquí, o selecciónalos desde tu computadora.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      inputArchivos.current?.click()
+                    }
+                    className="mt-4 rounded-xl bg-[#072c74] px-5 py-3 text-sm font-black text-white shadow-md transition hover:bg-[#0a3b8f]"
+                  >
+                    Seleccionar archivos
+                  </button>
+                </div>
+
+                {archivos.length >
+                  0 && (
+                  <div className="mt-6">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-black text-slate-900">
+                        Archivos seleccionados
+                      </h3>
+
+                      <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-black text-cyan-700">
+                        {archivos.length}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 space-y-2">
+                      {archivos.map(
+                        (item) => (
+                          <div
+                            key={
+                              item.id
+                            }
+                            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3"
+                          >
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-cyan-700 shadow-sm">
+                              <IconoImagen />
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-black text-slate-900">
+                                {
+                                  item.archivo.name
+                                }
+                              </p>
+
+                              <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                                <span>
+                                  {formatearTamaño(
+                                    item.archivo.size
+                                  )}
+                                </span>
+
+                                {item.estado ===
+                                  "completado" && (
+                                  <span className="font-black text-emerald-600">
+                                    Completado
+                                  </span>
+                                )}
+
+                                {item.estado ===
+                                  "error" && (
+                                  <span className="font-black text-red-600">
+                                    Error
+                                  </span>
+                                )}
+                              </div>
+
+                              {(item.estado ===
+                                "subiendo" ||
+                                item.estado ===
+                                  "completado") && (
+                                <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
+                                  <div
+                                    className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 transition-all"
+                                    style={{
+                                      width: `${item.progreso}%`,
+                                    }}
+                                  />
+                                </div>
+                              )}
+
+                              {item.error && (
+                                <p className="mt-2 text-xs font-semibold text-red-600">
+                                  {item.error}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="shrink-0 text-xs font-black text-slate-500">
+                              {item.estado ===
+                              "subiendo"
+                                ? `${item.progreso}%`
+                                : ""}
+                            </div>
+
+                            <button
+                              type="button"
+                              disabled={subiendo}
+                              onClick={() =>
+                                quitarArchivo(
+                                  item.id
+                                )
+                              }
+                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                              aria-label="Quitar archivo"
+                            >
+                              <IconoCerrar />
+                            </button>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {mensaje && (
+                  <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-700">
+                    {mensaje}
+                  </div>
+                )}
+
+                <div className="mt-6 flex justify-end">
+                  <button
+                    type="button"
+                    disabled={
+                      subiendo ||
+                      archivos.length ===
+                        0 ||
+                      !clienteSeleccionado.onedrive_folder_id
+                    }
+                    onClick={
+                      subirEvidencias
+                    }
+                    className="rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-6 py-3 text-sm font-black text-white shadow-lg transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {subiendo
+                      ? "Subiendo a OneDrive..."
+                      : "Subir evidencias"}
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
