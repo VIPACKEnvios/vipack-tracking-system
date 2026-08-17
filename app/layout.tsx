@@ -84,9 +84,9 @@ export const metadata: Metadata = {
   },
 
   icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
-    apple: "/favicon.ico",
+    icon: "/vipack-logo.jpg",
+    shortcut: "/vipack-logo.jpg",
+    apple: "/vipack-logo.jpg",
   },
 };
 
