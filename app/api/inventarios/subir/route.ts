@@ -381,9 +381,9 @@ export async function POST(request: Request) {
     /*
      * 5. Crear una sesión de carga.
      *
-     * Usamos drive_id cuando existe.
-     * Si por alguna razón no está guardado,
-     * usamos /me/drive.
+     * La carpeta fue vinculada usando la misma
+     * cuenta personal conectada de OneDrive,
+     * por eso usamos /me/drive.
      */
     const nombreCodificado =
       encodeURIComponent(
@@ -442,8 +442,33 @@ export async function POST(request: Request) {
     ) {
       console.error(
         "Error creando upload session:",
-        sessionData
+        {
+          status:
+            sessionResponse.status,
+          statusText:
+            sessionResponse.statusText,
+          sessionData,
+        }
       );
+
+      const graphCode =
+        sessionData?.error?.code;
+
+      const graphMessage =
+        sessionData?.error?.message;
+
+      const detalle =
+        [
+          graphCode
+            ? `Código: ${graphCode}`
+            : "",
+          graphMessage
+            ? `Microsoft: ${graphMessage}`
+            : "",
+          `HTTP: ${sessionResponse.status}`,
+        ]
+          .filter(Boolean)
+          .join(" | ");
 
       return NextResponse.json(
         {
@@ -451,12 +476,16 @@ export async function POST(request: Request) {
           error:
             "No se pudo preparar la subida del archivo en OneDrive.",
           detalle:
-            sessionData?.error?.message ||
-            sessionData?.error?.code ||
-            sessionData?.error ||
-            sessionData,
+            detalle ||
+            "Microsoft Graph rechazó createUploadSession.",
         },
-        { status: 400 }
+        {
+          status:
+            sessionResponse.status >= 400 &&
+            sessionResponse.status < 600
+              ? sessionResponse.status
+              : 400,
+        }
       );
     }
 
