@@ -921,26 +921,22 @@ export default function InventarioClientePage() {
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {videos.map((item) => (
-                      <a
+                      <article
                         key={item.id}
-                        href={item.webUrl || "#"}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="group overflow-hidden rounded-[20px] border border-slate-200 bg-slate-50 transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-lg"
+                        className="overflow-hidden rounded-[20px] border border-slate-200 bg-slate-50 shadow-sm transition hover:border-blue-200 hover:shadow-lg"
                       >
-                        <div className="relative flex aspect-video items-center justify-center bg-gradient-to-br from-[#082c78] via-[#0a3183] to-[#1761db] text-white">
-                          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/15 shadow-xl backdrop-blur transition group-hover:scale-105 group-hover:bg-white/20">
-                            <svg
-                              viewBox="0 0 24 24"
-                              fill="currentColor"
-                              className="ml-1 h-8 w-8"
-                              aria-hidden="true"
-                            >
-                              <path d="M8 5v14l11-7L8 5Z" />
-                            </svg>
-                          </div>
+                        <div className="relative overflow-hidden bg-black">
+                          <video
+                            controls
+                            playsInline
+                            preload="metadata"
+                            src={srcImagen(item)}
+                            className="aspect-video w-full bg-black object-contain"
+                          >
+                            Tu navegador no puede reproducir este video.
+                          </video>
 
-                          <div className="absolute left-3 top-3 rounded-xl bg-black/30 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide backdrop-blur">
+                          <div className="pointer-events-none absolute left-3 top-3 rounded-xl bg-black/55 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white backdrop-blur">
                             Video
                           </div>
                         </div>
@@ -962,16 +958,11 @@ export default function InventarioClientePage() {
                             </div>
                           </div>
 
-                          <div className="mt-4 flex items-center justify-between">
-                            <span className="text-sm font-black text-[#0a3183]">
-                              Ver video
-                            </span>
-                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-[#0a3183] transition group-hover:bg-[#0a3183] group-hover:text-white">
-                              ▶
-                            </span>
+                          <div className="mt-4 rounded-xl bg-blue-50 px-3 py-2 text-center text-xs font-black text-[#0a3183]">
+                            Reproducir directamente en tu inventario
                           </div>
                         </div>
-                      </a>
+                      </article>
                     ))}
                   </div>
                 </div>
