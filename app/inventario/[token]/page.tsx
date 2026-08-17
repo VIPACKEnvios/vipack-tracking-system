@@ -386,73 +386,79 @@ export default function InventarioClientePage() {
             </div>
 
             {imagenes.length > 0 && (
-              <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <button
-                  type="button"
-                  onClick={() =>
-                    cambiarMes("todos")
-                  }
-                  className={`w-full rounded-2xl border px-4 py-3 text-left transition sm:w-auto sm:min-w-[150px] ${
-                    mesActivo === "todos"
-                      ? "border-[#072c74] bg-[#072c74] text-white"
-                      : "border-slate-200 bg-white text-slate-700 hover:border-[#072c74]"
-                  }`}
-                >
-                  <span className="block text-sm font-bold">
-                    Todos
-                  </span>
-
-                  <span
-                    className={`mt-1 block text-xs font-semibold ${
+              <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+                <div className="flex w-full gap-1.5 sm:gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      cambiarMes("todos")
+                    }
+                    className={`min-w-0 flex-1 rounded-xl border px-2 py-2 text-center transition sm:rounded-2xl sm:px-3 sm:py-2.5 ${
                       mesActivo === "todos"
-                        ? "text-white/70"
-                        : "text-slate-400"
+                        ? "border-[#072c74] bg-[#072c74] text-white shadow-sm"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:border-[#072c74] hover:bg-white"
                     }`}
                   >
-                    {imagenes.length} fotos
-                  </span>
-                </button>
+                    <span className="block truncate text-[11px] font-black sm:text-sm">
+                      Todos
+                    </span>
 
-                {mesesDisponibles.map(
-                  (mes) => {
-                    const cantidad =
-                      imagenes.filter(
-                        (item) =>
-                          obtenerClaveMes(
-                            item.modificado
-                          ) === mes
-                      ).length;
+                    <span
+                      className={`mt-0.5 block text-[10px] font-bold sm:text-xs ${
+                        mesActivo === "todos"
+                          ? "text-white/75"
+                          : "text-slate-400"
+                      }`}
+                    >
+                      {imagenes.length}
+                    </span>
+                  </button>
 
-                    return (
-                      <button
-                        key={mes}
-                        type="button"
-                        onClick={() =>
-                          cambiarMes(mes)
-                        }
-                        className={`w-full rounded-2xl border px-4 py-3 text-left transition sm:w-auto sm:min-w-[150px] ${
-                          mesActivo === mes
-                            ? "border-[#072c74] bg-[#072c74] text-white"
-                            : "border-slate-200 bg-white text-slate-700 hover:border-[#072c74]"
-                        }`}
-                      >
-                        <span className="block text-sm font-bold">
-                          {formatearMes(mes)}
-                        </span>
+                  {mesesDisponibles.map(
+                    (mes) => {
+                      const cantidad =
+                        imagenes.filter(
+                          (item) =>
+                            obtenerClaveMes(
+                              item.modificado
+                            ) === mes
+                        ).length;
 
-                        <span
-                          className={`mt-1 block text-xs font-semibold ${
+                      return (
+                        <button
+                          key={mes}
+                          type="button"
+                          onClick={() =>
+                            cambiarMes(mes)
+                          }
+                          className={`min-w-0 flex-1 rounded-xl border px-1.5 py-2 text-center transition sm:rounded-2xl sm:px-3 sm:py-2.5 ${
                             mesActivo === mes
-                              ? "text-white/70"
-                              : "text-slate-400"
+                              ? "border-[#072c74] bg-[#072c74] text-white shadow-sm"
+                              : "border-slate-200 bg-slate-50 text-slate-700 hover:border-[#072c74] hover:bg-white"
                           }`}
                         >
-                          {cantidad} fotos
-                        </span>
-                      </button>
-                    );
-                  }
-                )}
+                          <span className="block truncate text-[10px] font-black sm:hidden">
+                            {formatearMesCorto(mes)}
+                          </span>
+
+                          <span className="hidden truncate text-sm font-black sm:block">
+                            {formatearMes(mes)}
+                          </span>
+
+                          <span
+                            className={`mt-0.5 block text-[10px] font-bold sm:text-xs ${
+                              mesActivo === mes
+                                ? "text-white/75"
+                                : "text-slate-400"
+                            }`}
+                          >
+                            {cantidad}
+                          </span>
+                        </button>
+                      );
+                    }
+                  )}
+                </div>
               </div>
             )}
 
