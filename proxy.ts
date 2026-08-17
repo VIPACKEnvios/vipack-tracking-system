@@ -14,14 +14,6 @@ export function proxy(request: NextRequest) {
 
   /*
    * APIs PÚBLICAS
-   *
-   * TrackingMore debe poder entrar sin cookie.
-   * El webhook se protege con
-   * TRACKINGMORE_WEBHOOK_SECRET.
-   *
-   * OneDrive:
-   * estas rutas necesitan poder recibir
-   * llamadas externas / callbacks sin cookie.
    */
   const isPublicApi =
     path === "/api/login" ||
@@ -30,15 +22,18 @@ export function proxy(request: NextRequest) {
     path.startsWith("/api/trackingmore/") ||
 
     /*
-     * Microsoft OAuth
+     * Microsoft OneDrive
      */
     path === "/api/onedrive/login" ||
     path === "/api/onedrive/callback" ||
+    path === "/api/onedrive/sync-clientes" ||
 
     /*
-     * Sincronización inicial de clientes
+     * Inventario privado por token.
+     * No requiere cookie de administrador.
+     * La propia API valida token_inventario.
      */
-    path === "/api/onedrive/sync-clientes";
+    path.startsWith("/api/inventario/");
 
   if (isPublicPage || isPublicApi) {
     return NextResponse.next();
