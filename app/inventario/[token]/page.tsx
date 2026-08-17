@@ -538,8 +538,8 @@ export default function InventarioClientePage() {
           <div className="absolute right-20 top-10 h-28 w-28 rotate-12 rounded-3xl border border-blue-200/10 bg-blue-300/5" />
 
           <div className="relative mx-auto max-w-6xl px-4 pb-7 pt-5 sm:px-8 sm:pb-16 sm:pt-10">
-            <div className="flex items-start justify-between gap-5">
-              <div>
+            <div className="relative flex items-start justify-between gap-3 sm:gap-5">
+              <div className="min-w-0 pr-14 sm:pr-0">
                 <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.24em] text-blue-100 sm:text-sm">
                   <IconoCaja className="h-4 w-4 sm:h-5 sm:w-5" />
                   VIPACK Envíos
@@ -564,8 +564,8 @@ export default function InventarioClientePage() {
                 </div>
               </div>
 
-              <div className="hidden text-blue-100/80 sm:block">
-                <IconoCaja className="h-24 w-24 lg:h-32 lg:w-32" />
+              <div className="pointer-events-none absolute right-1 top-6 text-blue-100/55 sm:static sm:block sm:text-blue-100/80">
+                <IconoCaja className="h-16 w-16 sm:h-24 sm:w-24 lg:h-32 lg:w-32" />
               </div>
             </div>
           </div>
@@ -573,13 +573,13 @@ export default function InventarioClientePage() {
 
         <section className="relative mx-auto -mt-4 max-w-6xl px-3.5 pb-10 sm:-mt-10 sm:px-8">
           <div className="rounded-[24px] border border-slate-200/80 bg-white p-4 shadow-xl shadow-slate-200/60 sm:rounded-[28px] sm:p-8">
-            <div className="flex items-start justify-between gap-4">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 sm:flex sm:justify-between sm:gap-4">
               <div className="min-w-0">
                 <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-400 sm:text-sm">
                   Inventario de
                 </p>
 
-                <h2 className="mt-1 break-words text-[25px] font-black leading-[1.07] text-slate-900 sm:mt-2 sm:text-4xl">
+                <h2 className="mt-1 break-words text-[23px] font-black leading-[1.07] text-slate-900 sm:mt-2 sm:text-4xl">
                   {
                     data.cliente
                       ?.nombre
@@ -587,22 +587,22 @@ export default function InventarioClientePage() {
                 </h2>
               </div>
 
-              <div className="hidden shrink-0 text-blue-100 sm:block">
-                <div className="rounded-3xl bg-blue-50 p-5 text-[#0a3183]">
-                  <IconoCaja className="h-16 w-16" />
+              <div className="shrink-0 text-blue-100">
+                <div className="rounded-2xl bg-blue-50 p-2.5 text-[#0a3183] sm:rounded-3xl sm:p-5">
+                  <IconoCaja className="h-8 w-8 sm:h-16 sm:w-16" />
                 </div>
               </div>
             </div>
 
             <div className="mt-4 grid grid-cols-3 gap-2 sm:mt-7 sm:gap-4">
               <div className="min-w-0 rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 to-white p-2.5 sm:p-5">
-                <div className="flex flex-col items-start gap-1.5 text-violet-600 sm:flex-row sm:items-center sm:gap-2">
+                <div className="flex items-center gap-1.5 text-violet-600 sm:gap-2">
                   <IconoDocumento className="h-5 w-5 shrink-0 sm:h-8 sm:w-8" />
                   <div className="min-w-0">
-                    <p className="min-h-[22px] text-[9px] font-black uppercase leading-[1.05] tracking-[0.02em] text-slate-500 sm:min-h-0 sm:text-sm sm:leading-normal">
+                    <p className="text-[8px] font-black uppercase leading-[1.05] tracking-[0.01em] text-slate-500 sm:text-sm sm:leading-normal">
                       Archivos
                     </p>
-                    <p className="mt-0.5 text-[26px] font-black leading-none text-violet-600 sm:text-4xl">
+                    <p className="mt-0.5 text-[23px] font-black leading-none text-violet-600 sm:text-4xl">
                       {
                         data.total ||
                         0
@@ -613,13 +613,13 @@ export default function InventarioClientePage() {
               </div>
 
               <div className="min-w-0 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-2.5 sm:p-5">
-                <div className="flex flex-col items-start gap-1.5 text-emerald-600 sm:flex-row sm:items-center sm:gap-2">
+                <div className="flex items-center gap-1.5 text-emerald-600 sm:gap-2">
                   <IconoImagen className="h-5 w-5 shrink-0 sm:h-8 sm:w-8" />
                   <div className="min-w-0">
-                    <p className="min-h-[22px] text-[9px] font-black uppercase leading-[1.05] tracking-[0.02em] text-slate-500 sm:min-h-0 sm:text-sm sm:leading-normal">
+                    <p className="text-[8px] font-black uppercase leading-[1.05] tracking-[0.01em] text-slate-500 sm:text-sm sm:leading-normal">
                       Fotos
                     </p>
-                    <p className="mt-0.5 text-[26px] font-black leading-none text-emerald-600 sm:text-4xl">
+                    <p className="mt-0.5 text-[23px] font-black leading-none text-emerald-600 sm:text-4xl">
                       {
                         imagenes.length
                       }
@@ -629,13 +629,13 @@ export default function InventarioClientePage() {
               </div>
 
               <div className="min-w-0 rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white p-2.5 sm:p-5">
-                <div className="flex flex-col items-start gap-1.5 text-amber-500 sm:flex-row sm:items-center sm:gap-2">
+                <div className="flex items-center gap-1.5 text-amber-500 sm:gap-2">
                   <IconoCarpeta className="h-5 w-5 shrink-0 sm:h-8 sm:w-8" />
                   <div className="min-w-0">
-                    <p className="min-h-[22px] text-[9px] font-black uppercase leading-[1.05] tracking-[0.02em] text-slate-500 sm:min-h-0 sm:text-sm sm:leading-normal">
+                    <p className="text-[8px] font-black uppercase leading-[1.05] tracking-[0.01em] text-slate-500 sm:text-sm sm:leading-normal">
                       Otros archivos
                     </p>
-                    <p className="mt-0.5 text-[26px] font-black leading-none text-amber-500 sm:text-4xl">
+                    <p className="mt-0.5 text-[23px] font-black leading-none text-amber-500 sm:text-4xl">
                       {
                         otrosArchivos.length
                       }
@@ -647,7 +647,7 @@ export default function InventarioClientePage() {
           </div>
 
           <div className="mt-5 sm:mt-8">
-            <div className="flex items-end justify-between gap-2 sm:gap-3">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 sm:flex sm:justify-between sm:gap-3">
               <div>
                 <div className="flex items-center gap-2 text-[#0a3183]">
                   <IconoCamara />
@@ -656,7 +656,7 @@ export default function InventarioClientePage() {
                   </p>
                 </div>
 
-                <h2 className="mt-1 whitespace-nowrap text-[23px] font-black leading-none tracking-tight text-slate-900 sm:text-4xl">
+                <h2 className="mt-1 whitespace-nowrap text-[21px] font-black leading-none tracking-tight text-slate-900 sm:text-4xl">
                   Fotos de recolección
                 </h2>
               </div>
@@ -676,7 +676,7 @@ export default function InventarioClientePage() {
             {imagenes.length >
               0 && (
               <div className="mt-3.5 rounded-[18px] border border-slate-200 bg-white p-1.5 shadow-md shadow-slate-200/40 sm:mt-5 sm:rounded-[22px] sm:p-2.5">
-                <div className="flex w-full gap-1.5 sm:gap-2">
+                <div className="grid w-full grid-cols-4 gap-1.5 sm:flex sm:gap-2">
                   <button
                     type="button"
                     onClick={() =>
@@ -684,7 +684,7 @@ export default function InventarioClientePage() {
                         "todos"
                       )
                     }
-                    className={`min-w-0 flex-1 rounded-xl border px-1 py-1.5 text-center transition sm:rounded-2xl sm:px-2 sm:py-2.5 ${
+                    className={`min-w-0 rounded-xl border px-1 py-1.5 text-center transition sm:flex-1 sm:rounded-2xl sm:px-2 sm:py-2.5 ${
                       mesActivo ===
                       "todos"
                         ? "border-[#0a3183] bg-[#0a3183] text-white shadow-md"
@@ -733,7 +733,7 @@ export default function InventarioClientePage() {
                               mes
                             )
                           }
-                          className={`min-w-0 flex-1 rounded-xl border px-0.5 py-1.5 text-center transition sm:rounded-2xl sm:px-1.5 sm:py-2.5 ${
+                          className={`min-w-0 rounded-xl border px-0.5 py-1.5 text-center transition sm:flex-1 sm:rounded-2xl sm:px-1.5 sm:py-2.5 ${
                             mesActivo ===
                             mes
                               ? "border-[#0a3183] bg-[#0a3183] text-white shadow-md"
