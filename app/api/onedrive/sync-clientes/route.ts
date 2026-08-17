@@ -31,71 +31,6 @@ function normalizar(
     .toLocaleLowerCase("es");
 }
 
-function limpiarNombreCarpeta(
-  valor: string
-) {
-  /*
-   * OneDrive no admite:
-   * " * : < > ? / \ |
-   *
-   * Tampoco conviene terminar
-   * nombres con punto o espacios.
-   */
-  return valor
-    .replace(
-      /["*:<>?\/\\|]/g,
-      "-"
-    )
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/[.\s]+$/g, "")
-    .slice(0, 180);
-}
-
-function nombreCarpetaEsperado(
-  idCliente: number,
-  nombre: string,
-  carpetaCliente:
-    | string
-    | null
-    | undefined
-) {
-  const prefijo =
-    String(idCliente).padStart(
-      5,
-      "0"
-    );
-
-  const guardado =
-    limpiarNombreCarpeta(
-      String(
-        carpetaCliente || ""
-      )
-    );
-
-  /*
-   * Si carpeta_cliente ya contiene
-   * el número del cliente, la respetamos.
-   */
-  if (
-    guardado === prefijo ||
-    guardado.startsWith(
-      `${prefijo} `
-    )
-  ) {
-    return guardado;
-  }
-
-  const nombreLimpio =
-    limpiarNombreCarpeta(
-      nombre
-    );
-
-  return limpiarNombreCarpeta(
-    `${prefijo} ${nombreLimpio}`
-  );
-}
-
 async function leerJsonSeguro(
   response: Response
 ) {
@@ -313,8 +248,10 @@ export async function POST() {
      * 3. Obtener la carpeta raíz
      * "Envios/Recoleccion por cliente".
      *
-     * Necesitamos su ID para poder
-     * crear nuevas carpetas dentro.
+     * IMPORTANTE:
+     * Esta API NO crea, renombra ni borra carpetas.
+     * AppSheet es quien crea las carpetas.
+     * Aquí solamente las detectamos y vinculamos.
      */
     const rootFolderUrl =
       `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
@@ -478,11 +415,12 @@ export async function POST() {
      * - Si ya tiene onedrive_folder_id,
      *   NO tocamos su carpeta.
      *
-     * - Si no tiene carpeta:
+     * - Si no tiene carpeta vinculada:
      *   1) buscamos por #00001...
-     *   2) buscamos por nombre exacto
-     *   3) si no existe, la creamos
+     *   2) buscamos por carpeta_cliente exacta
+     *   3) si no existe, queda pendiente.
      *
+     * - NUNCA creamos carpetas desde el ERP.
      * - Si no tiene token, generamos uno.
      */
     for (
@@ -498,11 +436,9 @@ export async function POST() {
         );
 
       const nombreEsperado =
-        nombreCarpetaEsperado(
-          cliente.id_cliente,
-          cliente.nombre,
-          cliente.carpeta_cliente
-        );
+        String(
+          cliente.carpeta_cliente || ""
+        ).trim();
 
       let tokenInventario =
         cliente.token_inventario;
@@ -662,7 +598,6 @@ export async function POST() {
       let metodo:
         | "id_cliente"
         | "nombre_exacto"
-        | "creada"
         | null =
         carpetaEncontrada
           ? "id_cliente"
@@ -674,15 +609,16 @@ export async function POST() {
        */
       if (!carpetaEncontrada) {
         const nombresPosibles =
-          new Set([
-            normalizar(
-              nombreEsperado
-            ),
-            normalizar(
-              cliente
-                .carpeta_cliente
-            ),
-          ]);
+          new Set(
+            [
+              nombreEsperado,
+              cliente.carpeta_cliente,
+            ]
+              .map((valor) =>
+                normalizar(valor)
+              )
+              .filter(Boolean)
+          );
 
         const coincidenciasNombre =
           carpetas.filter(
@@ -739,175 +675,33 @@ export async function POST() {
       }
 
       /*
-       * C. Si no existe:
-       * CREAR carpeta automáticamente.
+       * C. Si AppSheet todavía no ha creado
+       * la carpeta, NO hacemos ningún cambio
+       * en OneDrive. El cliente queda pendiente
+       * para la siguiente sincronización.
        */
       if (!carpetaEncontrada) {
-        const createFolderUrl =
-          `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(
-            rootFolderId
-          )}/children`;
+        resultados.push({
+          id_cliente:
+            cliente.id_cliente,
 
-        const createResponse =
-          await fetch(
-            createFolderUrl,
-            {
-              method: "POST",
+          nombre:
+            cliente.nombre,
 
-              headers: {
-                Authorization:
-                  `Bearer ${accessToken}`,
+          carpeta_cliente:
+            cliente.carpeta_cliente,
 
-                "Content-Type":
-                  "application/json",
-              },
+          token_generado:
+            tokenGenerado,
 
-              body:
-                JSON.stringify({
-                  name:
-                    nombreEsperado,
+          estado:
+            "pendiente_carpeta",
 
-                  folder: {},
+          mensaje:
+            "La carpeta todavía no existe en OneDrive. AppSheet debe crearla antes de vincularla.",
+        });
 
-                  "@microsoft.graph.conflictBehavior":
-                    "fail",
-                }),
-
-              cache:
-                "no-store",
-            }
-          );
-
-        const createData =
-          await leerJsonSeguro(
-            createResponse
-          );
-
-        if (
-          !createResponse.ok ||
-          !createData?.id
-        ) {
-          /*
-           * Si Microsoft responde conflicto,
-           * volvemos a leer las carpetas por
-           * si otro proceso la creó justo antes.
-           */
-          if (
-            createResponse.status ===
-            409
-          ) {
-            const retryResponse =
-              await fetch(
-                childrenUrl,
-                {
-                  headers: {
-                    Authorization:
-                      `Bearer ${accessToken}`,
-                  },
-
-                  cache:
-                    "no-store",
-                }
-              );
-
-            const retryData =
-              await leerJsonSeguro(
-                retryResponse
-              );
-
-            const carpetasRetry:
-              CarpetaOneDrive[] =
-              Array.isArray(
-                retryData?.value
-              )
-                ? retryData.value.filter(
-                    (item: any) =>
-                      Boolean(
-                        item?.folder
-                      )
-                  )
-                : [];
-
-            const retryCoincidencia =
-              carpetasRetry.find(
-                (carpeta) =>
-                  normalizar(
-                    carpeta.name
-                  ) ===
-                  normalizar(
-                    nombreEsperado
-                  )
-              );
-
-            if (
-              retryCoincidencia
-            ) {
-              carpetaEncontrada =
-                retryCoincidencia;
-
-              metodo =
-                "nombre_exacto";
-            }
-          }
-
-          if (!carpetaEncontrada) {
-            resultados.push({
-              id_cliente:
-                cliente.id_cliente,
-
-              nombre:
-                cliente.nombre,
-
-              carpeta_cliente:
-                nombreEsperado,
-
-              estado:
-                "error",
-
-              etapa:
-                "crear_carpeta",
-
-              error:
-                createData
-                  ?.error
-                  ?.message ||
-                createData
-                  ?.error
-                  ?.code ||
-                `HTTP ${createResponse.status}`,
-            });
-
-            continue;
-          }
-        } else {
-          carpetaEncontrada = {
-            id:
-              String(
-                createData.id
-              ),
-
-            name:
-              String(
-                createData.name ||
-                  nombreEsperado
-              ),
-
-            folder:
-              createData.folder,
-          };
-
-          metodo =
-            "creada";
-
-          /*
-           * Añadirla al arreglo local
-           * para evitar recrearla dentro
-           * de esta misma ejecución.
-           */
-          carpetas.push(
-            carpetaEncontrada
-          );
-        }
+        continue;
       }
 
       /*
@@ -985,9 +779,7 @@ export async function POST() {
           tokenGenerado,
 
         estado:
-          metodo === "creada"
-            ? "carpeta_creada"
-            : "sincronizado",
+          "sincronizado",
       });
     }
 
@@ -999,17 +791,20 @@ export async function POST() {
         resultados.length,
 
       carpetas_creadas:
-        resultados.filter(
-          (item) =>
-            item.estado ===
-            "carpeta_creada"
-        ).length,
+        0,
 
       sincronizados:
         resultados.filter(
           (item) =>
             item.estado ===
             "sincronizado"
+        ).length,
+
+      pendientes_carpeta:
+        resultados.filter(
+          (item) =>
+            item.estado ===
+            "pendiente_carpeta"
         ).length,
 
       ya_sincronizados:
