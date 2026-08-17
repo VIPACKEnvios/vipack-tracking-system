@@ -1,44 +1,60 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
 
     const code = url.searchParams.get("code");
-    const error = url.searchParams.get("error");
+    const microsoftError = url.searchParams.get("error");
     const errorDescription =
       url.searchParams.get("error_description");
 
-    if (error) {
+    /*
+     * 1. Revisar si Microsoft devolvió un error
+     */
+    if (microsoftError) {
       return NextResponse.json(
         {
           success: false,
-          error,
+          error: microsoftError,
           detalle: errorDescription,
         },
         { status: 400 }
       );
     }
 
+    /*
+     * 2. Debemos recibir un código de autorización
+     */
     if (!code) {
       return NextResponse.json(
         {
           success: false,
-          error: "Microsoft no devolvió código de autorización.",
+          error:
+            "Microsoft no devolvió código de autorización.",
         },
         { status: 400 }
       );
     }
 
+    /*
+     * 3. Variables de Microsoft
+     */
     const clientId =
       process.env.ONEDRIVE_CLIENT_ID;
 
     const clientSecret =
       process.env.ONEDRIVE_CLIENT_SECRET;
 
+    /*
+     * Para cuentas personales Microsoft usamos
+     * el endpoint common.
+     */
     if (!clientId || !clientSecret) {
       return NextResponse.json(
         {
@@ -50,26 +66,69 @@ export async function GET(request: Request) {
       );
     }
 
+    /*
+     * 4. Variables de Supabase
+     */
+    const supabaseUrl =
+      process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+    const supabaseServiceRoleKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceRoleKey) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Faltan las variables de conexión de Supabase.",
+        },
+        { status: 500 }
+      );
+    }
+
+    /*
+     * IMPORTANTE:
+     * Esta conexión usa SERVICE ROLE.
+     * Solamente existe en el servidor.
+     */
+    const supabase = createClient(
+      supabaseUrl,
+      supabaseServiceRoleKey,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+
     const redirectUri =
       "https://vipack-envios.com/api/onedrive/callback";
 
+    /*
+     * 5. Cambiar el código recibido por tokens
+     */
     const tokenResponse = await fetch(
       "https://login.microsoftonline.com/common/oauth2/v2.0/token",
       {
         method: "POST",
+
         headers: {
           "Content-Type":
             "application/x-www-form-urlencoded",
         },
+
         body: new URLSearchParams({
           client_id: clientId,
           client_secret: clientSecret,
           grant_type: "authorization_code",
           code,
           redirect_uri: redirectUri,
+
           scope:
             "openid profile offline_access User.Read Files.ReadWrite",
         }),
+
         cache: "no-store",
       }
     );
@@ -78,15 +137,21 @@ export async function GET(request: Request) {
       await tokenResponse.json();
 
     if (!tokenResponse.ok) {
+      console.error(
+        "Error Microsoft token:",
+        tokenData
+      );
+
       return NextResponse.json(
         {
           success: false,
           error:
             "Microsoft no pudo intercambiar el código por tokens.",
+
           detalle:
             tokenData?.error_description ||
             tokenData?.error ||
-            tokenData,
+            "Error desconocido.",
         },
         { status: 400 }
       );
@@ -110,8 +175,7 @@ export async function GET(request: Request) {
     }
 
     /*
-     * Probamos inmediatamente que el token
-     * pueda leer el OneDrive conectado.
+     * 6. Probar el token contra OneDrive
      */
     const driveResponse = await fetch(
       "https://graph.microsoft.com/v1.0/me/drive",
@@ -120,6 +184,7 @@ export async function GET(request: Request) {
           Authorization:
             `Bearer ${accessToken}`,
         },
+
         cache: "no-store",
       }
     );
@@ -128,6 +193,11 @@ export async function GET(request: Request) {
       await driveResponse.json();
 
     if (!driveResponse.ok) {
+      console.error(
+        "Error Graph /me/drive:",
+        driveData
+      );
+
       return NextResponse.json(
         {
           success: false,
@@ -139,30 +209,223 @@ export async function GET(request: Request) {
       );
     }
 
+    const driveId =
+      String(driveData?.id || "").trim();
+
+    const driveType =
+      String(
+        driveData?.driveType || ""
+      ).trim();
+
+    const ownerName =
+      String(
+        driveData?.owner?.user?.displayName ||
+          ""
+      ).trim();
+
+    if (!driveId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Microsoft Graph no devolvió el ID de OneDrive.",
+        },
+        { status: 400 }
+      );
+    }
+
     /*
-     * POR SEGURIDAD:
-     * No mostramos los tokens completos en pantalla.
+     * 7. Ver si esta cuenta de OneDrive
+     * ya estaba conectada anteriormente.
+     */
+    const {
+      data: conexiones,
+      error: searchError,
+    } = await supabase
+      .from("onedrive_connections")
+      .select(
+        "id, drive_id, refresh_token"
+      )
+      .eq("drive_id", driveId)
+      .order("id", {
+        ascending: false,
+      })
+      .limit(1);
+
+    if (searchError) {
+      console.error(
+        "Error buscando conexión:",
+        searchError
+      );
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "No se pudo consultar la conexión de OneDrive en Supabase.",
+          detalle: searchError.message,
+        },
+        { status: 500 }
+      );
+    }
+
+    const conexionExistente =
+      conexiones &&
+      conexiones.length > 0
+        ? conexiones[0]
+        : null;
+
+    /*
+     * 8. Si ya existe:
+     * actualizarla.
      *
-     * En el siguiente paso los guardaremos
-     * correctamente en Supabase.
+     * Si Microsoft por alguna razón no manda
+     * un refresh_token nuevo, conservamos el
+     * que ya estaba guardado.
+     */
+    if (conexionExistente) {
+      const tokenAGuardar =
+        refreshToken ||
+        conexionExistente.refresh_token;
+
+      if (!tokenAGuardar) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "No existe refresh_token para mantener la conexión.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const {
+        error: updateError,
+      } = await supabase
+        .from("onedrive_connections")
+        .update({
+          provider: "microsoft",
+          drive_type:
+            driveType || null,
+          owner_name:
+            ownerName || null,
+          refresh_token:
+            tokenAGuardar,
+          updated_at:
+            new Date().toISOString(),
+        })
+        .eq(
+          "id",
+          conexionExistente.id
+        );
+
+      if (updateError) {
+        console.error(
+          "Error actualizando conexión:",
+          updateError
+        );
+
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "OneDrive se conectó, pero no se pudo actualizar la conexión en Supabase.",
+            detalle:
+              updateError.message,
+          },
+          { status: 500 }
+        );
+      }
+    } else {
+      /*
+       * Primera conexión.
+       * Aquí sí necesitamos obligatoriamente
+       * el refresh_token.
+       */
+      if (!refreshToken) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Microsoft no devolvió refresh_token. Vuelve a autorizar OneDrive.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const {
+        error: insertError,
+      } = await supabase
+        .from("onedrive_connections")
+        .insert({
+          provider:
+            "microsoft",
+
+          drive_id:
+            driveId,
+
+          drive_type:
+            driveType || null,
+
+          owner_name:
+            ownerName || null,
+
+          refresh_token:
+            refreshToken,
+
+          updated_at:
+            new Date().toISOString(),
+        });
+
+      if (insertError) {
+        console.error(
+          "Error guardando conexión:",
+          insertError
+        );
+
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "OneDrive se conectó, pero no se pudo guardar la conexión en Supabase.",
+            detalle:
+              insertError.message,
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    /*
+     * 9. RESPUESTA FINAL
+     *
+     * Nunca devolvemos:
+     * - access_token
+     * - refresh_token
+     * - client_secret
      */
     return NextResponse.json({
       success: true,
+
       mensaje:
-        "OneDrive conectado correctamente con VIPACK.",
+        "OneDrive conectado y guardado correctamente en VIPACK.",
+
       drive: {
         id:
-          driveData?.id || null,
+          driveId,
+
         tipo:
-          driveData?.driveType || null,
+          driveType || null,
+
         propietario:
-          driveData?.owner?.user
-            ?.displayName || null,
+          ownerName || null,
       },
-      refresh_token_recibido:
-        Boolean(refreshToken),
+
+      conexion_guardada:
+        true,
+
       siguiente_paso:
-        "Guardar la conexión de OneDrive en Supabase.",
+        "Localizar la carpeta Envios/Recoleccion por cliente.",
     });
   } catch (error: unknown) {
     console.error(
@@ -173,6 +436,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         success: false,
+
         error:
           error instanceof Error
             ? error.message
