@@ -385,11 +385,6 @@ export async function POST(request: Request) {
      * Si por alguna razón no está guardado,
      * usamos /me/drive.
      */
-    const driveId =
-      String(
-        conexion.drive_id || ""
-      ).trim();
-
     const nombreCodificado =
       encodeURIComponent(
         nombreArchivo
@@ -400,12 +395,17 @@ export async function POST(request: Request) {
         folderId
       );
 
+    /*
+     * Usamos /me/drive porque toda la vinculación
+     * de carpetas del ERP fue creada contra la misma
+     * cuenta personal conectada de OneDrive.
+     *
+     * Así evitamos mezclar un folder_id obtenido
+     * desde /me/drive con un drive_id distinto o
+     * desactualizado guardado previamente.
+     */
     const crearSesionUrl =
-      driveId
-        ? `https://graph.microsoft.com/v1.0/drives/${encodeURIComponent(
-            driveId
-          )}/items/${folderCodificado}:/${nombreCodificado}:/createUploadSession`
-        : `https://graph.microsoft.com/v1.0/me/drive/items/${folderCodificado}:/${nombreCodificado}:/createUploadSession`;
+      `https://graph.microsoft.com/v1.0/me/drive/items/${folderCodificado}:/${nombreCodificado}:/createUploadSession`;
 
     const sessionResponse =
       await fetch(
@@ -426,12 +426,6 @@ export async function POST(request: Request) {
               item: {
                 "@microsoft.graph.conflictBehavior":
                   "rename",
-
-                name:
-                  nombreArchivo,
-
-                fileSize:
-                  tamaño,
               },
             }),
 
@@ -457,8 +451,8 @@ export async function POST(request: Request) {
           error:
             "No se pudo preparar la subida del archivo en OneDrive.",
           detalle:
-            sessionData?.error
-              ?.message ||
+            sessionData?.error?.message ||
+            sessionData?.error?.code ||
             sessionData?.error ||
             sessionData,
         },
