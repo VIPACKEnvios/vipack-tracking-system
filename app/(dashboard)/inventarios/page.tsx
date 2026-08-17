@@ -185,6 +185,39 @@ function IconoSincronizar({
   );
 }
 
+
+function IconoCopiar() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className="h-4 w-4"
+      aria-hidden="true"
+    >
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
+function IconoWhatsApp() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className="h-4 w-4"
+      aria-hidden="true"
+    >
+      <path d="M20 11.5a8 8 0 0 1-11.8 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z" />
+      <path d="M8.5 8.5c.5 2.8 2.2 4.5 5 5" />
+    </svg>
+  );
+}
+
 export default function InventariosAdminPage() {
   const [clientes, setClientes] =
     useState<ClienteInventario[]>([]);
@@ -750,6 +783,81 @@ export default function InventariosAdminPage() {
     }
   }
 
+  function obtenerUrlInventario(
+    cliente: ClienteInventario
+  ) {
+    if (!cliente.token_inventario) {
+      return "";
+    }
+
+    const path =
+      `/inventario/${cliente.token_inventario}`;
+
+    if (typeof window === "undefined") {
+      return path;
+    }
+
+    return `${window.location.origin}${path}`;
+  }
+
+  async function copiarEnlaceInventario(
+    cliente: ClienteInventario
+  ) {
+    if (!cliente.token_inventario) {
+      setMensaje(
+        "Este cliente todavía no tiene token de inventario."
+      );
+      return;
+    }
+
+    const url =
+      obtenerUrlInventario(
+        cliente
+      );
+
+    try {
+      await navigator.clipboard.writeText(url);
+
+      setMensaje(
+        "Enlace del inventario copiado."
+      );
+    } catch {
+      setMensaje(
+        "No se pudo copiar automáticamente el enlace."
+      );
+    }
+  }
+
+  function compartirWhatsApp(
+    cliente: ClienteInventario
+  ) {
+    if (!cliente.token_inventario) {
+      setMensaje(
+        "Este cliente todavía no tiene token de inventario."
+      );
+      return;
+    }
+
+    const url =
+      obtenerUrlInventario(
+        cliente
+      );
+
+    const mensajeWhatsApp =
+      `📦 *VIPACK Envíos*\\n\\nHola ${cliente.nombre} 👋\\n\\nYa puedes consultar tu inventario y las evidencias de tus paquetes desde el siguiente enlace:\\n\\n🔗 ${url}\\n\\nEste enlace es personal. Te recomendamos conservarlo para consultar tus evidencias cuando lo necesites.`;
+
+    const whatsappUrl =
+      `https://wa.me/?text=${encodeURIComponent(
+        mensajeWhatsApp
+      )}`;
+
+    window.open(
+      whatsappUrl,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
   function abrirInventario(
     cliente: ClienteInventario
   ) {
@@ -1034,17 +1142,51 @@ export default function InventariosAdminPage() {
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      abrirInventario(
-                        clienteSeleccionado
-                      )
-                    }
-                    className="w-full shrink-0 rounded-xl border border-[#072c74] px-4 py-2.5 text-sm font-black text-[#072c74] transition hover:bg-[#072c74] hover:text-white md:w-auto"
-                  >
-                    Ver inventario
-                  </button>
+                  <div className="grid w-full shrink-0 grid-cols-1 gap-2 sm:grid-cols-3 md:w-auto">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        abrirInventario(
+                          clienteSeleccionado
+                        )
+                      }
+                      className="rounded-xl border border-[#072c74] px-3 py-2.5 text-sm font-black text-[#072c74] transition hover:bg-[#072c74] hover:text-white"
+                    >
+                      Ver inventario
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        copiarEnlaceInventario(
+                          clienteSeleccionado
+                        )
+                      }
+                      disabled={
+                        !clienteSeleccionado.token_inventario
+                      }
+                      className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-black text-slate-700 transition hover:border-cyan-300 hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <IconoCopiar />
+                      Copiar enlace
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        compartirWhatsApp(
+                          clienteSeleccionado
+                        )
+                      }
+                      disabled={
+                        !clienteSeleccionado.token_inventario
+                      }
+                      className="flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-3 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <IconoWhatsApp />
+                      WhatsApp
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mt-5 grid min-w-0 grid-cols-1 gap-2 min-[430px]:grid-cols-3 sm:gap-3">
