@@ -606,10 +606,10 @@ export default function InventariosAdminPage() {
   }
 
   return (
-    <div className="min-h-full overflow-x-hidden bg-slate-100 px-3 py-5 sm:px-4 sm:py-6 md:px-6 lg:px-8">
+    <div className="min-h-full overflow-x-hidden bg-slate-100 px-2.5 py-4 sm:px-4 sm:py-6 md:px-6 lg:px-8">
       <div
         ref={inicioPanelRef}
-        className="mx-auto w-full min-w-0 max-w-7xl"
+        className="mx-auto w-full min-w-0 max-w-7xl overflow-x-hidden"
       >
         <div>
           <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-700">
@@ -736,7 +736,7 @@ export default function InventariosAdminPage() {
                           <IconoCarpeta />
                         </div>
 
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0 flex-1 overflow-hidden">
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-xs font-black text-cyan-700">
                               {numeroCliente(
@@ -773,7 +773,7 @@ export default function InventariosAdminPage() {
           </section>
 
           <section
-            className={`min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 md:p-6 ${
+            className={`min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-5 md:p-6 ${
               clienteSeleccionado
                 ? "block"
                 : "hidden xl:block"
@@ -858,13 +858,13 @@ export default function InventariosAdminPage() {
                   </button>
                 </div>
 
-                <div className="mt-5 grid grid-cols-1 gap-2 min-[430px]:grid-cols-3 sm:gap-3">
-                  <div className="min-w-0 rounded-2xl bg-slate-50 p-3 sm:p-4">
+                <div className="mt-5 grid min-w-0 grid-cols-1 gap-2 min-[430px]:grid-cols-3 sm:gap-3">
+                  <div className="min-w-0 overflow-hidden rounded-2xl bg-slate-50 p-3 sm:p-4">
                     <p className="text-[10px] font-bold leading-tight text-slate-500 sm:text-xs">
                       Carpeta OneDrive
                     </p>
                     <p
-                      className={`mt-2 text-sm font-black ${
+                      className={`mt-2 break-words text-sm font-black leading-tight ${
                         clienteSeleccionado.onedrive_folder_id
                           ? "text-emerald-600"
                           : "text-amber-600"
@@ -876,7 +876,7 @@ export default function InventariosAdminPage() {
                     </p>
                   </div>
 
-                  <div className="min-w-0 rounded-2xl bg-slate-50 p-3 sm:p-4">
+                  <div className="min-w-0 overflow-hidden rounded-2xl bg-slate-50 p-3 sm:p-4">
                     <p className="text-[10px] font-bold leading-tight text-slate-500 sm:text-xs">
                       Archivos
                     </p>
@@ -888,12 +888,12 @@ export default function InventariosAdminPage() {
                     </p>
                   </div>
 
-                  <div className="min-w-0 rounded-2xl bg-slate-50 p-3 sm:p-4">
+                  <div className="min-w-0 overflow-hidden rounded-2xl bg-slate-50 p-3 sm:p-4">
                     <p className="text-[10px] font-bold leading-tight text-slate-500 sm:text-xs">
                       Acceso cliente
                     </p>
                     <p
-                      className={`mt-2 text-sm font-black ${
+                      className={`mt-2 break-words text-sm font-black leading-tight ${
                         clienteSeleccionado.token_inventario
                           ? "text-emerald-600"
                           : "text-amber-600"
@@ -911,7 +911,7 @@ export default function InventariosAdminPage() {
                     event.preventDefault()
                   }
                   onDrop={manejarDrop}
-                  className="mt-5 min-w-0 overflow-hidden rounded-3xl border-2 border-dashed border-cyan-200 bg-cyan-50/40 p-4 text-center transition hover:border-cyan-400 sm:mt-6 sm:p-6"
+                  className="mt-5 w-full min-w-0 max-w-full overflow-hidden rounded-3xl border-2 border-dashed border-cyan-200 bg-cyan-50/40 p-3.5 text-center transition hover:border-cyan-400 sm:mt-6 sm:p-6"
                 >
                   <input
                     ref={inputArchivos}
@@ -932,7 +932,7 @@ export default function InventariosAdminPage() {
                     Subir evidencia
                   </h3>
 
-                  <p className="mx-auto mt-1 max-w-md break-words text-sm leading-5 text-slate-500">
+                  <p className="mx-auto mt-1 max-w-full break-words px-1 text-sm leading-5 text-slate-500 sm:max-w-md">
                     Arrastra fotos o videos aquí, o selecciónalos desde tu computadora.
                   </p>
 
@@ -941,7 +941,7 @@ export default function InventariosAdminPage() {
                     onClick={() =>
                       inputArchivos.current?.click()
                     }
-                    className="mt-4 w-full rounded-xl bg-[#072c74] px-5 py-3 text-sm font-black text-white shadow-md transition hover:bg-[#0a3b8f] sm:w-auto"
+                    className="mt-4 w-full max-w-full rounded-xl bg-[#072c74] px-4 py-3 text-sm font-black text-white shadow-md transition hover:bg-[#0a3b8f] sm:w-auto sm:px-5"
                   >
                     Seleccionar archivos
                   </button>
@@ -949,7 +949,7 @@ export default function InventariosAdminPage() {
 
                 {archivos.length >
                   0 && (
-                  <div className="mt-6">
+                  <div className="mt-6 min-w-0">
                     <div className="flex min-w-0 items-center justify-between gap-2">
                       <h3 className="font-black text-slate-900">
                         Archivos seleccionados
@@ -960,21 +960,21 @@ export default function InventariosAdminPage() {
                       </span>
                     </div>
 
-                    <div className="mt-3 space-y-2">
+                    <div className="mt-3 min-w-0 space-y-2">
                       {archivos.map(
                         (item) => (
                           <div
                             key={
                               item.id
                             }
-                            className="flex min-w-0 items-start gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:items-center sm:gap-3"
+                            className="flex w-full min-w-0 max-w-full items-start gap-2 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:items-center sm:gap-3"
                           >
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-cyan-700 shadow-sm">
                               <IconoImagen />
                             </div>
 
                             <div className="min-w-0 flex-1">
-                              <p className="break-all text-sm font-black leading-5 text-slate-900 sm:truncate">
+                              <p className="block max-w-full truncate text-sm font-black leading-5 text-slate-900">
                                 {
                                   item.archivo.name
                                 }
@@ -1023,7 +1023,7 @@ export default function InventariosAdminPage() {
                               )}
                             </div>
 
-                            <div className="shrink-0 pt-0.5 text-xs font-black text-slate-500">
+                            <div className="hidden shrink-0 pt-0.5 text-xs font-black text-slate-500 min-[390px]:block">
                               {item.estado ===
                               "subiendo"
                                 ? `${item.progreso}%`
@@ -1051,12 +1051,12 @@ export default function InventariosAdminPage() {
                 )}
 
                 {mensaje && (
-                  <div className="mt-5 break-words rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold leading-5 text-slate-700">
+                  <div className="mt-5 w-full max-w-full break-words rounded-2xl border border-slate-200 bg-slate-50 p-3.5 text-sm font-bold leading-5 text-slate-700 sm:p-4">
                     {mensaje}
                   </div>
                 )}
 
-                <div className="mt-6 flex min-w-0 justify-end">
+                <div className="mt-6 flex w-full min-w-0 justify-stretch sm:justify-end">
                   <button
                     type="button"
                     disabled={
@@ -1068,7 +1068,7 @@ export default function InventariosAdminPage() {
                     onClick={
                       subirEvidencias
                     }
-                    className="w-full rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-6 py-3 text-sm font-black text-white shadow-lg transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                    className="w-full max-w-full rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-3 text-sm font-black text-white shadow-lg transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:px-6"
                   >
                     {subiendo
                       ? "Subiendo a OneDrive..."
