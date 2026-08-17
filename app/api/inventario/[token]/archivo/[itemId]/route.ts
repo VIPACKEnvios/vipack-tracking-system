@@ -70,7 +70,7 @@ export async function GET(
     );
 
     /*
-     * 1. Buscar cliente por token
+     * 1. Buscar cliente por token.
      */
     const {
       data: cliente,
@@ -126,7 +126,7 @@ export async function GET(
     }
 
     /*
-     * 2. Obtener conexión de OneDrive
+     * 2. Obtener conexión OneDrive.
      */
     const {
       data: conexion,
@@ -167,7 +167,7 @@ export async function GET(
     }
 
     /*
-     * 3. Renovar access_token
+     * 3. Renovar access_token.
      */
     const tokenResponse = await fetch(
       "https://login.microsoftonline.com/consumers/oauth2/v2.0/token",
@@ -236,8 +236,7 @@ export async function GET(
     }
 
     /*
-     * Guardar refresh_token nuevo si Microsoft
-     * lo rotó.
+     * Guardar refresh_token rotado.
      */
     if (
       newRefreshToken &&
@@ -257,11 +256,8 @@ export async function GET(
     }
 
     /*
-     * 4. Validar que el archivo realmente
-     * pertenece a la carpeta del cliente.
-     *
-     * Leemos los hijos de SU carpeta y
-     * buscamos exclusivamente itemId.
+     * 4. Validar que itemId pertenezca
+     * realmente a la carpeta del cliente.
      */
     const childrenUrl =
       `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(
@@ -324,10 +320,78 @@ export async function GET(
     }
 
     /*
-     * 5. Descargar contenido real desde Graph.
+     * 5. Intentar obtener thumbnail.
      *
-     * /content puede devolver redirección hacia
-     * una URL temporal de descarga.
+     * Esto resuelve el problema de HEIC:
+     * el navegador recibe una vista previa
+     * generada por OneDrive.
+     */
+    const thumbnailUrl =
+      `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(
+        itemId
+      )}/thumbnails/0/large/content`;
+
+    const thumbnailResponse =
+      await fetch(
+        thumbnailUrl,
+        {
+          headers: {
+            Authorization:
+              `Bearer ${accessToken}`,
+          },
+
+          redirect:
+            "follow",
+
+          cache:
+            "no-store",
+        }
+      );
+
+    /*
+     * Si Microsoft sí generó thumbnail,
+     * lo usamos.
+     */
+    if (thumbnailResponse.ok) {
+      const thumbnailBuffer =
+        await thumbnailResponse.arrayBuffer();
+
+      const thumbnailContentType =
+        thumbnailResponse.headers.get(
+          "content-type"
+        ) ||
+        "image/jpeg";
+
+      return new NextResponse(
+        thumbnailBuffer,
+        {
+          status: 200,
+
+          headers: {
+            "Content-Type":
+              thumbnailContentType,
+
+            "Content-Length":
+              String(
+                thumbnailBuffer.byteLength
+              ),
+
+            "Cache-Control":
+              "private, max-age=300",
+
+            "Content-Disposition":
+              `inline; filename*=UTF-8''${encodeURIComponent(
+                `${archivo.name}.preview`
+              )}`,
+          },
+        }
+      );
+    }
+
+    /*
+     * 6. Respaldo:
+     * si Microsoft no tiene thumbnail,
+     * devolvemos el archivo original.
      */
     const contentUrl =
       `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(
@@ -356,49 +420,46 @@ export async function GET(
         {
           success: false,
           error:
-            "No se pudo obtener el archivo de OneDrive.",
+            "No se pudo obtener la vista previa ni el archivo original de OneDrive.",
         },
         { status: 400 }
       );
     }
 
-    const contentType =
+    const originalBuffer =
+      await contentResponse.arrayBuffer();
+
+    const originalContentType =
       contentResponse.headers.get(
         "content-type"
       ) ||
       archivo?.file?.mimeType ||
       "application/octet-stream";
 
-    const buffer =
-      await contentResponse.arrayBuffer();
+    return new NextResponse(
+      originalBuffer,
+      {
+        status: 200,
 
-    /*
-     * 6. Entregar archivo al navegador.
-     *
-     * No revelamos access_token,
-     * refresh_token ni URL privada de Microsoft.
-     */
-    return new NextResponse(buffer, {
-      status: 200,
+        headers: {
+          "Content-Type":
+            originalContentType,
 
-      headers: {
-        "Content-Type":
-          contentType,
+          "Content-Length":
+            String(
+              originalBuffer.byteLength
+            ),
 
-        "Content-Length":
-          String(
-            buffer.byteLength
-          ),
+          "Cache-Control":
+            "private, max-age=300",
 
-        "Cache-Control":
-          "private, max-age=300",
-
-        "Content-Disposition":
-          `inline; filename*=UTF-8''${encodeURIComponent(
-            archivo.name
-          )}`,
-      },
-    });
+          "Content-Disposition":
+            `inline; filename*=UTF-8''${encodeURIComponent(
+              archivo.name
+            )}`,
+        },
+      }
+    );
   } catch (error: unknown) {
     console.error(
       "Error archivo inventario:",
