@@ -34,6 +34,23 @@ type RespuestaSesionCarga = {
   detalle?: unknown;
 };
 
+
+type RespuestaSincronizacion = {
+  success: boolean;
+  resumen?: {
+    total_clientes?: number;
+    carpetas_creadas?: number;
+    sincronizados?: number;
+    ya_sincronizados?: number;
+    tokens_generados?: number;
+    duplicados_onedrive?: number;
+    errores?: number;
+    carpetas_onedrive?: number;
+  };
+  error?: string;
+  detalle?: unknown;
+};
+
 type ArchivoPendiente = {
   id: string;
   archivo: File;
@@ -143,6 +160,31 @@ function IconoCerrar() {
   );
 }
 
+
+function IconoSincronizar({
+  girando = false,
+}: {
+  girando?: boolean;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className={`h-5 w-5 ${
+        girando ? "animate-spin" : ""
+      }`}
+      aria-hidden="true"
+    >
+      <path d="M20 7v5h-5" />
+      <path d="M4 17v-5h5" />
+      <path d="M6.1 9A7 7 0 0 1 18 6l2 1" />
+      <path d="M17.9 15A7 7 0 0 1 6 18l-2-1" />
+    </svg>
+  );
+}
+
 export default function InventariosAdminPage() {
   const [clientes, setClientes] =
     useState<ClienteInventario[]>([]);
@@ -168,51 +210,84 @@ export default function InventariosAdminPage() {
   const [mensaje, setMensaje] =
     useState("");
 
+  const [sincronizando, setSincronizando] =
+    useState(false);
+
+  const [mensajeSincronizacion, setMensajeSincronizacion] =
+    useState("");
+
   const inputArchivos =
     useRef<HTMLInputElement | null>(null);
 
   const inicioPanelRef =
     useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    const cargarClientes = async () => {
-      try {
-        setCargando(true);
-        setError("");
+  async function cargarClientes() {
+    try {
+      setCargando(true);
+      setError("");
 
-        const response = await fetch(
-          "/api/inventarios/clientes",
-          {
-            cache: "no-store",
-          }
+      const response = await fetch(
+        "/api/inventarios/clientes",
+        {
+          cache: "no-store",
+        }
+      );
+
+      const data: RespuestaClientes =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        throw new Error(
+          data.error ||
+            "No se pudieron cargar los clientes."
         );
+      }
 
-        const data: RespuestaClientes =
-          await response.json();
+      const lista =
+        Array.isArray(
+          data.clientes
+        )
+          ? data.clientes
+          : [];
 
-        if (!response.ok || !data.success) {
-          throw new Error(
-            data.error ||
-              "No se pudieron cargar los clientes."
+      setClientes(lista);
+
+      /*
+       * Si hay un cliente seleccionado,
+       * refrescamos sus datos después de
+       * sincronizar sin sacarlo del panel.
+       */
+      setClienteSeleccionado(
+        (actual) => {
+          if (!actual) {
+            return actual;
+          }
+
+          return (
+            lista.find(
+              (cliente) =>
+                cliente.id ===
+                actual.id
+            ) || actual
           );
         }
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "No se pudieron cargar los clientes."
+      );
+    } finally {
+      setCargando(false);
+    }
+  }
 
-        setClientes(
-          Array.isArray(data.clientes)
-            ? data.clientes
-            : []
-        );
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "No se pudieron cargar los clientes."
-        );
-      } finally {
-        setCargando(false);
-      }
-    };
-
+  useEffect(() => {
     cargarClientes();
   }, []);
 
@@ -243,6 +318,93 @@ export default function InventariosAdminPage() {
         );
       });
     }, [clientes, busqueda]);
+
+  async function sincronizarClientes() {
+    try {
+      setSincronizando(true);
+      setMensajeSincronizacion("");
+
+      const response = await fetch(
+        "/api/onedrive/sync-clientes",
+        {
+          method: "POST",
+          cache: "no-store",
+        }
+      );
+
+      const data: RespuestaSincronizacion =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        let detalle = "";
+
+        if (
+          typeof data.detalle ===
+          "string"
+        ) {
+          detalle = data.detalle;
+        } else if (
+          data.detalle
+        ) {
+          try {
+            detalle =
+              JSON.stringify(
+                data.detalle
+              );
+          } catch {
+            detalle = "";
+          }
+        }
+
+        throw new Error(
+          detalle
+            ? `${data.error || "No se pudo sincronizar."} — ${detalle}`
+            : data.error ||
+                "No se pudo sincronizar."
+        );
+      }
+
+      const resumen =
+        data.resumen || {};
+
+      const creadas =
+        resumen.carpetas_creadas ||
+        0;
+
+      const vinculadas =
+        resumen.sincronizados ||
+        0;
+
+      const tokens =
+        resumen.tokens_generados ||
+        0;
+
+      const duplicados =
+        resumen.duplicados_onedrive ||
+        0;
+
+      const errores =
+        resumen.errores ||
+        0;
+
+      setMensajeSincronizacion(
+        `Sincronización terminada: ${creadas} carpeta(s) creada(s), ${vinculadas} cliente(s) vinculado(s), ${tokens} token(s) generado(s), ${duplicados} duplicado(s) y ${errores} error(es).`
+      );
+
+      await cargarClientes();
+    } catch (err) {
+      setMensajeSincronizacion(
+        err instanceof Error
+          ? err.message
+          : "No se pudo sincronizar clientes."
+      );
+    } finally {
+      setSincronizando(false);
+    }
+  }
 
   function agregarArchivos(
     lista: FileList | File[]
@@ -611,19 +773,41 @@ export default function InventariosAdminPage() {
         ref={inicioPanelRef}
         className="mx-auto w-full min-w-0 max-w-7xl overflow-x-hidden"
       >
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-700">
-            Operación interna
-          </p>
+        <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-700">
+              Operación interna
+            </p>
 
-          <h1 className="mt-1 text-3xl font-black text-slate-950">
-            Inventarios
-          </h1>
+            <h1 className="mt-1 text-3xl font-black text-slate-950">
+              Inventarios
+            </h1>
 
-          <p className="mt-2 max-w-3xl text-sm text-slate-600">
-            Selecciona un cliente, revisa su carpeta vinculada y sube fotos o videos de evidencia directamente a su inventario.
-          </p>
+            <p className="mt-2 max-w-3xl text-sm text-slate-600">
+              Selecciona un cliente, revisa su carpeta vinculada y sube fotos o videos de evidencia directamente a su inventario.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={sincronizarClientes}
+            disabled={sincronizando}
+            className="flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-3 text-sm font-black text-white shadow-lg transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+          >
+            <IconoSincronizar
+              girando={sincronizando}
+            />
+            {sincronizando
+              ? "Sincronizando..."
+              : "Sincronizar clientes"}
+          </button>
         </div>
+
+        {mensajeSincronizacion && (
+          <div className="mt-4 w-full rounded-2xl border border-cyan-100 bg-cyan-50 px-4 py-3 text-sm font-bold leading-5 text-cyan-900">
+            {mensajeSincronizacion}
+          </div>
+        )}
 
         <div className="mt-5 grid min-w-0 gap-5 sm:mt-6 sm:gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
           <section
@@ -650,12 +834,17 @@ export default function InventariosAdminPage() {
               />
             </div>
 
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-sm font-black text-slate-800">
-                Clientes activos
-              </p>
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-black text-slate-800">
+                  Clientes activos
+                </p>
+                <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                  Verde = vinculada · Amarillo = pendiente
+                </p>
+              </div>
 
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
+              <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
                 {clientesFiltrados.length}
               </span>
             </div>
