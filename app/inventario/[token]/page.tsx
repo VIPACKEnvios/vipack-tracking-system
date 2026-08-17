@@ -226,6 +226,28 @@ function IconoCamara({
   );
 }
 
+
+function IconoVideo({
+  className = "h-6 w-6",
+}: {
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className={className}
+      aria-hidden="true"
+    >
+      <rect x="3" y="5" width="14" height="14" rx="2" />
+      <path d="m17 10 4-2v8l-4-2" />
+      <path d="m9 9 4 3-4 3V9Z" />
+    </svg>
+  );
+}
+
 function IconoCalendario({
   className = "h-4 w-4",
 }: {
@@ -339,6 +361,18 @@ export default function InventarioClientePage() {
     inventario.filter(
       (item) =>
         !item.mime_type?.startsWith("image/")
+    );
+
+
+  const videos =
+    otrosArchivos.filter((item) =>
+      item.mime_type?.startsWith("video/")
+    );
+
+  const documentos =
+    otrosArchivos.filter(
+      (item) =>
+        !item.mime_type?.startsWith("video/")
     );
 
   const mesesDisponibles =
@@ -867,8 +901,7 @@ export default function InventarioClientePage() {
             )}
           </div>
 
-          {otrosArchivos.length >
-            0 && (
+          {otrosArchivos.length > 0 && (
             <div className="mt-10 rounded-[28px] border border-slate-200 bg-white p-5 shadow-lg shadow-slate-200/40 sm:p-7">
               <div className="flex items-center gap-2">
                 <IconoCarpeta className="h-6 w-6 text-amber-500" />
@@ -877,41 +910,112 @@ export default function InventarioClientePage() {
                 </h2>
               </div>
 
-              <div className="mt-5 space-y-3">
-                {otrosArchivos.map(
-                  (item) => (
-                    <a
-                      key={
-                        item.id
-                      }
-                      href={
-                        item.webUrl ||
-                        "#"
-                      }
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-blue-200 hover:bg-blue-50/50"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate font-black text-slate-900">
-                          {
-                            item.nombre
-                          }
-                        </p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {formatearFecha(
-                            item.modificado
-                          )}
-                        </p>
-                      </div>
+              {videos.length > 0 && (
+                <div className="mt-5">
+                  <div className="mb-3 flex items-center gap-2 text-[#0a3183]">
+                    <IconoVideo className="h-5 w-5" />
+                    <p className="text-sm font-black uppercase tracking-[0.1em]">
+                      Videos
+                    </p>
+                  </div>
 
-                      <span className="shrink-0 text-sm font-black text-[#0a3183]">
-                        Abrir
-                      </span>
-                    </a>
-                  )
-                )}
-              </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {videos.map((item) => (
+                      <a
+                        key={item.id}
+                        href={item.webUrl || "#"}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="group overflow-hidden rounded-[20px] border border-slate-200 bg-slate-50 transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-lg"
+                      >
+                        <div className="relative flex aspect-video items-center justify-center bg-gradient-to-br from-[#082c78] via-[#0a3183] to-[#1761db] text-white">
+                          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/15 shadow-xl backdrop-blur transition group-hover:scale-105 group-hover:bg-white/20">
+                            <svg
+                              viewBox="0 0 24 24"
+                              fill="currentColor"
+                              className="ml-1 h-8 w-8"
+                              aria-hidden="true"
+                            >
+                              <path d="M8 5v14l11-7L8 5Z" />
+                            </svg>
+                          </div>
+
+                          <div className="absolute left-3 top-3 rounded-xl bg-black/30 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide backdrop-blur">
+                            Video
+                          </div>
+                        </div>
+
+                        <div className="p-4">
+                          <p className="truncate text-sm font-black text-slate-900 sm:text-base">
+                            {item.nombre}
+                          </p>
+
+                          <div className="mt-3 space-y-1.5 text-[11px] font-semibold text-slate-500 sm:text-xs">
+                            <div className="flex items-center gap-2">
+                              <IconoCalendario className="h-4 w-4 shrink-0 text-blue-400" />
+                              <span>{formatearFecha(item.modificado)}</span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <IconoDocumento className="h-4 w-4 shrink-0 text-blue-400" />
+                              <span>{formatearTamaño(item.tamaño)}</span>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 flex items-center justify-between">
+                            <span className="text-sm font-black text-[#0a3183]">
+                              Ver video
+                            </span>
+                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-[#0a3183] transition group-hover:bg-[#0a3183] group-hover:text-white">
+                              ▶
+                            </span>
+                          </div>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {documentos.length > 0 && (
+                <div className={videos.length > 0 ? "mt-7" : "mt-5"}>
+                  {videos.length > 0 && (
+                    <div className="mb-3 flex items-center gap-2 text-amber-600">
+                      <IconoDocumento className="h-5 w-5" />
+                      <p className="text-sm font-black uppercase tracking-[0.1em]">
+                        Documentos
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    {documentos.map((item) => (
+                      <a
+                        key={item.id}
+                        href={item.webUrl || "#"}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex min-w-0 items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-blue-200 hover:bg-blue-50/50"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-black text-slate-900">
+                            {item.nombre}
+                          </p>
+
+                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
+                            <span>{formatearFecha(item.modificado)}</span>
+                            <span>{formatearTamaño(item.tamaño)}</span>
+                          </div>
+                        </div>
+
+                        <span className="shrink-0 text-sm font-black text-[#0a3183]">
+                          Abrir
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
