@@ -843,13 +843,13 @@ export default function InventariosAdminPage() {
         cliente
       );
 
-    const mensajeWhatsApp = `📦 *VIPACK Envíos*
+    const mensajeWhatsApp = `\u{1F4E6} *VIPACK Envíos*
 
-Hola ${cliente.nombre} 👋
+Hola ${cliente.nombre} \u{1F44B}
 
 Ya puedes consultar tu inventario y las evidencias de tus paquetes desde el siguiente enlace:
 
-🔗 ${url}
+\u{1F517} ${url}
 
 Este enlace es personal. Te recomendamos conservarlo para consultar tus evidencias cuando lo necesites.`;
 
