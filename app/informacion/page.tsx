@@ -335,6 +335,8 @@ export default function InformacionPage() {
   const [vista, setVista] = useState<Vista>("comprar");
   const [compraSeccion, setCompraSeccion] =
     useState<CompraSeccion>("bazares");
+  const [detalleCompraAbierto, setDetalleCompraAbierto] =
+    useState(false);
 
   const tituloActivo = useMemo(
     () => opciones.find((item) => item.id === vista)?.titulo || "",
@@ -499,7 +501,7 @@ export default function InformacionPage() {
                 <div className="grid grid-cols-3 gap-2.5">
                   <button
                     type="button"
-                    onClick={() => setCompraSeccion("bazares")}
+                    onClick={() => { setCompraSeccion("bazares"); setDetalleCompraAbierto(false); }}
                     className={`group flex min-h-[96px] flex-col items-center justify-center rounded-[20px] border px-2 py-3 text-center transition sm:min-h-[112px] sm:px-4 ${
                       compraSeccion === "bazares"
                         ? "border-violet-300 bg-violet-700 text-white shadow-lg shadow-violet-200"
@@ -531,7 +533,7 @@ export default function InformacionPage() {
 
                   <button
                     type="button"
-                    onClick={() => setCompraSeccion("bodegas")}
+                    onClick={() => { setCompraSeccion("bodegas"); setDetalleCompraAbierto(false); }}
                     className={`group flex min-h-[96px] flex-col items-center justify-center rounded-[20px] border px-2 py-3 text-center transition sm:min-h-[112px] sm:px-4 ${
                       compraSeccion === "bodegas"
                         ? "border-emerald-300 bg-emerald-600 text-white shadow-lg shadow-emerald-200"
@@ -563,7 +565,7 @@ export default function InformacionPage() {
 
                   <button
                     type="button"
-                    onClick={() => setCompraSeccion("grupo")}
+                    onClick={() => { setCompraSeccion("grupo"); setDetalleCompraAbierto(false); }}
                     className={`group flex min-h-[96px] flex-col items-center justify-center rounded-[20px] border px-2 py-3 text-center transition sm:min-h-[112px] sm:px-4 ${
                       compraSeccion === "grupo"
                         ? "border-cyan-300 bg-[#0a3183] text-white shadow-lg shadow-blue-200"
@@ -595,9 +597,39 @@ export default function InformacionPage() {
                 </div>
               </div>
 
+              <div className="mt-3 sm:hidden">
+                <button
+                  type="button"
+                  onClick={() => setDetalleCompraAbierto((valor) => !valor)}
+                  className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3.5 text-left text-sm font-black shadow-sm transition ${
+                    compraSeccion === "bazares"
+                      ? "border-violet-200 bg-violet-50 text-violet-800"
+                      : compraSeccion === "bodegas"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : "border-blue-200 bg-blue-50 text-[#0a3183]"
+                  }`}
+                >
+                  <span>
+                    {detalleCompraAbierto
+                      ? "Ocultar información"
+                      : compraSeccion === "grupo"
+                      ? "Ver dinámica y reglas"
+                      : "Ver pasos y reglas"}
+                  </span>
+
+                  <span
+                    className={`text-lg transition-transform ${
+                      detalleCompraAbierto ? "rotate-180" : ""
+                    }`}
+                  >
+                    ↓
+                  </span>
+                </button>
+              </div>
+
               <div className="mt-4">
                 {compraSeccion === "bazares" && (
-                  <div className="animate-[fadeIn_.25s_ease-out]">
+                  <div className={`${detalleCompraAbierto ? "block" : "hidden"} animate-[fadeIn_.25s_ease-out] sm:block`}>
                     <div className="min-w-0 overflow-hidden rounded-[26px] border border-violet-200 sm:rounded-[30px] bg-gradient-to-br from-violet-50 via-white to-white shadow-sm">
                       <div className="p-5 sm:p-6">
                         <div className="flex items-start gap-4">
@@ -706,7 +738,7 @@ export default function InformacionPage() {
                 )}
 
                 {compraSeccion === "bodegas" && (
-                  <div className="animate-[fadeIn_.25s_ease-out]">
+                  <div className={`${detalleCompraAbierto ? "block" : "hidden"} animate-[fadeIn_.25s_ease-out] sm:block`}>
                     <div className="min-w-0 overflow-hidden rounded-[26px] border border-emerald-200 sm:rounded-[30px] bg-gradient-to-br from-emerald-50 via-white to-white shadow-sm">
                       <div className="p-5 sm:p-6">
                         <div className="flex items-start gap-4">
@@ -827,7 +859,7 @@ export default function InformacionPage() {
                 )}
 
                 {compraSeccion === "grupo" && (
-                  <div className="animate-[fadeIn_.25s_ease-out]">
+                  <div className={`${detalleCompraAbierto ? "block" : "hidden"} animate-[fadeIn_.25s_ease-out] sm:block`}>
                     <div className="mt-5 min-w-0 overflow-hidden rounded-[26px] border border-blue-200 sm:rounded-[30px] bg-gradient-to-br from-[#071f57] via-[#0a3183] to-[#0b57d0] text-white shadow-[0_24px_70px_rgba(10,49,131,.18)]">
                       <div className="p-5 sm:p-7">
                         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -1271,11 +1303,19 @@ export default function InformacionPage() {
               pagos, empaque, envío y responsabilidades antes de utilizar el
               servicio.
             </p>
+
+            <Link
+              href="/informacion/terminos"
+              className="mt-4 inline-flex items-center gap-2 text-sm font-black text-[#0a3183] sm:hidden"
+            >
+              Consultar términos
+              <IconoFlecha className="h-4 w-4" />
+            </Link>
           </div>
 
           <Link
             href="/informacion/terminos"
-            className="inline-flex h-full min-h-[82px] items-center justify-center gap-2 rounded-[24px] bg-[#0a3183] px-6 text-sm font-black text-white shadow-xl shadow-blue-200 transition hover:-translate-y-1"
+            className="hidden h-full min-h-[82px] items-center justify-center gap-2 rounded-[24px] bg-[#0a3183] px-6 text-sm font-black text-white shadow-xl shadow-blue-200 transition hover:-translate-y-1 sm:inline-flex"
           >
             Ver términos
             <IconoFlecha />
@@ -1284,7 +1324,7 @@ export default function InformacionPage() {
       </section>
 
       <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-8 text-center sm:px-6 md:flex-row md:items-center md:justify-between md:text-left lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 text-center sm:px-6 sm:py-8 md:flex-row md:items-center md:justify-between md:text-left lg:px-8">
           <div className="flex items-center justify-center gap-3 md:justify-start">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0a3183] text-white">
               <IconoCaja className="h-5 w-5" />
