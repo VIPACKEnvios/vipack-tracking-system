@@ -236,7 +236,7 @@ function AccesoCard({
 
   const contenido = (
     <div
-      className={`group relative h-full min-h-[150px] overflow-hidden rounded-[24px] border p-4 shadow-lg transition duration-300 hover:-translate-y-1 hover:shadow-2xl sm:min-h-0 sm:rounded-[28px] sm:p-5 ${clases}`}
+      className={`group relative h-full min-h-[150px] overflow-hidden rounded-[24px] border p-4 shadow-[0_14px_36px_rgba(15,23,42,.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_50px_rgba(15,23,42,.13)] sm:min-h-[220px] sm:rounded-[26px] sm:p-5 ${clases}`}
     >
       <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-cyan-300/15 blur-2xl" />
       <div className="absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-transparent via-cyan-300/50 to-transparent opacity-70" />
@@ -257,7 +257,7 @@ function AccesoCard({
         </h3>
 
         <p
-          className={`mt-2 hidden text-sm leading-6 sm:block ${
+          className={`mt-2 hidden text-[13px] leading-6 sm:block ${
             destacado ? "text-blue-100/85" : "text-slate-500"
           }`}
         >
@@ -367,6 +367,15 @@ export default function InformacionPage() {
               </div>
             </Link>
 
+            <div className="flex items-center gap-2 md:hidden">
+              <Link
+                href="/informacion/bazares"
+                className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-[11px] font-black text-white backdrop-blur"
+              >
+                Bazares
+              </Link>
+            </div>
+
             <div className="hidden items-center gap-2 md:flex">
               <Link
                 href="/informacion/bazares"
@@ -383,22 +392,22 @@ export default function InformacionPage() {
             </div>
           </nav>
 
-          <div className="mt-8 grid items-center gap-7 sm:mt-12 lg:grid-cols-[1.08fr_.92fr] lg:gap-14 lg:py-8">
+          <div className="mt-8 grid items-center gap-7 sm:mt-12 lg:grid-cols-[1.05fr_.95fr] lg:gap-16 lg:py-10">
             <div className="max-w-3xl">
               <div className="inline-flex rounded-full border border-cyan-200/20 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-cyan-100 backdrop-blur-xl sm:px-3.5 sm:py-2 sm:text-xs sm:tracking-[0.16em]">
                 Información para clientes
               </div>
 
-              <h1 className="mt-4 max-w-[390px] text-[36px] font-black leading-[1.02] tracking-[-.04em] sm:mt-6 sm:max-w-none sm:text-6xl sm:leading-[.98] lg:text-[68px]">
-                Todo lo que necesitas
-                <span className="block bg-gradient-to-r from-white via-cyan-100 to-blue-200 bg-clip-text text-transparent">
-                  para comprar y enviar.
+              <h1 className="mt-4 max-w-[390px] text-[36px] font-black leading-[1.02] tracking-[-.04em] sm:mt-6 sm:max-w-[720px] sm:text-6xl sm:leading-[.98] lg:text-[68px]">
+                Todo lo que necesitas para
+                <span className="block bg-gradient-to-r from-cyan-200 via-cyan-300 to-sky-300 bg-clip-text text-transparent">
+                  comprar y enviar.
                 </span>
               </h1>
 
               <p className="mt-4 max-w-[390px] text-[14px] leading-6 text-blue-100/80 sm:mt-6 sm:max-w-2xl sm:text-lg sm:leading-8">
                 Compra en Tijuana, reúne tus mercancías y envíalas a cualquier
-                parte de México. Aquí encontrarás cómo funciona cada paso.
+                parte de México. Aquí encontrarás cada paso, claro y organizado.
               </p>
 
               <div className="mt-6 grid grid-cols-[1.35fr_.85fr] gap-2.5 pb-2 sm:mt-8 sm:flex sm:flex-row sm:gap-3 sm:pb-0">
@@ -423,8 +432,8 @@ export default function InformacionPage() {
             <div className="relative mx-auto hidden w-full max-w-xl sm:block">
               <div className="absolute -inset-8 rounded-[40px] bg-cyan-300/10 blur-3xl" />
 
-              <div className="relative rounded-[34px] border border-white/15 bg-white/[0.08] p-3 shadow-[0_30px_80px_rgba(2,17,58,.45)] backdrop-blur-2xl sm:p-4">
-                <div className="rounded-[28px] bg-white p-5 text-slate-950 sm:p-6">
+              <div className="relative rounded-[32px] border border-white/15 bg-white/[0.08] p-3 shadow-[0_26px_70px_rgba(2,17,58,.38)] backdrop-blur-2xl sm:p-4">
+                <div className="rounded-[26px] bg-white p-5 text-slate-950 sm:p-6">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-xs font-black uppercase tracking-[0.14em] text-cyan-700">
@@ -471,10 +480,16 @@ export default function InformacionPage() {
         id="elige"
         className="relative z-10 mx-auto mt-0 max-w-7xl px-4 pt-6 sm:-mt-12 sm:px-6 sm:pt-0 lg:px-8"
       >
-        <div className="mb-5 text-center sm:mb-6">
-          <h2 className="mt-1.5 text-[24px] font-black tracking-[-.02em] sm:mt-2 sm:text-3xl">
-            ¿Qué necesitas hacer?
-          </h2>
+        <div className="mb-5 text-center sm:mb-7">
+          <div className="flex items-center justify-center gap-3">
+            <span className="hidden h-px w-14 bg-gradient-to-r from-transparent to-blue-300 sm:block" />
+            <span className="hidden h-1.5 w-1.5 rounded-full bg-cyan-400 sm:block" />
+            <h2 className="text-[24px] font-black tracking-[-.02em] sm:text-3xl">
+              ¿Qué necesitas hacer?
+            </h2>
+            <span className="hidden h-1.5 w-1.5 rounded-full bg-cyan-400 sm:block" />
+            <span className="hidden h-px w-14 bg-gradient-to-l from-transparent to-blue-300 sm:block" />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
@@ -492,7 +507,7 @@ export default function InformacionPage() {
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-16 lg:px-8">
-        <div className="min-w-0 overflow-hidden rounded-[26px] border border-white/80 bg-white/95 p-4 shadow-[0_20px_55px_rgba(15,23,42,.10)] backdrop-blur sm:rounded-[34px] sm:p-8 lg:p-10">
+        <div className="min-w-0 overflow-hidden rounded-[26px] border border-slate-200/80 bg-white/95 p-4 shadow-[0_22px_60px_rgba(15,23,42,.09)] backdrop-blur sm:rounded-[30px] sm:p-8 lg:p-9">
           <div className="flex flex-col gap-3 border-b border-slate-100 pb-6 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.15em] text-cyan-700">
@@ -511,8 +526,8 @@ export default function InformacionPage() {
 
           {vista === "comprar" && (
             <div className="mt-6 sm:mt-8">
-              <div className="rounded-[26px] border border-slate-200 bg-slate-50/80 p-2 shadow-inner sm:p-3">
-                <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-2 shadow-inner sm:p-3">
+                <div className="grid grid-cols-3 gap-2.5">
                   <button
                     type="button"
                     onClick={() => setCompraSeccion("bazares")}
