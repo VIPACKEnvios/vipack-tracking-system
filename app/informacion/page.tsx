@@ -303,10 +303,11 @@ export default function InformacionPage() {
         <div className="mx-auto max-w-7xl px-4 pb-24 pt-5 sm:px-6 sm:pb-32 lg:px-8">
           <nav className="flex items-center justify-between gap-4">
             <Link href="/informacion" className="flex items-center gap-3">
-              <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-white/15 bg-white/10 shadow-xl backdrop-blur-xl">
-                <IconoCaja className="h-7 w-7" />
-                <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-cyan-300 ring-4 ring-[#092e81]" />
-              </div>
+              <img
+                src="/vipack-logo.jpg"
+                alt="VIPACK Envíos"
+                className="h-14 w-14 rounded-2xl object-cover shadow-xl"
+              />
 
               <div>
                 <p className="text-sm font-black tracking-[0.18em]">
@@ -320,7 +321,7 @@ export default function InformacionPage() {
 
             <div className="hidden items-center gap-2 md:flex">
               <Link
-                href="/consulta-bazares"
+                href="/informacion/bazares"
                 className="rounded-xl px-4 py-2 text-sm font-bold text-blue-100 transition hover:bg-white/10 hover:text-white"
               >
                 Bazares
@@ -362,10 +363,10 @@ export default function InformacionPage() {
                 </a>
 
                 <Link
-                  href="/consulta-bazares"
+                  href="/informacion/bazares"
                   className="inline-flex items-center justify-center rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 text-sm font-black text-white backdrop-blur-xl transition hover:bg-white/15"
                 >
-                  Consultar bazares
+                  Ver bazares
                 </Link>
               </div>
             </div>
@@ -673,7 +674,7 @@ export default function InformacionPage() {
           {vista === "donde" && (
             <div className="mt-8 grid gap-5 lg:grid-cols-2">
               <Link
-                href="/consulta-bazares"
+                href="/informacion/bazares"
                 className="group rounded-[30px] bg-gradient-to-br from-[#071f57] via-[#0a3183] to-[#0b57d0] p-6 text-white shadow-xl transition hover:-translate-y-1"
               >
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">
@@ -689,7 +690,7 @@ export default function InformacionPage() {
                 </h3>
 
                 <p className="mt-3 text-sm leading-6 text-blue-100/85">
-                  Consulta los bazares que aparecen registrados dentro de VIPACK.
+                  Consulta bazares y entra directamente a sus redes para revisar sus publicaciones.
                 </p>
 
                 <div className="mt-6 flex items-center gap-2 text-sm font-black">
@@ -770,7 +771,7 @@ export default function InformacionPage() {
           </div>
 
           <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs font-bold text-slate-500 md:justify-end">
-            <Link href="/consulta-bazares" className="hover:text-[#0a3183]">
+            <Link href="/informacion/bazares" className="hover:text-[#0a3183]">
               Bazares
             </Link>
             <Link href="/informacion/bodegas" className="hover:text-[#0a3183]">
