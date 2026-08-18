@@ -10,7 +10,14 @@ export function proxy(request: NextRequest) {
   const isPublicPage =
     path === "/login" ||
     path === "/registro-bazar" ||
-    path === "/consulta-bazares";
+    path === "/consulta-bazares" ||
+
+    /*
+     * Inventario privado por token.
+     * No requiere login del ERP.
+     * El token del enlace identifica al cliente.
+     */
+    path.startsWith("/inventario/");
 
   /*
    * APIs PÚBLICAS
