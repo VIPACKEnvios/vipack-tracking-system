@@ -367,22 +367,7 @@ export default function InformacionPage() {
               </div>
             </Link>
 
-            <div className="flex items-center gap-2 md:hidden">
-              <Link
-                href="/informacion/bazares"
-                className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-[11px] font-black text-white backdrop-blur"
-              >
-                Bazares
-              </Link>
-            </div>
-
-            <div className="hidden items-center gap-2 md:flex">
-              <Link
-                href="/informacion/bazares"
-                className="rounded-xl px-4 py-2 text-sm font-bold text-blue-100 transition hover:bg-white/10 hover:text-white"
-              >
-                Bazares
-              </Link>
+            <div className="hidden items-center md:flex">
               <Link
                 href="/informacion/terminos"
                 className="rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-black text-white backdrop-blur-xl transition hover:bg-white/15"
@@ -405,27 +390,11 @@ export default function InformacionPage() {
                 </span>
               </h1>
 
-              <p className="mt-4 max-w-[390px] text-[14px] leading-6 text-blue-100/80 sm:mt-6 sm:max-w-2xl sm:text-lg sm:leading-8">
+              <p className="mt-4 max-w-[390px] text-[14px] leading-6 text-blue-100/80 sm:mt-6 sm:max-w-2xl sm:text-lg sm:leading-8 lg:pb-3">
                 Compra en Tijuana, reúne tus mercancías y envíalas a cualquier
                 parte de México. Aquí encontrarás cada paso, claro y organizado.
               </p>
 
-              <div className="mt-6 grid grid-cols-[1.35fr_.85fr] gap-2.5 pb-2 sm:mt-8 sm:flex sm:flex-row sm:gap-3 sm:pb-0">
-                <a
-                  href="#elige"
-                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-[16px] bg-gradient-to-r from-cyan-300 via-cyan-100 to-white px-3 py-3 text-[12px] font-black text-[#061b4f] shadow-[0_14px_34px_rgba(0,0,0,.16)] transition hover:-translate-y-0.5 sm:w-auto sm:gap-2 sm:rounded-2xl sm:px-5 sm:py-3.5 sm:text-sm"
-                >
-                  ¿Qué necesitas hacer?
-                  <IconoFlecha />
-                </a>
-
-                <Link
-                  href="/informacion/bazares"
-                  className="inline-flex w-full items-center justify-center rounded-[16px] border border-white/20 bg-white/10 px-3 py-3 text-[12px] font-black text-white backdrop-blur-xl transition hover:bg-white/15 sm:w-auto sm:rounded-2xl sm:px-5 sm:py-3.5 sm:text-sm"
-                >
-                  Ver bazares
-                </Link>
-              </div>
 
             </div>
 
