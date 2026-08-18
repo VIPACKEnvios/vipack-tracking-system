@@ -348,7 +348,7 @@ export default function InformacionPage() {
         <div className="absolute inset-0 -z-20 bg-gradient-to-br from-[#061b4f]/40 via-[#092e81]/75 to-[#0b57d0]/60" />
         <div className="absolute inset-0 -z-10 opacity-[0.07] [background-image:linear-gradient(rgba(255,255,255,.7)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.7)_1px,transparent_1px)] [background-size:42px_42px]" />
 
-        <div className="mx-auto max-w-7xl px-5 pb-12 pt-4 sm:px-6 sm:pb-28 sm:pt-5 lg:px-8">
+        <div className="mx-auto max-w-7xl px-5 pb-16 pt-4 sm:px-6 sm:pb-28 sm:pt-5 lg:px-8">
           <nav className="flex items-center justify-between gap-4">
             <Link href="/informacion" className="flex items-center gap-3">
               <img
@@ -401,7 +401,7 @@ export default function InformacionPage() {
                 parte de México. Aquí encontrarás cómo funciona cada paso.
               </p>
 
-              <div className="mt-6 grid grid-cols-[1.35fr_.85fr] gap-2.5 sm:mt-8 sm:flex sm:flex-row sm:gap-3">
+              <div className="mt-6 grid grid-cols-[1.35fr_.85fr] gap-2.5 pb-2 sm:mt-8 sm:flex sm:flex-row sm:gap-3 sm:pb-0">
                 <a
                   href="#elige"
                   className="inline-flex w-full items-center justify-center gap-1.5 rounded-[16px] bg-gradient-to-r from-cyan-300 via-cyan-100 to-white px-3 py-3 text-[12px] font-black text-[#061b4f] shadow-[0_14px_34px_rgba(0,0,0,.16)] transition hover:-translate-y-0.5 sm:w-auto sm:gap-2 sm:rounded-2xl sm:px-5 sm:py-3.5 sm:text-sm"
@@ -418,16 +418,6 @@ export default function InformacionPage() {
                 </Link>
               </div>
 
-              <div className="mt-5 flex flex-wrap gap-2 sm:hidden">
-                {["Compra", "Recolecta", "Envía"].map((item) => (
-                  <span
-                    key={item}
-                    className="rounded-full border border-white/12 bg-white/[0.07] px-3 py-1.5 text-[10px] font-bold text-blue-100 backdrop-blur"
-                  >
-                    {item}
-                  </span>
-                ))}
-              </div>
             </div>
 
             <div className="relative mx-auto hidden w-full max-w-xl sm:block">
@@ -479,12 +469,9 @@ export default function InformacionPage() {
 
       <section
         id="elige"
-        className="relative z-10 mx-auto -mt-4 max-w-7xl px-4 sm:-mt-12 sm:px-6 lg:px-8"
+        className="relative z-10 mx-auto mt-0 max-w-7xl px-4 pt-6 sm:-mt-12 sm:px-6 sm:pt-0 lg:px-8"
       >
-        <div className="mb-4 text-center sm:mb-6">
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-700 sm:text-xs">
-            Empieza aquí
-          </p>
+        <div className="mb-5 text-center sm:mb-6">
           <h2 className="mt-1.5 text-[24px] font-black tracking-[-.02em] sm:mt-2 sm:text-3xl">
             ¿Qué necesitas hacer?
           </h2>
