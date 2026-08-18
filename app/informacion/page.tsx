@@ -350,7 +350,7 @@ export default function InformacionPage() {
         <div className="absolute inset-0 -z-20 bg-gradient-to-br from-[#061b4f]/40 via-[#092e81]/75 to-[#0b57d0]/60" />
         <div className="absolute inset-0 -z-10 opacity-[0.07] [background-image:linear-gradient(rgba(255,255,255,.7)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.7)_1px,transparent_1px)] [background-size:42px_42px]" />
 
-        <div className="mx-auto max-w-7xl px-5 pb-10 pt-4 sm:px-6 sm:pb-28 sm:pt-5 lg:px-8">
+        <div className="mx-auto max-w-7xl px-5 pb-10 pt-4 sm:px-6 sm:pb-24 sm:pt-5 lg:px-8 lg:pb-16">
           <nav className="flex items-center justify-between gap-4">
             <Link href="/informacion" className="flex items-center gap-3">
               <img
@@ -449,9 +449,9 @@ export default function InformacionPage() {
 
       <section
         id="elige"
-        className="relative z-10 mx-auto mt-0 max-w-7xl px-4 pt-7 sm:-mt-12 sm:px-6 sm:pt-0 lg:px-8"
+        className="relative z-10 mx-auto mt-0 max-w-7xl px-4 pt-7 sm:px-6 sm:pt-8 lg:px-8 lg:pt-9"
       >
-        <div className="mb-7 text-center sm:mb-7">
+        <div className="mb-7 text-center sm:mb-8">
           <div className="flex items-center justify-center gap-3">
             <span className="hidden h-px w-14 bg-gradient-to-r from-transparent to-blue-300 sm:block" />
             <span className="hidden h-1.5 w-1.5 rounded-full bg-cyan-400 sm:block" />
