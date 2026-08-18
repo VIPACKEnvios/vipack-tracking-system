@@ -573,54 +573,119 @@ export default function InformacionPage() {
                 </div>
 
                 {/* BODEGAS */}
-                <div className="rounded-[30px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white p-5 shadow-sm sm:p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-200">
-                      <IconoEscudo className="h-6 w-6" />
-                    </div>
-
-                    <div>
-                      <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
-                        Compra en bodegas
-                      </p>
-                      <h3 className="mt-1 text-2xl font-black">
-                        Dinámica de compra en bodegas
-                      </h3>
-                      <p className="mt-2 text-sm leading-6 text-slate-500">
-                        La compra en bodegas funciona de manera diferente a los
-                        bazares. Algunas ventas se realizan mediante grupos de
-                        WhatsApp, vendedores o durante visitas programadas.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 rounded-[24px] border border-dashed border-emerald-300 bg-white/80 p-6 text-center">
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
-                      <IconoDocumento className="h-6 w-6" />
-                    </div>
-                    <h4 className="mt-4 text-lg font-black">
-                      Información en preparación
-                    </h4>
-                    <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">
-                      Estamos organizando la dinámica completa de compra en
-                      bodegas para mostrarte claramente cómo comprar según cada
-                      modalidad.
-                    </p>
-                  </div>
-
-                  <div className="mt-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-                    {[
-                      "Grupos de WhatsApp",
-                      "Vendedores",
-                      "Visitas a bodegas",
-                    ].map((texto) => (
-                      <div
-                        key={texto}
-                        className="rounded-2xl border border-emerald-100 bg-white p-4 text-center text-sm font-black text-emerald-800"
-                      >
-                        {texto}
+                <div className="overflow-hidden rounded-[30px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white shadow-sm">
+                  <div className="p-5 sm:p-6">
+                    <div className="flex items-start gap-4">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-200">
+                        <IconoEscudo className="h-6 w-6" />
                       </div>
-                    ))}
+
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+                          Compra en bodegas
+                        </p>
+                        <h3 className="mt-1 text-2xl font-black">
+                          ¿Cómo comprar en una bodega por WhatsApp?
+                        </h3>
+                        <p className="mt-2 text-sm leading-6 text-slate-500">
+                          Algunas bodegas realizan sus ventas por grupos de
+                          WhatsApp. Sigue esta dinámica para que podamos
+                          identificar y corroborar correctamente tu recolección.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 space-y-3">
+                      {[
+                        {
+                          titulo: "Publicación de productos",
+                          texto:
+                            "La bodega o vendedor publica los productos disponibles directamente en su grupo de WhatsApp. Algunos artículos pueden ser pieza única y otros tener varias piezas disponibles.",
+                        },
+                        {
+                          titulo: "Aparta tu producto",
+                          texto:
+                            'Cuando encuentres un producto que quieras comprar, responde directamente a la foto o deslízala y escribe “Yo”.',
+                        },
+                        {
+                          titulo: "Confirma que alcanzaste",
+                          texto:
+                            "Si el vendedor reacciona con 👍 o Like a tu comentario, significa que alcanzaste el producto y será agregado a tu nota o pedido.",
+                        },
+                        {
+                          titulo: "Acumula tus compras",
+                          texto:
+                            "Durante los días de venta puedes seguir comprando. Los productos que alcances se irán agregando a tu nota.",
+                        },
+                        {
+                          titulo: "Recibe y paga tu nota",
+                          texto:
+                            "La bodega o vendedor te enviará tu nota con los artículos comprados y el total a pagar. Liquídala dentro del plazo indicado.",
+                        },
+                        {
+                          titulo: "Indica que recolecta VIPACK",
+                          texto:
+                            'Al proporcionar tus datos de entrega, indica claramente: “Me recolecta VIPACK”.',
+                        },
+                        {
+                          titulo: "Comparte tu nota o pedido con VIPACK",
+                          texto:
+                            "Cuando recibas tu nota, pedido o comprobante de compra, debes enviárselo a VIPACK antes de la recolección. Lo utilizamos para saber qué mercancía debemos recoger y corroborar que la entrega de la bodega esté completa.",
+                        },
+                        {
+                          titulo: "VIPACK realiza la recolección",
+                          texto:
+                            "VIPACK acude a la ubicación acordada con la bodega, recibe tu mercancía y la identifica para continuar con el proceso.",
+                        },
+                        {
+                          titulo: "Revisa tus evidencias",
+                          texto:
+                            "Una vez procesada la recolección, podrás consultar las evidencias disponibles en tu carpeta o inventario.",
+                        },
+                      ].map((paso, index) => (
+                        <div
+                          key={paso.titulo}
+                          className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-white p-4"
+                        >
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-xs font-black text-emerald-700">
+                            {index + 1}
+                          </span>
+
+                          <div>
+                            <p className="text-sm font-black text-slate-800">
+                              {paso.titulo}
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-slate-500">
+                              {paso.texto}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-5 rounded-2xl border border-amber-300 bg-amber-50 p-4">
+                      <p className="text-sm font-black text-amber-900">
+                        Muy importante
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-amber-800/85">
+                        Comparte con VIPACK tu nota, pedido o comprobante de
+                        compra antes de la recolección. Esto nos permite
+                        corroborar que la mercancía entregada por la bodega
+                        corresponda con tu pedido.
+                      </p>
+                    </div>
+
+                    <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                      <p className="text-sm font-black text-emerald-900">
+                        Recuerda
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-emerald-800/80">
+                        Cada bodega puede manejar diferentes días de venta,
+                        horarios, fechas de pago, formas de entrega y políticas.
+                        Revisa siempre las reglas particulares del grupo antes de
+                        comprar.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
