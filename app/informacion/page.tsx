@@ -9,6 +9,11 @@ type Vista =
   | "recolecciones"
   | "donde";
 
+type CompraSeccion =
+  | "bazares"
+  | "bodegas"
+  | "grupo";
+
 type CardProps = {
   titulo: string;
   descripcion: string;
@@ -328,6 +333,8 @@ const opciones: Array<{
 
 export default function InformacionPage() {
   const [vista, setVista] = useState<Vista>("comprar");
+  const [compraSeccion, setCompraSeccion] =
+    useState<CompraSeccion>("bazares");
 
   const tituloActivo = useMemo(
     () => opciones.find((item) => item.id === vista)?.titulo || "",
@@ -504,7 +511,7 @@ export default function InformacionPage() {
               <p className="text-xs font-black uppercase tracking-[0.15em] text-cyan-700">
                 Guía rápida
               </p>
-              <h2 className="mt-2 text-3xl font-black tracking-[-.03em] sm:text-4xl">
+              <h2 className="mt-1 text-[28px] font-black tracking-[-.03em] sm:mt-2 sm:text-4xl">
                 {tituloActivo}
               </h2>
             </div>
@@ -516,467 +523,575 @@ export default function InformacionPage() {
           </div>
 
           {vista === "comprar" && (
-            <div className="mt-8">
-              <div className="grid gap-5 lg:grid-cols-2">
-                {/* BAZARES */}
-                <div className="min-w-0 overflow-hidden rounded-[26px] border border-violet-200 sm:rounded-[30px] bg-gradient-to-br from-violet-50 via-white to-white shadow-sm">
-                  <div className="p-5 sm:p-6">
-                    <div className="flex items-start gap-4">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-700 text-white shadow-lg shadow-violet-200">
-                        <IconoTienda className="h-6 w-6" />
-                      </div>
-
-                      <div>
-                        <p className="text-xs font-black uppercase tracking-[0.14em] text-violet-700">
-                          Compra en bazares
-                        </p>
-                        <h3 className="mt-1 text-2xl font-black">
-                          ¿Cómo comprar en un bazar?
-                        </h3>
-                        <p className="mt-2 text-sm leading-6 text-slate-500">
-                          Sigue estos pasos para que tu compra quede correctamente
-                          identificada y pueda ser entregada a VIPACK.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-6 space-y-3">
-                      {[
-                        {
-                          titulo: "Aparta tu producto",
-                          texto:
-                            'En publicaciones o álbumes normalmente se aparta comentando “Yo” o “Mío”. Preguntar por un artículo no significa que esté apartado.',
-                        },
-                        {
-                          titulo: "Indica quién recolecta",
-                          texto:
-                            'Al comentar o confirmar tu compra, menciona: “Me recolecta VIPACK”.',
-                        },
-                        {
-                          titulo: "Confirma tu compra y total",
-                          texto:
-                            "El bazar te indicará por Inbox, Messenger o el medio que utilice el total y los datos necesarios para realizar tu pago.",
-                        },
-                        {
-                          titulo: "Identifica correctamente tu pago",
-                          texto:
-                            "Coloca tu nombre o el dato solicitado por el bazar en el concepto para que tu pago pueda identificarse.",
-                        },
-                        {
-                          titulo: "Respeta la fecha límite de pago",
-                          texto:
-                            "Realiza el pago dentro del plazo indicado por el bazar. Los días y horarios pueden variar.",
-                        },
-                        {
-                          titulo: "Entrega a VIPACK",
-                          texto:
-                            "Los bazares entregan las compras de nuestros clientes en nuestro punto de recolección, Local C-10, en el pasillo de la comida de Swap Meet.",
-                        },
-                        {
-                          titulo: "Revisa los detalles del producto",
-                          texto:
-                            "En artículos como calzado, confirma si el producto se vende con o sin caja y revisa cualquier condición indicada en la publicación.",
-                        },
-                        {
-                          titulo: "Conserva evidencia de tu compra",
-                          texto:
-                            "Guarda capturas, comprobantes y mensajes hasta que tu mercancía aparezca en tu carpeta de recolecciones.",
-                        },
-                      ].map((paso, index) => (
-                        <div
-                          key={paso.titulo}
-                          className="flex items-start gap-3 rounded-2xl border border-violet-100 bg-white p-4"
-                        >
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-xs font-black text-violet-700">
-                            {index + 1}
-                          </span>
-
-                          <div>
-                            <p className="text-sm font-black text-slate-800">
-                              {paso.titulo}
-                            </p>
-                            <p className="mt-1 text-sm leading-6 text-slate-500">
-                              {paso.texto}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                      <p className="text-sm font-black text-amber-900">
-                        Importante
-                      </p>
-                      <p className="mt-1 text-sm leading-6 text-amber-800/80">
-                        Cada bazar puede manejar sus propios días de entrega,
-                        horarios, formas de apartado, pagos y políticas. Revisa
-                        siempre las condiciones de la publicación antes de comprar.
-                      </p>
-                    </div>
-
-                    <Link
-                      href="/informacion/bazares"
-                      className="mt-5 flex items-center justify-center gap-2 rounded-2xl bg-violet-700 px-5 py-3.5 text-sm font-black text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5 hover:bg-violet-800"
+            <div className="mt-6 sm:mt-8">
+              <div className="rounded-[26px] border border-slate-200 bg-slate-50/80 p-2 shadow-inner sm:p-3">
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCompraSeccion("bazares")}
+                    className={`group flex min-h-[96px] flex-col items-center justify-center rounded-[20px] border px-2 py-3 text-center transition sm:min-h-[112px] sm:px-4 ${
+                      compraSeccion === "bazares"
+                        ? "border-violet-300 bg-violet-700 text-white shadow-lg shadow-violet-200"
+                        : "border-transparent bg-white text-slate-700 hover:border-violet-200"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-9 w-9 items-center justify-center rounded-xl ${
+                        compraSeccion === "bazares"
+                          ? "bg-white/15"
+                          : "bg-violet-50 text-violet-700"
+                      }`}
                     >
-                      Ver bazares donde puedo comprar
-                      <IconoFlecha className="h-4 w-4" />
-                    </Link>
-                  </div>
-                </div>
+                      <IconoTienda className="h-5 w-5" />
+                    </span>
+                    <span className="mt-2 text-[12px] font-black leading-tight sm:text-sm">
+                      Bazares
+                    </span>
+                    <span
+                      className={`mt-1 hidden text-[10px] font-semibold sm:block ${
+                        compraSeccion === "bazares"
+                          ? "text-violet-100"
+                          : "text-slate-400"
+                      }`}
+                    >
+                      Facebook
+                    </span>
+                  </button>
 
-                {/* BODEGAS */}
-                <div className="min-w-0 overflow-hidden rounded-[26px] border border-emerald-200 sm:rounded-[30px] bg-gradient-to-br from-emerald-50 via-white to-white shadow-sm">
-                  <div className="p-5 sm:p-6">
-                    <div className="flex items-start gap-4">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-200">
-                        <IconoEscudo className="h-6 w-6" />
-                      </div>
+                  <button
+                    type="button"
+                    onClick={() => setCompraSeccion("bodegas")}
+                    className={`group flex min-h-[96px] flex-col items-center justify-center rounded-[20px] border px-2 py-3 text-center transition sm:min-h-[112px] sm:px-4 ${
+                      compraSeccion === "bodegas"
+                        ? "border-emerald-300 bg-emerald-600 text-white shadow-lg shadow-emerald-200"
+                        : "border-transparent bg-white text-slate-700 hover:border-emerald-200"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-9 w-9 items-center justify-center rounded-xl ${
+                        compraSeccion === "bodegas"
+                          ? "bg-white/15"
+                          : "bg-emerald-50 text-emerald-700"
+                      }`}
+                    >
+                      <IconoEscudo className="h-5 w-5" />
+                    </span>
+                    <span className="mt-2 text-[12px] font-black leading-tight sm:text-sm">
+                      Bodegas
+                    </span>
+                    <span
+                      className={`mt-1 hidden text-[10px] font-semibold sm:block ${
+                        compraSeccion === "bodegas"
+                          ? "text-emerald-100"
+                          : "text-slate-400"
+                      }`}
+                    >
+                      WhatsApp
+                    </span>
+                  </button>
 
-                      <div>
-                        <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
-                          Compra en bodegas
-                        </p>
-                        <h3 className="mt-1 text-2xl font-black">
-                          ¿Cómo comprar en una bodega por WhatsApp?
-                        </h3>
-                        <p className="mt-2 text-sm leading-6 text-slate-500">
-                          Algunas bodegas realizan sus ventas por grupos de
-                          WhatsApp. Sigue esta dinámica para que podamos
-                          identificar y corroborar correctamente tu recolección.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-6 space-y-3">
-                      {[
-                        {
-                          titulo: "Publicación de productos",
-                          texto:
-                            "La bodega o vendedor publica los productos disponibles directamente en su grupo de WhatsApp. Algunos artículos pueden ser pieza única y otros tener varias piezas disponibles.",
-                        },
-                        {
-                          titulo: "Aparta tu producto",
-                          texto:
-                            'Cuando encuentres un producto que quieras comprar, responde directamente a la foto o deslízala y escribe “Yo”.',
-                        },
-                        {
-                          titulo: "Confirma que alcanzaste",
-                          texto:
-                            "Si el vendedor reacciona con 👍 o Like a tu comentario, significa que alcanzaste el producto y será agregado a tu nota o pedido.",
-                        },
-                        {
-                          titulo: "Acumula tus compras",
-                          texto:
-                            "Durante los días de venta puedes seguir comprando. Los productos que alcances se irán agregando a tu nota.",
-                        },
-                        {
-                          titulo: "Recibe y paga tu nota",
-                          texto:
-                            "La bodega o vendedor te enviará tu nota con los artículos comprados y el total a pagar. Liquídala dentro del plazo indicado.",
-                        },
-                        {
-                          titulo: "Indica que recolecta VIPACK",
-                          texto:
-                            'Al proporcionar tus datos de entrega, indica claramente: “Me recolecta VIPACK”.',
-                        },
-                        {
-                          titulo: "Comparte tu nota o pedido con VIPACK",
-                          texto:
-                            "Cuando recibas tu nota, pedido o comprobante de compra, debes enviárselo a VIPACK antes de la recolección. Lo utilizamos para saber qué mercancía debemos recoger y corroborar que la entrega de la bodega esté completa.",
-                        },
-                        {
-                          titulo: "VIPACK realiza la recolección",
-                          texto:
-                            "VIPACK acude a la ubicación acordada con la bodega, recibe tu mercancía y la identifica para continuar con el proceso.",
-                        },
-                        {
-                          titulo: "Revisa tus evidencias",
-                          texto:
-                            "Una vez procesada la recolección, podrás consultar las evidencias disponibles en tu carpeta o inventario.",
-                        },
-                      ].map((paso, index) => (
-                        <div
-                          key={paso.titulo}
-                          className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-white p-4"
-                        >
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-xs font-black text-emerald-700">
-                            {index + 1}
-                          </span>
-
-                          <div>
-                            <p className="text-sm font-black text-slate-800">
-                              {paso.titulo}
-                            </p>
-                            <p className="mt-1 text-sm leading-6 text-slate-500">
-                              {paso.texto}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="mt-5 rounded-2xl border border-amber-300 bg-amber-50 p-4">
-                      <p className="text-sm font-black text-amber-900">
-                        Muy importante
-                      </p>
-                      <p className="mt-1 text-sm leading-6 text-amber-800/85">
-                        Comparte con VIPACK tu nota, pedido o comprobante de
-                        compra antes de la recolección. Esto nos permite
-                        corroborar que la mercancía entregada por la bodega
-                        corresponda con tu pedido.
-                      </p>
-                    </div>
-
-                    <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                      <p className="text-sm font-black text-emerald-900">
-                        Recuerda
-                      </p>
-                      <p className="mt-1 text-sm leading-6 text-emerald-800/80">
-                        Cada bodega puede manejar diferentes días de venta,
-                        horarios, fechas de pago, formas de entrega y políticas.
-                        Revisa siempre las reglas particulares del grupo antes de
-                        comprar.
-                      </p>
-                    </div>
-                  </div>
-
+                  <button
+                    type="button"
+                    onClick={() => setCompraSeccion("grupo")}
+                    className={`group flex min-h-[96px] flex-col items-center justify-center rounded-[20px] border px-2 py-3 text-center transition sm:min-h-[112px] sm:px-4 ${
+                      compraSeccion === "grupo"
+                        ? "border-cyan-300 bg-[#0a3183] text-white shadow-lg shadow-blue-200"
+                        : "border-transparent bg-white text-slate-700 hover:border-blue-200"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-9 w-9 items-center justify-center rounded-xl ${
+                        compraSeccion === "grupo"
+                          ? "bg-white/15"
+                          : "bg-blue-50 text-[#0a3183]"
+                      }`}
+                    >
+                      <IconoEstrella className="h-5 w-5" />
+                    </span>
+                    <span className="mt-2 text-[12px] font-black leading-tight sm:text-sm">
+                      Grupo VIPACK
+                    </span>
+                    <span
+                      className={`mt-1 hidden text-[10px] font-semibold sm:block ${
+                        compraSeccion === "grupo"
+                          ? "text-blue-100"
+                          : "text-slate-400"
+                      }`}
+                    >
+                      Exclusivo
+                    </span>
+                  </button>
                 </div>
               </div>
 
-              {/* GRUPO EXCLUSIVO VIPACK */}
-              <div className="mt-5 min-w-0 overflow-hidden rounded-[26px] border border-blue-200 sm:rounded-[30px] bg-gradient-to-br from-[#071f57] via-[#0a3183] to-[#0b57d0] text-white shadow-[0_24px_70px_rgba(10,49,131,.18)]">
-                <div className="p-5 sm:p-7">
-                  <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/20">
-                        <IconoEstrella className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-black uppercase tracking-[0.14em] text-cyan-200">
-                          Modalidad exclusiva
-                        </p>
-                        <h3 className="mt-1 text-2xl font-black sm:text-3xl">
-                          Grupo Exclusivo VIPACK
-                        </h3>
-                        <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-100/85">
-                          Compra productos de bodegas de Tijuana mientras nuestro
-                          equipo realiza la visita por ti. Las fotos y avisos se
-                          comparten en tiempo real dentro del grupo.
-                        </p>
-                      </div>
-                    </div>
-
-                    <span className="w-fit rounded-full bg-cyan-300 px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-[#061b4f]">
-                      Venta en tiempo real
-                    </span>
-                  </div>
-
-                  <div className="mt-7 grid gap-4 md:grid-cols-2">
-                    {[
-                      {
-                        titulo: "Equipo autorizado",
-                        texto:
-                          "María forma parte del equipo autorizado de VIPACK para visitar las bodegas, tomar fotografías en tiempo real y realizar las ventas.",
-                      },
-                      {
-                        titulo: "Aviso de visita",
-                        texto:
-                          "Se avisa dentro del grupo cuando nuestro equipo ya se encuentra en la bodega para que puedas estar al pendiente de las publicaciones.",
-                      },
-                      {
-                        titulo: "Horario de las visitas",
-                        texto:
-                          "Las visitas se realizan entre 10:00 a. m. y 5:00 p. m., hora de Tijuana. Considera la diferencia de horario con el centro del país.",
-                      },
-                      {
-                        titulo: "Fotos en tiempo real",
-                        texto:
-                          "Las fotografías se suben mientras nuestro equipo está en la bodega. Puedes realizar tus compras durante la visita y cada producto apartado se marca con 👍.",
-                      },
-                      {
-                        titulo: "Último aviso",
-                        texto:
-                          "Aproximadamente media hora antes de salir se avisa que queda poco tiempo para seguir comprando. Antes de cerrar nota o pagar se dará un último aviso.",
-                      },
-                      {
-                        titulo: "Precios reales de bodega",
-                        texto:
-                          "Los precios que aparecen en las fotografías son los precios reales de la bodega. La comisión de VIPACK no se agrega directamente al precio del producto.",
-                      },
-                    ].map((item, index) => (
-                      <div
-                        key={item.titulo}
-                        className="rounded-[22px] border border-white/15 bg-white/10 p-4 backdrop-blur"
-                      >
-                        <div className="flex items-start gap-3">
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-xs font-black text-[#0a3183]">
-                            {index + 1}
-                          </span>
+              <div className="mt-4">
+                {compraSeccion === "bazares" && (
+                  <div className="animate-[fadeIn_.25s_ease-out]">
+                    <div className="min-w-0 overflow-hidden rounded-[26px] border border-violet-200 sm:rounded-[30px] bg-gradient-to-br from-violet-50 via-white to-white shadow-sm">
+                      <div className="p-5 sm:p-6">
+                        <div className="flex items-start gap-4">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-700 text-white shadow-lg shadow-violet-200">
+                            <IconoTienda className="h-6 w-6" />
+                          </div>
+                    
                           <div>
-                            <p className="text-sm font-black">{item.titulo}</p>
-                            <p className="mt-1 text-sm leading-6 text-blue-100/80">
-                              {item.texto}
+                            <p className="text-xs font-black uppercase tracking-[0.14em] text-violet-700">
+                              Compra en bazares
+                            </p>
+                            <h3 className="mt-1 text-2xl font-black">
+                              ¿Cómo comprar en un bazar?
+                            </h3>
+                            <p className="mt-2 text-sm leading-6 text-slate-500">
+                              Sigue estos pasos para que tu compra quede correctamente
+                              identificada y pueda ser entregada a VIPACK.
                             </p>
                           </div>
                         </div>
+                    
+                        <div className="mt-6 space-y-3">
+                          {[
+                            {
+                              titulo: "Aparta tu producto",
+                              texto:
+                                'En publicaciones o álbumes normalmente se aparta comentando “Yo” o “Mío”. Preguntar por un artículo no significa que esté apartado.',
+                            },
+                            {
+                              titulo: "Indica quién recolecta",
+                              texto:
+                                'Al comentar o confirmar tu compra, menciona: “Me recolecta VIPACK”.',
+                            },
+                            {
+                              titulo: "Confirma tu compra y total",
+                              texto:
+                                "El bazar te indicará por Inbox, Messenger o el medio que utilice el total y los datos necesarios para realizar tu pago.",
+                            },
+                            {
+                              titulo: "Identifica correctamente tu pago",
+                              texto:
+                                "Coloca tu nombre o el dato solicitado por el bazar en el concepto para que tu pago pueda identificarse.",
+                            },
+                            {
+                              titulo: "Respeta la fecha límite de pago",
+                              texto:
+                                "Realiza el pago dentro del plazo indicado por el bazar. Los días y horarios pueden variar.",
+                            },
+                            {
+                              titulo: "Entrega a VIPACK",
+                              texto:
+                                "Los bazares entregan las compras de nuestros clientes en nuestro punto de recolección, Local C-10, en el pasillo de la comida de Swap Meet.",
+                            },
+                            {
+                              titulo: "Revisa los detalles del producto",
+                              texto:
+                                "En artículos como calzado, confirma si el producto se vende con o sin caja y revisa cualquier condición indicada en la publicación.",
+                            },
+                            {
+                              titulo: "Conserva evidencia de tu compra",
+                              texto:
+                                "Guarda capturas, comprobantes y mensajes hasta que tu mercancía aparezca en tu carpeta de recolecciones.",
+                            },
+                          ].map((paso, index) => (
+                            <div
+                              key={paso.titulo}
+                              className="flex items-start gap-3 rounded-2xl border border-violet-100 bg-white p-4"
+                            >
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-xs font-black text-violet-700">
+                                {index + 1}
+                              </span>
+                    
+                              <div>
+                                <p className="text-sm font-black text-slate-800">
+                                  {paso.titulo}
+                                </p>
+                                <p className="mt-1 text-sm leading-6 text-slate-500">
+                                  {paso.texto}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                    
+                        <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                          <p className="text-sm font-black text-amber-900">
+                            Importante
+                          </p>
+                          <p className="mt-1 text-sm leading-6 text-amber-800/80">
+                            Cada bazar puede manejar sus propios días de entrega,
+                            horarios, formas de apartado, pagos y políticas. Revisa
+                            siempre las condiciones de la publicación antes de comprar.
+                          </p>
+                        </div>
+                    
+                        <Link
+                          href="/informacion/bazares"
+                          className="mt-5 flex items-center justify-center gap-2 rounded-2xl bg-violet-700 px-5 py-3.5 text-sm font-black text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5 hover:bg-violet-800"
+                        >
+                          Ver bazares donde puedo comprar
+                          <IconoFlecha className="h-4 w-4" />
+                        </Link>
                       </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-6 rounded-[26px] bg-white p-5 text-slate-950 sm:p-6">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
-                        <IconoDinero className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
-                          Comisión de compra
-                        </p>
-                        <h4 className="text-xl font-black">
-                          La comisión se cobra al final
-                        </h4>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-center">
-                        <p className="text-sm font-bold text-slate-600">
-                          Compra de hasta $500
-                        </p>
-                        <p className="mt-1 text-3xl font-black text-emerald-700">
-                          $50
-                        </p>
-                        <p className="text-xs font-bold text-slate-500">
-                          de comisión
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-center">
-                        <p className="text-sm font-bold text-slate-600">
-                          Compra mayor a $500
-                        </p>
-                        <p className="mt-1 text-3xl font-black text-emerald-700">
-                          $150
-                        </p>
-                        <p className="text-xs font-bold text-slate-500">
-                          de comisión
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                    {[
-                      "No se hacen listas",
-                      "No hay cancelaciones",
-                      "Las compras son por retiro sin tarjeta",
-                    ].map((regla) => (
-                      <div
-                        key={regla}
-                        className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-center text-sm font-black text-rose-800"
-                      >
-                        {regla}
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                    <div className="rounded-[24px] border border-amber-300 bg-amber-50 p-5 text-slate-950">
-                      <p className="font-black text-amber-900">
-                        Responsabilidad en las compras
-                      </p>
-                      <p className="mt-2 text-sm leading-6 text-amber-900/80">
-                        La persona que quede mal 2 veces será expulsada del grupo.
-                        No se compran productos por encargo, ya que todo se maneja
-                        en el momento y un artículo puede agotarse.
-                      </p>
-                    </div>
-
-                    <div className="rounded-[24px] border border-violet-200 bg-violet-50 p-5 text-slate-950">
-                      <p className="font-black text-violet-900">
-                        Aclaraciones y reembolsos
-                      </p>
-                      <p className="mt-2 text-sm leading-6 text-violet-900/80">
-                        Para cualquier aclaración es obligatorio enviar un video
-                        abriendo la caja, sin cortes. Sin video no hay reembolso.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                    <div className="rounded-[22px] border border-white/15 bg-white/10 p-5">
-                      <p className="text-xs font-black uppercase tracking-[0.12em] text-cyan-200">
-                        Envíos
-                      </p>
-                      <p className="mt-2 font-black">
-                        Solicita tu envío directamente con VIPACK
-                      </p>
-                      <p className="mt-1 text-sm leading-6 text-blue-100/80">
-                        Una vez terminadas tus compras, podrás solicitar el envío
-                        de tu mercancía mediante los canales de atención de VIPACK.
-                      </p>
-                    </div>
-
-                    <div className="rounded-[22px] border border-white/15 bg-white/10 p-5">
-                      <p className="text-xs font-black uppercase tracking-[0.12em] text-cyan-200">
-                        Almacenamiento
-                      </p>
-                      <p className="mt-2 text-2xl font-black">
-                        Hasta por 5 semanas
-                      </p>
-                      <p className="mt-1 text-sm leading-6 text-blue-100/80">
-                        Puedes reunir tus compras antes de solicitar tu envío.
-                      </p>
                     </div>
                   </div>
+                )}
 
-                  <div className="mt-6 rounded-[26px] border border-rose-200 bg-white p-5 text-slate-950 sm:p-6">
-                    <div className="text-center">
-                      <p className="text-xs font-black uppercase tracking-[0.14em] text-rose-600">
-                        Importante sobre pagos
-                      </p>
-                      <h4 className="mt-1 text-xl font-black">
-                        Las bodegas dan un plazo de 1 a 2 días para liquidar la mercancía
-                      </h4>
-                      <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                        Para cuidar el crédito con las bodegas y poder continuar
-                        ofreciendo la facilidad de realizar apartados, se aplican
-                        las siguientes condiciones por mora:
-                      </p>
-                    </div>
-
-                    <div className="mt-5 grid gap-3 md:grid-cols-3">
-                      <div className="rounded-2xl border border-orange-200 bg-orange-50 p-5 text-center">
-                        <p className="text-3xl font-black text-orange-600">5%</p>
-                        <p className="mt-1 text-sm font-bold text-slate-700">
-                          si pagas después de la hora acordada el mismo día
-                        </p>
+                {compraSeccion === "bodegas" && (
+                  <div className="animate-[fadeIn_.25s_ease-out]">
+                    <div className="min-w-0 overflow-hidden rounded-[26px] border border-emerald-200 sm:rounded-[30px] bg-gradient-to-br from-emerald-50 via-white to-white shadow-sm">
+                      <div className="p-5 sm:p-6">
+                        <div className="flex items-start gap-4">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-200">
+                            <IconoEscudo className="h-6 w-6" />
+                          </div>
+                    
+                          <div>
+                            <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+                              Compra en bodegas
+                            </p>
+                            <h3 className="mt-1 text-2xl font-black">
+                              ¿Cómo comprar en una bodega por WhatsApp?
+                            </h3>
+                            <p className="mt-2 text-sm leading-6 text-slate-500">
+                              Algunas bodegas realizan sus ventas por grupos de
+                              WhatsApp. Sigue esta dinámica para que podamos
+                              identificar y corroborar correctamente tu recolección.
+                            </p>
+                          </div>
+                        </div>
+                    
+                        <div className="mt-6 space-y-3">
+                          {[
+                            {
+                              titulo: "Publicación de productos",
+                              texto:
+                                "La bodega o vendedor publica los productos disponibles directamente en su grupo de WhatsApp. Algunos artículos pueden ser pieza única y otros tener varias piezas disponibles.",
+                            },
+                            {
+                              titulo: "Aparta tu producto",
+                              texto:
+                                'Cuando encuentres un producto que quieras comprar, responde directamente a la foto o deslízala y escribe “Yo”.',
+                            },
+                            {
+                              titulo: "Confirma que alcanzaste",
+                              texto:
+                                "Si el vendedor reacciona con 👍 o Like a tu comentario, significa que alcanzaste el producto y será agregado a tu nota o pedido.",
+                            },
+                            {
+                              titulo: "Acumula tus compras",
+                              texto:
+                                "Durante los días de venta puedes seguir comprando. Los productos que alcances se irán agregando a tu nota.",
+                            },
+                            {
+                              titulo: "Recibe y paga tu nota",
+                              texto:
+                                "La bodega o vendedor te enviará tu nota con los artículos comprados y el total a pagar. Liquídala dentro del plazo indicado.",
+                            },
+                            {
+                              titulo: "Indica que recolecta VIPACK",
+                              texto:
+                                'Al proporcionar tus datos de entrega, indica claramente: “Me recolecta VIPACK”.',
+                            },
+                            {
+                              titulo: "Comparte tu nota o pedido con VIPACK",
+                              texto:
+                                "Cuando recibas tu nota, pedido o comprobante de compra, debes enviárselo a VIPACK antes de la recolección. Lo utilizamos para saber qué mercancía debemos recoger y corroborar que la entrega de la bodega esté completa.",
+                            },
+                            {
+                              titulo: "VIPACK realiza la recolección",
+                              texto:
+                                "VIPACK acude a la ubicación acordada con la bodega, recibe tu mercancía y la identifica para continuar con el proceso.",
+                            },
+                            {
+                              titulo: "Revisa tus evidencias",
+                              texto:
+                                "Una vez procesada la recolección, podrás consultar las evidencias disponibles en tu carpeta o inventario.",
+                            },
+                          ].map((paso, index) => (
+                            <div
+                              key={paso.titulo}
+                              className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-white p-4"
+                            >
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-xs font-black text-emerald-700">
+                                {index + 1}
+                              </span>
+                    
+                              <div>
+                                <p className="text-sm font-black text-slate-800">
+                                  {paso.titulo}
+                                </p>
+                                <p className="mt-1 text-sm leading-6 text-slate-500">
+                                  {paso.texto}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                    
+                        <div className="mt-5 rounded-2xl border border-amber-300 bg-amber-50 p-4">
+                          <p className="text-sm font-black text-amber-900">
+                            Muy importante
+                          </p>
+                          <p className="mt-1 text-sm leading-6 text-amber-800/85">
+                            Comparte con VIPACK tu nota, pedido o comprobante de
+                            compra antes de la recolección. Esto nos permite
+                            corroborar que la mercancía entregada por la bodega
+                            corresponda con tu pedido.
+                          </p>
+                        </div>
+                    
+                        <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                          <p className="text-sm font-black text-emerald-900">
+                            Recuerda
+                          </p>
+                          <p className="mt-1 text-sm leading-6 text-emerald-800/80">
+                            Cada bodega puede manejar diferentes días de venta,
+                            horarios, fechas de pago, formas de entrega y políticas.
+                            Revisa siempre las reglas particulares del grupo antes de
+                            comprar.
+                          </p>
+                        </div>
                       </div>
-
-                      <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-center">
-                        <p className="text-3xl font-black text-rose-600">10%</p>
-                        <p className="mt-1 text-sm font-bold text-slate-700">
-                          si pagas al día siguiente
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl border border-fuchsia-200 bg-fuchsia-50 p-5 text-center">
-                        <p className="text-3xl font-black text-fuchsia-700">15%</p>
-                        <p className="mt-1 text-sm font-bold text-slate-700">
-                          si VIPACK tiene que pagar por ti
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 rounded-2xl bg-slate-950 px-4 py-3 text-center text-sm font-black text-white">
-                      No buscamos afectarles, sino fomentar la responsabilidad en sus compras.
+                    
                     </div>
                   </div>
-                </div>
+                )}
+
+                {compraSeccion === "grupo" && (
+                  <div className="animate-[fadeIn_.25s_ease-out]">
+                    <div className="mt-5 min-w-0 overflow-hidden rounded-[26px] border border-blue-200 sm:rounded-[30px] bg-gradient-to-br from-[#071f57] via-[#0a3183] to-[#0b57d0] text-white shadow-[0_24px_70px_rgba(10,49,131,.18)]">
+                      <div className="p-5 sm:p-7">
+                        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="flex items-start gap-4">
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/20">
+                              <IconoEstrella className="h-6 w-6" />
+                            </div>
+                            <div>
+                              <p className="text-xs font-black uppercase tracking-[0.14em] text-cyan-200">
+                                Modalidad exclusiva
+                              </p>
+                              <h3 className="mt-1 text-2xl font-black sm:text-3xl">
+                                Grupo Exclusivo VIPACK
+                              </h3>
+                              <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-100/85">
+                                Compra productos de bodegas de Tijuana mientras nuestro
+                                equipo realiza la visita por ti. Las fotos y avisos se
+                                comparten en tiempo real dentro del grupo.
+                              </p>
+                            </div>
+                          </div>
+                    
+                          <span className="w-fit rounded-full bg-cyan-300 px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-[#061b4f]">
+                            Venta en tiempo real
+                          </span>
+                        </div>
+                    
+                        <div className="mt-7 grid gap-4 md:grid-cols-2">
+                          {[
+                            {
+                              titulo: "Equipo autorizado",
+                              texto:
+                                "María forma parte del equipo autorizado de VIPACK para visitar las bodegas, tomar fotografías en tiempo real y realizar las ventas.",
+                            },
+                            {
+                              titulo: "Aviso de visita",
+                              texto:
+                                "Se avisa dentro del grupo cuando nuestro equipo ya se encuentra en la bodega para que puedas estar al pendiente de las publicaciones.",
+                            },
+                            {
+                              titulo: "Horario de las visitas",
+                              texto:
+                                "Las visitas se realizan entre 10:00 a. m. y 5:00 p. m., hora de Tijuana. Considera la diferencia de horario con el centro del país.",
+                            },
+                            {
+                              titulo: "Fotos en tiempo real",
+                              texto:
+                                "Las fotografías se suben mientras nuestro equipo está en la bodega. Puedes realizar tus compras durante la visita y cada producto apartado se marca con 👍.",
+                            },
+                            {
+                              titulo: "Último aviso",
+                              texto:
+                                "Aproximadamente media hora antes de salir se avisa que queda poco tiempo para seguir comprando. Antes de cerrar nota o pagar se dará un último aviso.",
+                            },
+                            {
+                              titulo: "Precios reales de bodega",
+                              texto:
+                                "Los precios que aparecen en las fotografías son los precios reales de la bodega. La comisión de VIPACK no se agrega directamente al precio del producto.",
+                            },
+                          ].map((item, index) => (
+                            <div
+                              key={item.titulo}
+                              className="rounded-[22px] border border-white/15 bg-white/10 p-4 backdrop-blur"
+                            >
+                              <div className="flex items-start gap-3">
+                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-xs font-black text-[#0a3183]">
+                                  {index + 1}
+                                </span>
+                                <div>
+                                  <p className="text-sm font-black">{item.titulo}</p>
+                                  <p className="mt-1 text-sm leading-6 text-blue-100/80">
+                                    {item.texto}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                    
+                        <div className="mt-6 rounded-[26px] bg-white p-5 text-slate-950 sm:p-6">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                              <IconoDinero className="h-6 w-6" />
+                            </div>
+                            <div>
+                              <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+                                Comisión de compra
+                              </p>
+                              <h4 className="text-xl font-black">
+                                La comisión se cobra al final
+                              </h4>
+                            </div>
+                          </div>
+                    
+                          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-center">
+                              <p className="text-sm font-bold text-slate-600">
+                                Compra de hasta $500
+                              </p>
+                              <p className="mt-1 text-3xl font-black text-emerald-700">
+                                $50
+                              </p>
+                              <p className="text-xs font-bold text-slate-500">
+                                de comisión
+                              </p>
+                            </div>
+                    
+                            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-center">
+                              <p className="text-sm font-bold text-slate-600">
+                                Compra mayor a $500
+                              </p>
+                              <p className="mt-1 text-3xl font-black text-emerald-700">
+                                $150
+                              </p>
+                              <p className="text-xs font-bold text-slate-500">
+                                de comisión
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                    
+                        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                          {[
+                            "No se hacen listas",
+                            "No hay cancelaciones",
+                            "Las compras son por retiro sin tarjeta",
+                          ].map((regla) => (
+                            <div
+                              key={regla}
+                              className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-center text-sm font-black text-rose-800"
+                            >
+                              {regla}
+                            </div>
+                          ))}
+                        </div>
+                    
+                        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                          <div className="rounded-[24px] border border-amber-300 bg-amber-50 p-5 text-slate-950">
+                            <p className="font-black text-amber-900">
+                              Responsabilidad en las compras
+                            </p>
+                            <p className="mt-2 text-sm leading-6 text-amber-900/80">
+                              La persona que quede mal 2 veces será expulsada del grupo.
+                              No se compran productos por encargo, ya que todo se maneja
+                              en el momento y un artículo puede agotarse.
+                            </p>
+                          </div>
+                    
+                          <div className="rounded-[24px] border border-violet-200 bg-violet-50 p-5 text-slate-950">
+                            <p className="font-black text-violet-900">
+                              Aclaraciones y reembolsos
+                            </p>
+                            <p className="mt-2 text-sm leading-6 text-violet-900/80">
+                              Para cualquier aclaración es obligatorio enviar un video
+                              abriendo la caja, sin cortes. Sin video no hay reembolso.
+                            </p>
+                          </div>
+                        </div>
+                    
+                        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                          <div className="rounded-[22px] border border-white/15 bg-white/10 p-5">
+                            <p className="text-xs font-black uppercase tracking-[0.12em] text-cyan-200">
+                              Envíos
+                            </p>
+                            <p className="mt-2 font-black">
+                              Solicita tu envío directamente con VIPACK
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-blue-100/80">
+                              Una vez terminadas tus compras, podrás solicitar el envío
+                              de tu mercancía mediante los canales de atención de VIPACK.
+                            </p>
+                          </div>
+                    
+                          <div className="rounded-[22px] border border-white/15 bg-white/10 p-5">
+                            <p className="text-xs font-black uppercase tracking-[0.12em] text-cyan-200">
+                              Almacenamiento
+                            </p>
+                            <p className="mt-2 text-2xl font-black">
+                              Hasta por 5 semanas
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-blue-100/80">
+                              Puedes reunir tus compras antes de solicitar tu envío.
+                            </p>
+                          </div>
+                        </div>
+                    
+                        <div className="mt-6 rounded-[26px] border border-rose-200 bg-white p-5 text-slate-950 sm:p-6">
+                          <div className="text-center">
+                            <p className="text-xs font-black uppercase tracking-[0.14em] text-rose-600">
+                              Importante sobre pagos
+                            </p>
+                            <h4 className="mt-1 text-xl font-black">
+                              Las bodegas dan un plazo de 1 a 2 días para liquidar la mercancía
+                            </h4>
+                            <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                              Para cuidar el crédito con las bodegas y poder continuar
+                              ofreciendo la facilidad de realizar apartados, se aplican
+                              las siguientes condiciones por mora:
+                            </p>
+                          </div>
+                    
+                          <div className="mt-5 grid gap-3 md:grid-cols-3">
+                            <div className="rounded-2xl border border-orange-200 bg-orange-50 p-5 text-center">
+                              <p className="text-3xl font-black text-orange-600">5%</p>
+                              <p className="mt-1 text-sm font-bold text-slate-700">
+                                si pagas después de la hora acordada el mismo día
+                              </p>
+                            </div>
+                    
+                            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-center">
+                              <p className="text-3xl font-black text-rose-600">10%</p>
+                              <p className="mt-1 text-sm font-bold text-slate-700">
+                                si pagas al día siguiente
+                              </p>
+                            </div>
+                    
+                            <div className="rounded-2xl border border-fuchsia-200 bg-fuchsia-50 p-5 text-center">
+                              <p className="text-3xl font-black text-fuchsia-700">15%</p>
+                              <p className="mt-1 text-sm font-bold text-slate-700">
+                                si VIPACK tiene que pagar por ti
+                              </p>
+                            </div>
+                          </div>
+                    
+                          <div className="mt-5 rounded-2xl bg-slate-950 px-4 py-3 text-center text-sm font-black text-white">
+                            No buscamos afectarles, sino fomentar la responsabilidad en sus compras.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
-
           {vista === "enviar" && (
             <div className="mt-8">
               <div className="grid gap-4 lg:grid-cols-2">
