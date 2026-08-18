@@ -231,27 +231,28 @@ function AccesoCard({
 
   const contenido = (
     <div
-      className={`group relative h-full overflow-hidden rounded-[28px] border p-5 shadow-xl transition duration-300 hover:-translate-y-1.5 hover:shadow-2xl ${clases}`}
+      className={`group relative h-full min-h-[150px] overflow-hidden rounded-[24px] border p-4 shadow-lg transition duration-300 hover:-translate-y-1 hover:shadow-2xl sm:min-h-0 sm:rounded-[28px] sm:p-5 ${clases}`}
     >
-      <div className="absolute right-[-30px] top-[-30px] h-32 w-32 rounded-full bg-cyan-300/10 blur-2xl" />
+      <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-cyan-300/15 blur-2xl" />
+      <div className="absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-transparent via-cyan-300/50 to-transparent opacity-70" />
 
-      <div className="relative">
+      <div className="relative flex h-full flex-col">
         <div
-          className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
+          className={`flex h-10 w-10 items-center justify-center rounded-[14px] sm:h-12 sm:w-12 sm:rounded-2xl ${
             destacado
-              ? "bg-white/15 text-white"
+              ? "bg-white/15 text-white ring-1 ring-white/15"
               : "bg-blue-50 text-[#0a3183]"
           }`}
         >
           {icono}
         </div>
 
-        <h3 className="mt-5 text-xl font-black tracking-tight">
+        <h3 className="mt-4 text-[16px] font-black leading-tight tracking-tight sm:mt-5 sm:text-xl">
           {titulo}
         </h3>
 
         <p
-          className={`mt-2 text-sm leading-6 ${
+          className={`mt-2 hidden text-sm leading-6 sm:block ${
             destacado ? "text-blue-100/85" : "text-slate-500"
           }`}
         >
@@ -259,12 +260,12 @@ function AccesoCard({
         </p>
 
         <div
-          className={`mt-5 flex items-center gap-2 text-sm font-black ${
+          className={`mt-auto flex items-center gap-1.5 pt-4 text-xs font-black sm:mt-5 sm:pt-0 sm:text-sm ${
             destacado ? "text-white" : "text-[#0a3183]"
           }`}
         >
-          Ver información
-          <IconoFlecha className="h-4 w-4 transition group-hover:translate-x-1" />
+          Ver
+          <IconoFlecha className="h-3.5 w-3.5 transition group-hover:translate-x-1 sm:h-4 sm:w-4" />
         </div>
       </div>
     </div>
@@ -334,26 +335,26 @@ export default function InformacionPage() {
   );
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#f4f7fb] text-slate-950">
-      <header className="relative isolate overflow-hidden bg-[#061b4f] text-white">
+    <main className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#eef4ff_0%,#f8fafc_42%,#f4f7fb_100%)] text-slate-950">
+      <header className="relative isolate overflow-hidden rounded-b-[34px] bg-[#061b4f] text-white shadow-[0_18px_50px_rgba(5,28,78,.22)] sm:rounded-b-none sm:shadow-none">
         <div className="absolute inset-0 -z-30 bg-[radial-gradient(circle_at_18%_15%,rgba(34,211,238,.22),transparent_28%),radial-gradient(circle_at_82%_22%,rgba(59,130,246,.28),transparent_32%),radial-gradient(circle_at_55%_100%,rgba(99,102,241,.18),transparent_30%)]" />
         <div className="absolute inset-0 -z-20 bg-gradient-to-br from-[#061b4f]/40 via-[#092e81]/75 to-[#0b57d0]/60" />
         <div className="absolute inset-0 -z-10 opacity-[0.07] [background-image:linear-gradient(rgba(255,255,255,.7)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.7)_1px,transparent_1px)] [background-size:42px_42px]" />
 
-        <div className="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6 sm:pb-28 sm:pt-5 lg:px-8">
+        <div className="mx-auto max-w-7xl px-5 pb-12 pt-4 sm:px-6 sm:pb-28 sm:pt-5 lg:px-8">
           <nav className="flex items-center justify-between gap-4">
             <Link href="/informacion" className="flex items-center gap-3">
               <img
                 src="/vipack-logo.jpg"
                 alt="VIPACK Envíos"
-                className="h-14 w-14 rounded-2xl object-cover shadow-xl"
+                className="h-11 w-11 rounded-[14px] object-cover shadow-xl ring-1 ring-white/15 sm:h-14 sm:w-14 sm:rounded-2xl"
               />
 
               <div>
-                <p className="text-sm font-black tracking-[0.18em]">
+                <p className="text-[13px] font-black tracking-[0.16em] sm:text-sm sm:tracking-[0.18em]">
                   VIPACK ENVÍOS
                 </p>
-                <p className="text-xs font-medium text-blue-100/75">
+                <p className="text-[10px] font-medium text-blue-100/70 sm:text-xs">
                   Centro de información
                 </p>
               </div>
@@ -375,28 +376,28 @@ export default function InformacionPage() {
             </div>
           </nav>
 
-          <div className="mt-9 grid items-center gap-8 sm:mt-12 lg:grid-cols-[1.08fr_.92fr] lg:gap-14 lg:py-8">
+          <div className="mt-8 grid items-center gap-7 sm:mt-12 lg:grid-cols-[1.08fr_.92fr] lg:gap-14 lg:py-8">
             <div className="max-w-3xl">
-              <div className="inline-flex rounded-full border border-cyan-200/20 bg-white/10 px-3.5 py-2 text-xs font-black uppercase tracking-[0.16em] text-cyan-100 backdrop-blur-xl">
+              <div className="inline-flex rounded-full border border-cyan-200/20 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-cyan-100 backdrop-blur-xl sm:px-3.5 sm:py-2 sm:text-xs sm:tracking-[0.16em]">
                 Información para clientes
               </div>
 
-              <h1 className="mt-5 text-[39px] font-black leading-[1.02] tracking-[-.035em] sm:mt-6 sm:text-6xl sm:leading-[.98] lg:text-[68px]">
+              <h1 className="mt-4 max-w-[390px] text-[36px] font-black leading-[1.02] tracking-[-.04em] sm:mt-6 sm:max-w-none sm:text-6xl sm:leading-[.98] lg:text-[68px]">
                 Todo lo que necesitas
                 <span className="block bg-gradient-to-r from-white via-cyan-100 to-blue-200 bg-clip-text text-transparent">
                   para comprar y enviar.
                 </span>
               </h1>
 
-              <p className="mt-5 max-w-2xl text-[15px] leading-7 text-blue-100/85 sm:mt-6 sm:text-lg sm:leading-8">
+              <p className="mt-4 max-w-[390px] text-[14px] leading-6 text-blue-100/80 sm:mt-6 sm:max-w-2xl sm:text-lg sm:leading-8">
                 Compra en Tijuana, reúne tus mercancías y envíalas a cualquier
                 parte de México. Aquí encontrarás cómo funciona cada paso.
               </p>
 
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <div className="mt-6 grid grid-cols-[1.35fr_.85fr] gap-2.5 sm:mt-8 sm:flex sm:flex-row sm:gap-3">
                 <a
                   href="#elige"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 to-white px-5 py-3.5 text-sm font-black text-[#061b4f] shadow-[0_16px_40px_rgba(0,0,0,.18)] transition hover:-translate-y-0.5 sm:w-auto"
+                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-[16px] bg-gradient-to-r from-cyan-300 via-cyan-100 to-white px-3 py-3 text-[12px] font-black text-[#061b4f] shadow-[0_14px_34px_rgba(0,0,0,.16)] transition hover:-translate-y-0.5 sm:w-auto sm:gap-2 sm:rounded-2xl sm:px-5 sm:py-3.5 sm:text-sm"
                 >
                   ¿Qué necesitas hacer?
                   <IconoFlecha />
@@ -404,10 +405,21 @@ export default function InformacionPage() {
 
                 <Link
                   href="/informacion/bazares"
-                  className="inline-flex w-full items-center justify-center rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 text-sm font-black text-white backdrop-blur-xl transition hover:bg-white/15 sm:w-auto"
+                  className="inline-flex w-full items-center justify-center rounded-[16px] border border-white/20 bg-white/10 px-3 py-3 text-[12px] font-black text-white backdrop-blur-xl transition hover:bg-white/15 sm:w-auto sm:rounded-2xl sm:px-5 sm:py-3.5 sm:text-sm"
                 >
                   Ver bazares
                 </Link>
+              </div>
+
+              <div className="mt-5 flex flex-wrap gap-2 sm:hidden">
+                {["Compra", "Recolecta", "Envía"].map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full border border-white/12 bg-white/[0.07] px-3 py-1.5 text-[10px] font-bold text-blue-100 backdrop-blur"
+                  >
+                    {item}
+                  </span>
+                ))}
               </div>
             </div>
 
@@ -460,18 +472,18 @@ export default function InformacionPage() {
 
       <section
         id="elige"
-        className="relative z-10 mx-auto -mt-5 max-w-7xl px-4 sm:-mt-12 sm:px-6 lg:px-8"
+        className="relative z-10 mx-auto -mt-4 max-w-7xl px-4 sm:-mt-12 sm:px-6 lg:px-8"
       >
-        <div className="mb-6 text-center">
-          <p className="text-xs font-black uppercase tracking-[0.15em] text-cyan-700">
+        <div className="mb-4 text-center sm:mb-6">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-700 sm:text-xs">
             Empieza aquí
           </p>
-          <h2 className="mt-2 text-2xl font-black sm:text-3xl">
+          <h2 className="mt-1.5 text-[24px] font-black tracking-[-.02em] sm:mt-2 sm:text-3xl">
             ¿Qué necesitas hacer?
           </h2>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
           {opciones.map((item, index) => (
             <AccesoCard
               key={item.id}
@@ -485,8 +497,8 @@ export default function InformacionPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-16 lg:px-8">
-        <div className="min-w-0 overflow-hidden rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_45px_rgba(15,23,42,.08)] sm:rounded-[34px] sm:p-8 lg:p-10">
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-16 lg:px-8">
+        <div className="min-w-0 overflow-hidden rounded-[26px] border border-white/80 bg-white/95 p-4 shadow-[0_20px_55px_rgba(15,23,42,.10)] backdrop-blur sm:rounded-[34px] sm:p-8 lg:p-10">
           <div className="flex flex-col gap-3 border-b border-slate-100 pb-6 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.15em] text-cyan-700">
