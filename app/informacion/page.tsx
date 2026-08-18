@@ -177,6 +177,46 @@ function IconoCamara({
   );
 }
 
+
+function IconoEstrella({
+  className = "h-6 w-6",
+}: {
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="m12 3 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.9L12 3Z" />
+    </svg>
+  );
+}
+
+function IconoDinero({
+  className = "h-6 w-6",
+}: {
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className={className}
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M15.5 8.5c-.8-.7-1.9-1-3.3-1-1.8 0-3.2.9-3.2 2.3 0 3.5 6.5 1.3 6.5 4.7 0 1.4-1.3 2.5-3.5 2.5-1.5 0-2.8-.5-3.7-1.4M12 5.5v13" />
+    </svg>
+  );
+}
+
 function AccesoCard({
   titulo,
   descripcion,
@@ -300,7 +340,7 @@ export default function InformacionPage() {
         <div className="absolute inset-0 -z-20 bg-gradient-to-br from-[#061b4f]/40 via-[#092e81]/75 to-[#0b57d0]/60" />
         <div className="absolute inset-0 -z-10 opacity-[0.07] [background-image:linear-gradient(rgba(255,255,255,.7)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.7)_1px,transparent_1px)] [background-size:42px_42px]" />
 
-        <div className="mx-auto max-w-7xl px-4 pb-24 pt-5 sm:px-6 sm:pb-32 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6 sm:pb-28 sm:pt-5 lg:px-8">
           <nav className="flex items-center justify-between gap-4">
             <Link href="/informacion" className="flex items-center gap-3">
               <img
@@ -335,20 +375,20 @@ export default function InformacionPage() {
             </div>
           </nav>
 
-          <div className="mt-14 grid items-center gap-12 lg:grid-cols-[1.08fr_.92fr] lg:gap-14 lg:py-8">
+          <div className="mt-9 grid items-center gap-8 sm:mt-12 lg:grid-cols-[1.08fr_.92fr] lg:gap-14 lg:py-8">
             <div className="max-w-3xl">
               <div className="inline-flex rounded-full border border-cyan-200/20 bg-white/10 px-3.5 py-2 text-xs font-black uppercase tracking-[0.16em] text-cyan-100 backdrop-blur-xl">
                 Información para clientes
               </div>
 
-              <h1 className="mt-6 text-4xl font-black leading-[.98] tracking-[-.035em] sm:text-6xl lg:text-[68px]">
+              <h1 className="mt-5 text-[39px] font-black leading-[1.02] tracking-[-.035em] sm:mt-6 sm:text-6xl sm:leading-[.98] lg:text-[68px]">
                 Todo lo que necesitas
                 <span className="block bg-gradient-to-r from-white via-cyan-100 to-blue-200 bg-clip-text text-transparent">
                   para comprar y enviar.
                 </span>
               </h1>
 
-              <p className="mt-6 max-w-2xl text-base leading-7 text-blue-100/80 sm:text-lg sm:leading-8">
+              <p className="mt-5 max-w-2xl text-[15px] leading-7 text-blue-100/85 sm:mt-6 sm:text-lg sm:leading-8">
                 Compra en Tijuana, reúne tus mercancías y envíalas a cualquier
                 parte de México. Aquí encontrarás cómo funciona cada paso.
               </p>
@@ -356,7 +396,7 @@ export default function InformacionPage() {
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <a
                   href="#elige"
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3.5 text-sm font-black text-[#0a3183] shadow-[0_16px_40px_rgba(0,0,0,.18)] transition hover:-translate-y-0.5"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 to-white px-5 py-3.5 text-sm font-black text-[#061b4f] shadow-[0_16px_40px_rgba(0,0,0,.18)] transition hover:-translate-y-0.5 sm:w-auto"
                 >
                   ¿Qué necesitas hacer?
                   <IconoFlecha />
@@ -364,14 +404,14 @@ export default function InformacionPage() {
 
                 <Link
                   href="/informacion/bazares"
-                  className="inline-flex items-center justify-center rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 text-sm font-black text-white backdrop-blur-xl transition hover:bg-white/15"
+                  className="inline-flex w-full items-center justify-center rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 text-sm font-black text-white backdrop-blur-xl transition hover:bg-white/15 sm:w-auto"
                 >
                   Ver bazares
                 </Link>
               </div>
             </div>
 
-            <div className="relative mx-auto w-full max-w-xl">
+            <div className="relative mx-auto hidden w-full max-w-xl sm:block">
               <div className="absolute -inset-8 rounded-[40px] bg-cyan-300/10 blur-3xl" />
 
               <div className="relative rounded-[34px] border border-white/15 bg-white/[0.08] p-3 shadow-[0_30px_80px_rgba(2,17,58,.45)] backdrop-blur-2xl sm:p-4">
@@ -420,7 +460,7 @@ export default function InformacionPage() {
 
       <section
         id="elige"
-        className="relative z-10 mx-auto -mt-12 max-w-7xl px-4 sm:-mt-16 sm:px-6 lg:px-8"
+        className="relative z-10 mx-auto -mt-5 max-w-7xl px-4 sm:-mt-12 sm:px-6 lg:px-8"
       >
         <div className="mb-6 text-center">
           <p className="text-xs font-black uppercase tracking-[0.15em] text-cyan-700">
@@ -445,8 +485,8 @@ export default function InformacionPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
-        <div className="rounded-[34px] border border-slate-200 bg-white p-5 shadow-[0_24px_60px_rgba(15,23,42,.08)] sm:p-8 lg:p-10">
+      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-16 lg:px-8">
+        <div className="min-w-0 overflow-hidden rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_45px_rgba(15,23,42,.08)] sm:rounded-[34px] sm:p-8 lg:p-10">
           <div className="flex flex-col gap-3 border-b border-slate-100 pb-6 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.15em] text-cyan-700">
@@ -467,7 +507,7 @@ export default function InformacionPage() {
             <div className="mt-8">
               <div className="grid gap-5 lg:grid-cols-2">
                 {/* BAZARES */}
-                <div className="overflow-hidden rounded-[30px] border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-white shadow-sm">
+                <div className="min-w-0 overflow-hidden rounded-[26px] border border-violet-200 sm:rounded-[30px] bg-gradient-to-br from-violet-50 via-white to-white shadow-sm">
                   <div className="p-5 sm:p-6">
                     <div className="flex items-start gap-4">
                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-700 text-white shadow-lg shadow-violet-200">
@@ -573,7 +613,7 @@ export default function InformacionPage() {
                 </div>
 
                 {/* BODEGAS */}
-                <div className="overflow-hidden rounded-[30px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white shadow-sm">
+                <div className="min-w-0 overflow-hidden rounded-[26px] border border-emerald-200 sm:rounded-[30px] bg-gradient-to-br from-emerald-50 via-white to-white shadow-sm">
                   <div className="p-5 sm:p-6">
                     <div className="flex items-start gap-4">
                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-200">
@@ -685,6 +725,239 @@ export default function InformacionPage() {
                         Revisa siempre las reglas particulares del grupo antes de
                         comprar.
                       </p>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* GRUPO EXCLUSIVO VIPACK */}
+              <div className="mt-5 min-w-0 overflow-hidden rounded-[26px] border border-blue-200 sm:rounded-[30px] bg-gradient-to-br from-[#071f57] via-[#0a3183] to-[#0b57d0] text-white shadow-[0_24px_70px_rgba(10,49,131,.18)]">
+                <div className="p-5 sm:p-7">
+                  <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="flex items-start gap-4">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/20">
+                        <IconoEstrella className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.14em] text-cyan-200">
+                          Modalidad exclusiva
+                        </p>
+                        <h3 className="mt-1 text-2xl font-black sm:text-3xl">
+                          Grupo Exclusivo VIPACK
+                        </h3>
+                        <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-100/85">
+                          Compra productos de bodegas de Tijuana mientras nuestro
+                          equipo realiza la visita por ti. Las fotos y avisos se
+                          comparten en tiempo real dentro del grupo.
+                        </p>
+                      </div>
+                    </div>
+
+                    <span className="w-fit rounded-full bg-cyan-300 px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-[#061b4f]">
+                      Venta en tiempo real
+                    </span>
+                  </div>
+
+                  <div className="mt-7 grid gap-4 md:grid-cols-2">
+                    {[
+                      {
+                        titulo: "Equipo autorizado",
+                        texto:
+                          "María forma parte del equipo autorizado de VIPACK para visitar las bodegas, tomar fotografías en tiempo real y realizar las ventas.",
+                      },
+                      {
+                        titulo: "Aviso de visita",
+                        texto:
+                          "Se avisa dentro del grupo cuando nuestro equipo ya se encuentra en la bodega para que puedas estar al pendiente de las publicaciones.",
+                      },
+                      {
+                        titulo: "Horario de las visitas",
+                        texto:
+                          "Las visitas se realizan entre 10:00 a. m. y 5:00 p. m., hora de Tijuana. Considera la diferencia de horario con el centro del país.",
+                      },
+                      {
+                        titulo: "Fotos en tiempo real",
+                        texto:
+                          "Las fotografías se suben mientras nuestro equipo está en la bodega. Puedes realizar tus compras durante la visita y cada producto apartado se marca con 👍.",
+                      },
+                      {
+                        titulo: "Último aviso",
+                        texto:
+                          "Aproximadamente media hora antes de salir se avisa que queda poco tiempo para seguir comprando. Antes de cerrar nota o pagar se dará un último aviso.",
+                      },
+                      {
+                        titulo: "Precios reales de bodega",
+                        texto:
+                          "Los precios que aparecen en las fotografías son los precios reales de la bodega. La comisión de VIPACK no se agrega directamente al precio del producto.",
+                      },
+                    ].map((item, index) => (
+                      <div
+                        key={item.titulo}
+                        className="rounded-[22px] border border-white/15 bg-white/10 p-4 backdrop-blur"
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-xs font-black text-[#0a3183]">
+                            {index + 1}
+                          </span>
+                          <div>
+                            <p className="text-sm font-black">{item.titulo}</p>
+                            <p className="mt-1 text-sm leading-6 text-blue-100/80">
+                              {item.texto}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-6 rounded-[26px] bg-white p-5 text-slate-950 sm:p-6">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                        <IconoDinero className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+                          Comisión de compra
+                        </p>
+                        <h4 className="text-xl font-black">
+                          La comisión se cobra al final
+                        </h4>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-center">
+                        <p className="text-sm font-bold text-slate-600">
+                          Compra de hasta $500
+                        </p>
+                        <p className="mt-1 text-3xl font-black text-emerald-700">
+                          $50
+                        </p>
+                        <p className="text-xs font-bold text-slate-500">
+                          de comisión
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-center">
+                        <p className="text-sm font-bold text-slate-600">
+                          Compra mayor a $500
+                        </p>
+                        <p className="mt-1 text-3xl font-black text-emerald-700">
+                          $150
+                        </p>
+                        <p className="text-xs font-bold text-slate-500">
+                          de comisión
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                    {[
+                      "No se hacen listas",
+                      "No hay cancelaciones",
+                      "Las compras son por retiro sin tarjeta",
+                    ].map((regla) => (
+                      <div
+                        key={regla}
+                        className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-center text-sm font-black text-rose-800"
+                      >
+                        {regla}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                    <div className="rounded-[24px] border border-amber-300 bg-amber-50 p-5 text-slate-950">
+                      <p className="font-black text-amber-900">
+                        Responsabilidad en las compras
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-amber-900/80">
+                        La persona que quede mal 2 veces será expulsada del grupo.
+                        No se compran productos por encargo, ya que todo se maneja
+                        en el momento y un artículo puede agotarse.
+                      </p>
+                    </div>
+
+                    <div className="rounded-[24px] border border-violet-200 bg-violet-50 p-5 text-slate-950">
+                      <p className="font-black text-violet-900">
+                        Aclaraciones y reembolsos
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-violet-900/80">
+                        Para cualquier aclaración es obligatorio enviar un video
+                        abriendo la caja, sin cortes. Sin video no hay reembolso.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-[22px] border border-white/15 bg-white/10 p-5">
+                      <p className="text-xs font-black uppercase tracking-[0.12em] text-cyan-200">
+                        Envíos
+                      </p>
+                      <p className="mt-2 font-black">
+                        Solicita tu envío directamente con VIPACK
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-blue-100/80">
+                        Una vez terminadas tus compras, podrás solicitar el envío
+                        de tu mercancía mediante los canales de atención de VIPACK.
+                      </p>
+                    </div>
+
+                    <div className="rounded-[22px] border border-white/15 bg-white/10 p-5">
+                      <p className="text-xs font-black uppercase tracking-[0.12em] text-cyan-200">
+                        Almacenamiento
+                      </p>
+                      <p className="mt-2 text-2xl font-black">
+                        Hasta por 5 semanas
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-blue-100/80">
+                        Puedes reunir tus compras antes de solicitar tu envío.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 rounded-[26px] border border-rose-200 bg-white p-5 text-slate-950 sm:p-6">
+                    <div className="text-center">
+                      <p className="text-xs font-black uppercase tracking-[0.14em] text-rose-600">
+                        Importante sobre pagos
+                      </p>
+                      <h4 className="mt-1 text-xl font-black">
+                        Las bodegas dan un plazo de 1 a 2 días para liquidar la mercancía
+                      </h4>
+                      <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                        Para cuidar el crédito con las bodegas y poder continuar
+                        ofreciendo la facilidad de realizar apartados, se aplican
+                        las siguientes condiciones por mora:
+                      </p>
+                    </div>
+
+                    <div className="mt-5 grid gap-3 md:grid-cols-3">
+                      <div className="rounded-2xl border border-orange-200 bg-orange-50 p-5 text-center">
+                        <p className="text-3xl font-black text-orange-600">5%</p>
+                        <p className="mt-1 text-sm font-bold text-slate-700">
+                          si pagas después de la hora acordada el mismo día
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-center">
+                        <p className="text-3xl font-black text-rose-600">10%</p>
+                        <p className="mt-1 text-sm font-bold text-slate-700">
+                          si pagas al día siguiente
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-fuchsia-200 bg-fuchsia-50 p-5 text-center">
+                        <p className="text-3xl font-black text-fuchsia-700">15%</p>
+                        <p className="mt-1 text-sm font-bold text-slate-700">
+                          si VIPACK tiene que pagar por ti
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 rounded-2xl bg-slate-950 px-4 py-3 text-center text-sm font-black text-white">
+                      No buscamos afectarles, sino fomentar la responsabilidad en sus compras.
                     </div>
                   </div>
                 </div>
@@ -828,7 +1101,7 @@ export default function InformacionPage() {
           )}
 
           {vista === "donde" && (
-            <div className="mt-8 grid gap-5 lg:grid-cols-2">
+            <div className="mt-6 grid min-w-0 gap-5 lg:mt-8 lg:grid-cols-2">
               <Link
                 href="/informacion/bazares"
                 className="group rounded-[30px] bg-gradient-to-br from-[#071f57] via-[#0a3183] to-[#0b57d0] p-6 text-white shadow-xl transition hover:-translate-y-1"
