@@ -236,7 +236,7 @@ function AccesoCard({
 
   const contenido = (
     <div
-      className={`group relative h-full min-h-[150px] overflow-hidden rounded-[24px] border p-4 shadow-[0_14px_36px_rgba(15,23,42,.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_50px_rgba(15,23,42,.13)] sm:min-h-[220px] sm:rounded-[26px] sm:p-5 ${clases}`}
+      className={`group relative h-full min-h-[148px] overflow-hidden rounded-[22px] border p-4 shadow-[0_12px_30px_rgba(15,23,42,.07)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_44px_rgba(15,23,42,.12)] sm:min-h-[220px] sm:rounded-[26px] sm:p-5 ${clases}`}
     >
       <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-cyan-300/15 blur-2xl" />
       <div className="absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-transparent via-cyan-300/50 to-transparent opacity-70" />
@@ -252,7 +252,7 @@ function AccesoCard({
           {icono}
         </div>
 
-        <h3 className="mt-4 text-[16px] font-black leading-tight tracking-tight sm:mt-5 sm:text-xl">
+        <h3 className="mt-4 min-h-[38px] text-[15px] font-black leading-[1.15] tracking-tight sm:min-h-0 sm:mt-5 sm:text-xl">
           {titulo}
         </h3>
 
@@ -265,7 +265,7 @@ function AccesoCard({
         </p>
 
         <div
-          className={`mt-auto flex items-center gap-1.5 pt-4 text-xs font-black sm:mt-5 sm:pt-0 sm:text-sm ${
+          className={`mt-auto flex items-center gap-1.5 pt-3 text-xs font-black sm:mt-5 sm:pt-0 sm:text-sm ${
             destacado ? "text-white" : "text-[#0a3183]"
           }`}
         >
@@ -348,7 +348,7 @@ export default function InformacionPage() {
         <div className="absolute inset-0 -z-20 bg-gradient-to-br from-[#061b4f]/40 via-[#092e81]/75 to-[#0b57d0]/60" />
         <div className="absolute inset-0 -z-10 opacity-[0.07] [background-image:linear-gradient(rgba(255,255,255,.7)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.7)_1px,transparent_1px)] [background-size:42px_42px]" />
 
-        <div className="mx-auto max-w-7xl px-5 pb-16 pt-4 sm:px-6 sm:pb-28 sm:pt-5 lg:px-8">
+        <div className="mx-auto max-w-7xl px-5 pb-10 pt-4 sm:px-6 sm:pb-28 sm:pt-5 lg:px-8">
           <nav className="flex items-center justify-between gap-4">
             <Link href="/informacion" className="flex items-center gap-3">
               <img
@@ -377,20 +377,20 @@ export default function InformacionPage() {
             </div>
           </nav>
 
-          <div className="mt-8 grid items-center gap-7 sm:mt-12 lg:grid-cols-[1.05fr_.95fr] lg:gap-16 lg:py-10">
+          <div className="mt-7 grid items-center gap-7 sm:mt-12 lg:grid-cols-[1.05fr_.95fr] lg:gap-16 lg:py-10">
             <div className="max-w-3xl">
               <div className="inline-flex rounded-full border border-cyan-200/20 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-cyan-100 backdrop-blur-xl sm:px-3.5 sm:py-2 sm:text-xs sm:tracking-[0.16em]">
                 Información para clientes
               </div>
 
-              <h1 className="mt-4 max-w-[390px] text-[36px] font-black leading-[1.02] tracking-[-.04em] sm:mt-6 sm:max-w-[720px] sm:text-6xl sm:leading-[.98] lg:text-[68px]">
+              <h1 className="mt-4 max-w-[390px] text-[34px] font-black leading-[1.02] tracking-[-.04em] sm:mt-6 sm:max-w-[720px] sm:text-6xl sm:leading-[.98] lg:text-[68px]">
                 Todo lo que necesitas para
                 <span className="block bg-gradient-to-r from-cyan-200 via-cyan-300 to-sky-300 bg-clip-text text-transparent">
                   comprar y enviar.
                 </span>
               </h1>
 
-              <p className="mt-4 max-w-[390px] text-[14px] leading-6 text-blue-100/80 sm:mt-6 sm:max-w-2xl sm:text-lg sm:leading-8 lg:pb-3">
+              <p className="mt-4 max-w-[390px] text-[13px] leading-[1.65] text-blue-100/80 sm:mt-6 sm:max-w-2xl sm:text-lg sm:leading-8 lg:pb-3">
                 Compra en Tijuana, reúne tus mercancías y envíalas a cualquier
                 parte de México. Aquí encontrarás cada paso, claro y organizado.
               </p>
@@ -447,9 +447,9 @@ export default function InformacionPage() {
 
       <section
         id="elige"
-        className="relative z-10 mx-auto mt-0 max-w-7xl px-4 pt-6 sm:-mt-12 sm:px-6 sm:pt-0 lg:px-8"
+        className="relative z-10 mx-auto mt-0 max-w-7xl px-4 pt-7 sm:-mt-12 sm:px-6 sm:pt-0 lg:px-8"
       >
-        <div className="mb-5 text-center sm:mb-7">
+        <div className="mb-7 text-center sm:mb-7">
           <div className="flex items-center justify-center gap-3">
             <span className="hidden h-px w-14 bg-gradient-to-r from-transparent to-blue-300 sm:block" />
             <span className="hidden h-1.5 w-1.5 rounded-full bg-cyan-400 sm:block" />
@@ -461,15 +461,15 @@ export default function InformacionPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-          {opciones.map((item, index) => (
+        <div className="grid grid-cols-2 gap-3.5 sm:gap-4 xl:grid-cols-4">
+          {opciones.map((item) => (
             <AccesoCard
               key={item.id}
               titulo={item.titulo}
               descripcion={item.descripcion}
               icono={item.icono}
               onClick={() => setVista(item.id)}
-              destacado={vista === item.id || index === 0}
+              destacado={vista === item.id}
             />
           ))}
         </div>
