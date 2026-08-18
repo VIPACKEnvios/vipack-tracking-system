@@ -464,73 +464,164 @@ export default function InformacionPage() {
           </div>
 
           {vista === "comprar" && (
-            <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_.9fr]">
-              <div>
-                <h3 className="text-2xl font-black">
-                  Antes de realizar una compra
-                </h3>
+            <div className="mt-8">
+              <div className="grid gap-5 lg:grid-cols-2">
+                {/* BAZARES */}
+                <div className="overflow-hidden rounded-[30px] border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-white shadow-sm">
+                  <div className="p-5 sm:p-6">
+                    <div className="flex items-start gap-4">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-700 text-white shadow-lg shadow-violet-200">
+                        <IconoTienda className="h-6 w-6" />
+                      </div>
 
-                <div className="mt-5 grid gap-3">
-                  {[
-                    "Usa siempre tu número o nombre de cliente para identificar la compra.",
-                    "Conserva comprobantes, nota o captura de tu pedido.",
-                    "Confirma quién entregará la mercancía.",
-                    "Evita mercancía sin identificación.",
-                    "Revisa las condiciones del bazar o bodega antes de pagar.",
-                    "Si es tu primera compra con un bazar, verifica cómo apareces registrado.",
-                  ].map((texto) => (
-                    <div
-                      key={texto}
-                      className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                    >
-                      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700">
-                        <IconoCheck className="h-4 w-4" />
-                      </span>
-                      <p className="text-sm font-bold leading-6 text-slate-700">
-                        {texto}
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.14em] text-violet-700">
+                          Compra en bazares
+                        </p>
+                        <h3 className="mt-1 text-2xl font-black">
+                          ¿Cómo comprar en un bazar?
+                        </h3>
+                        <p className="mt-2 text-sm leading-6 text-slate-500">
+                          Sigue estos pasos para que tu compra quede correctamente
+                          identificada y pueda ser entregada a VIPACK.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 space-y-3">
+                      {[
+                        {
+                          titulo: "Aparta tu producto",
+                          texto:
+                            'En publicaciones o álbumes normalmente se aparta comentando “Yo” o “Mío”. Preguntar por un artículo no significa que esté apartado.',
+                        },
+                        {
+                          titulo: "Indica quién recolecta",
+                          texto:
+                            'Al comentar o confirmar tu compra, menciona: “Me recolecta VIPACK”.',
+                        },
+                        {
+                          titulo: "Confirma tu compra y total",
+                          texto:
+                            "El bazar te indicará por Inbox, Messenger o el medio que utilice el total y los datos necesarios para realizar tu pago.",
+                        },
+                        {
+                          titulo: "Identifica correctamente tu pago",
+                          texto:
+                            "Coloca tu nombre o el dato solicitado por el bazar en el concepto para que tu pago pueda identificarse.",
+                        },
+                        {
+                          titulo: "Respeta la fecha límite de pago",
+                          texto:
+                            "Realiza el pago dentro del plazo indicado por el bazar. Los días y horarios pueden variar.",
+                        },
+                        {
+                          titulo: "Entrega a VIPACK",
+                          texto:
+                            "Los bazares entregan las compras de nuestros clientes en nuestro punto de recolección, Local C-10, en el pasillo de la comida de Swap Meet.",
+                        },
+                        {
+                          titulo: "Revisa los detalles del producto",
+                          texto:
+                            "En artículos como calzado, confirma si el producto se vende con o sin caja y revisa cualquier condición indicada en la publicación.",
+                        },
+                        {
+                          titulo: "Conserva evidencia de tu compra",
+                          texto:
+                            "Guarda capturas, comprobantes y mensajes hasta que tu mercancía aparezca en tu carpeta de recolecciones.",
+                        },
+                      ].map((paso, index) => (
+                        <div
+                          key={paso.titulo}
+                          className="flex items-start gap-3 rounded-2xl border border-violet-100 bg-white p-4"
+                        >
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-xs font-black text-violet-700">
+                            {index + 1}
+                          </span>
+
+                          <div>
+                            <p className="text-sm font-black text-slate-800">
+                              {paso.titulo}
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-slate-500">
+                              {paso.texto}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                      <p className="text-sm font-black text-amber-900">
+                        Importante
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-amber-800/80">
+                        Cada bazar puede manejar sus propios días de entrega,
+                        horarios, formas de apartado, pagos y políticas. Revisa
+                        siempre las condiciones de la publicación antes de comprar.
                       </p>
                     </div>
-                  ))}
-                </div>
-              </div>
 
-              <div className="grid gap-4">
-                <div className="rounded-[26px] bg-gradient-to-br from-violet-50 to-white p-5 ring-1 ring-violet-100">
-                  <p className="text-xs font-black uppercase tracking-[0.14em] text-violet-700">
-                    Bazares
-                  </p>
-                  <h4 className="mt-2 text-xl font-black">
-                    Identifícate correctamente
-                  </h4>
-                  <p className="mt-3 text-sm leading-6 text-slate-500">
-                    Cuando el bazar lo indique, comenta que VIPACK realiza tu
-                    recolección para que tu compra quede registrada con el
-                    recolector correcto.
-                  </p>
+                    <Link
+                      href="/informacion/bazares"
+                      className="mt-5 flex items-center justify-center gap-2 rounded-2xl bg-violet-700 px-5 py-3.5 text-sm font-black text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5 hover:bg-violet-800"
+                    >
+                      Ver bazares donde puedo comprar
+                      <IconoFlecha className="h-4 w-4" />
+                    </Link>
+                  </div>
                 </div>
 
-                <div className="rounded-[26px] bg-gradient-to-br from-emerald-50 to-white p-5 ring-1 ring-emerald-100">
-                  <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
-                    Bodegas
-                  </p>
-                  <h4 className="mt-2 text-xl font-black">
-                    Compra mientras el equipo está en visita
-                  </h4>
-                  <p className="mt-3 text-sm leading-6 text-slate-500">
-                    El equipo autorizado comparte evidencia y mantiene al grupo
-                    informado durante las visitas para que puedas comprar en
-                    tiempo real.
-                  </p>
-                </div>
+                {/* BODEGAS */}
+                <div className="rounded-[30px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white p-5 shadow-sm sm:p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-200">
+                      <IconoEscudo className="h-6 w-6" />
+                    </div>
 
-                <div className="rounded-[26px] bg-amber-50 p-5 ring-1 ring-amber-100">
-                  <p className="text-sm font-black text-amber-800">
-                    Importante
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-amber-800/80">
-                    Horarios, comisiones, días de visita y condiciones de pago
-                    pueden cambiar. Consulta siempre el aviso vigente del grupo.
-                  </p>
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+                        Compra en bodegas
+                      </p>
+                      <h3 className="mt-1 text-2xl font-black">
+                        Dinámica de compra en bodegas
+                      </h3>
+                      <p className="mt-2 text-sm leading-6 text-slate-500">
+                        La compra en bodegas funciona de manera diferente a los
+                        bazares. Algunas ventas se realizan mediante grupos de
+                        WhatsApp, vendedores o durante visitas programadas.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 rounded-[24px] border border-dashed border-emerald-300 bg-white/80 p-6 text-center">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                      <IconoDocumento className="h-6 w-6" />
+                    </div>
+                    <h4 className="mt-4 text-lg font-black">
+                      Información en preparación
+                    </h4>
+                    <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">
+                      Estamos organizando la dinámica completa de compra en
+                      bodegas para mostrarte claramente cómo comprar según cada
+                      modalidad.
+                    </p>
+                  </div>
+
+                  <div className="mt-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                    {[
+                      "Grupos de WhatsApp",
+                      "Vendedores",
+                      "Visitas a bodegas",
+                    ].map((texto) => (
+                      <div
+                        key={texto}
+                        className="rounded-2xl border border-emerald-100 bg-white p-4 text-center text-sm font-black text-emerald-800"
+                      >
+                        {texto}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
