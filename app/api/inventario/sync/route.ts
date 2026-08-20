@@ -8,7 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const BATCH_SIZE = 5;
+const BATCH_SIZE = 30;
 
 /*
  * El cron de cron-job.org se ejecutará
