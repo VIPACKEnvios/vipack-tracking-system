@@ -1,19 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+} from "react";
 
 type Props = {
   token: string;
 };
 
-function urlBase64ToUint8Array(base64String: string) {
+function urlBase64ToUint8Array(
+  base64String: string
+) {
   const padding =
     "=".repeat(
-      (4 - (base64String.length % 4)) % 4
+      (4 -
+        (base64String.length %
+          4)) %
+        4
     );
 
   const base64 =
-    (base64String + padding)
+    (
+      base64String +
+      padding
+    )
       .replace(/-/g, "+")
       .replace(/_/g, "/");
 
@@ -21,12 +32,14 @@ function urlBase64ToUint8Array(base64String: string) {
     window.atob(base64);
 
   const outputArray =
-    new Uint8Array(rawData.length);
+    new Uint8Array(
+      rawData.length
+    );
 
   for (
     let i = 0;
     i < rawData.length;
-    ++i
+    i++
   ) {
     outputArray[i] =
       rawData.charCodeAt(i);
@@ -38,68 +51,194 @@ function urlBase64ToUint8Array(base64String: string) {
 export default function EnablePushNotifications({
   token,
 }: Props) {
-  const [soportado, setSoportado] =
-    useState(true);
+  const [
+    soportado,
+    setSoportado,
+  ] = useState(true);
 
-  const [permiso, setPermiso] =
+  const [
+    permiso,
+    setPermiso,
+  ] =
     useState<NotificationPermission>(
       "default"
     );
 
-  const [activado, setActivado] =
-    useState(false);
+  const [
+    activado,
+    setActivado,
+  ] = useState(false);
 
-  const [cargando, setCargando] =
-    useState(false);
+  const [
+    verificando,
+    setVerificando,
+  ] = useState(true);
 
-  const [mensaje, setMensaje] =
-    useState("");
+  const [
+    cargando,
+    setCargando,
+  ] = useState(false);
+
+  const [
+    mensaje,
+    setMensaje,
+  ] = useState("");
 
   useEffect(() => {
-    const compatible =
-      typeof window !== "undefined" &&
-      "serviceWorker" in navigator &&
-      "PushManager" in window &&
-      "Notification" in window;
+    let cancelado = false;
 
-    setSoportado(compatible);
-
-    if (!compatible) {
-      return;
-    }
-
-    setPermiso(
-      Notification.permission
-    );
-
-    const revisarSuscripcion =
+    const revisar =
       async () => {
+        const compatible =
+          typeof window !==
+            "undefined" &&
+          "serviceWorker" in
+            navigator &&
+          "PushManager" in
+            window &&
+          "Notification" in
+            window;
+
+        if (
+          cancelado
+        ) {
+          return;
+        }
+
+        setSoportado(
+          compatible
+        );
+
+        if (
+          !compatible
+        ) {
+          setVerificando(
+            false
+          );
+          return;
+        }
+
+        const permisoActual =
+          Notification.permission;
+
+        setPermiso(
+          permisoActual
+        );
+
         try {
           const registration =
             await navigator.serviceWorker.register(
               "/sw.js"
             );
 
-          const subscription =
-            await registration.pushManager.getSubscription();
+          await navigator
+            .serviceWorker
+            .ready;
 
-          if (subscription) {
-            setActivado(true);
+          const subscription =
+            await registration
+              .pushManager
+              .getSubscription();
+
+          /*
+           * Chrome puede tener una
+           * suscripción del dominio,
+           * pero eso NO significa que
+           * pertenezca a este cliente.
+           */
+          if (
+            !subscription
+          ) {
+            if (
+              !cancelado
+            ) {
+              setActivado(
+                false
+              );
+            }
+
+            return;
           }
-        } catch (error) {
+
+          const endpoint =
+            subscription
+              .endpoint;
+
+          const response =
+            await fetch(
+              `/api/inventario/${encodeURIComponent(
+                token
+              )}/push/subscribe?endpoint=${encodeURIComponent(
+                endpoint
+              )}`,
+              {
+                method:
+                  "GET",
+                cache:
+                  "no-store",
+              }
+            );
+
+          const result =
+            await response.json();
+
+          if (
+            cancelado
+          ) {
+            return;
+          }
+
+          setActivado(
+            response.ok &&
+              result?.success ===
+                true &&
+              result?.activado ===
+                true
+          );
+        } catch (
+          error
+        ) {
           console.error(
-            "Error revisando push:",
+            "Error verificando notificaciones push:",
             error
           );
+
+          if (
+            !cancelado
+          ) {
+            setActivado(
+              false
+            );
+          }
+        } finally {
+          if (
+            !cancelado
+          ) {
+            setVerificando(
+              false
+            );
+          }
         }
       };
 
-    revisarSuscripcion();
-  }, []);
+    if (token) {
+      revisar();
+    } else {
+      setVerificando(
+        false
+      );
+    }
+
+    return () => {
+      cancelado = true;
+    };
+  }, [token]);
 
   const activarNotificaciones =
     async () => {
-      if (!soportado) {
+      if (
+        !soportado
+      ) {
         setMensaje(
           "Este navegador no admite notificaciones push."
         );
@@ -117,7 +256,9 @@ export default function EnablePushNotifications({
         process.env
           .NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
-      if (!vapidPublicKey) {
+      if (
+        !vapidPublicKey
+      ) {
         setMensaje(
           "Falta configurar la llave pública de notificaciones."
         );
@@ -125,20 +266,31 @@ export default function EnablePushNotifications({
       }
 
       try {
-        setCargando(true);
+        setCargando(
+          true
+        );
+
         setMensaje("");
 
         const permission =
           await Notification.requestPermission();
 
-        setPermiso(permission);
+        setPermiso(
+          permission
+        );
 
         if (
-          permission !== "granted"
+          permission !==
+          "granted"
         ) {
+          setActivado(
+            false
+          );
+
           setMensaje(
             "Debes permitir las notificaciones para activarlas."
           );
+
           return;
         }
 
@@ -147,22 +299,30 @@ export default function EnablePushNotifications({
             "/sw.js"
           );
 
-        await navigator.serviceWorker.ready;
+        await navigator
+          .serviceWorker
+          .ready;
 
         let subscription =
-          await registration.pushManager.getSubscription();
+          await registration
+            .pushManager
+            .getSubscription();
 
-        if (!subscription) {
+        if (
+          !subscription
+        ) {
           subscription =
-            await registration.pushManager.subscribe(
-              {
-                userVisibleOnly: true,
+            await registration
+              .pushManager
+              .subscribe({
+                userVisibleOnly:
+                  true,
+
                 applicationServerKey:
                   urlBase64ToUint8Array(
                     vapidPublicKey
                   ),
-              }
-            );
+              });
         }
 
         const response =
@@ -171,15 +331,19 @@ export default function EnablePushNotifications({
               token
             )}/push/subscribe`,
             {
-              method: "POST",
+              method:
+                "POST",
+
               headers: {
                 "Content-Type":
                   "application/json",
               },
-              body: JSON.stringify({
-                subscription:
-                  subscription.toJSON(),
-              }),
+
+              body:
+                JSON.stringify({
+                  subscription:
+                    subscription.toJSON(),
+                }),
             }
           );
 
@@ -188,11 +352,15 @@ export default function EnablePushNotifications({
 
         if (
           !response.ok ||
-          !result.success
+          !result?.success
         ) {
           console.error(
             "Error registrando push:",
             result
+          );
+
+          setActivado(
+            false
           );
 
           setMensaje(
@@ -203,32 +371,69 @@ export default function EnablePushNotifications({
           return;
         }
 
-        setActivado(true);
+        setActivado(
+          true
+        );
 
         setMensaje(
           "Notificaciones activadas correctamente."
         );
-      } catch (error) {
+      } catch (
+        error
+      ) {
         console.error(
           "Error activando notificaciones:",
           error
+        );
+
+        setActivado(
+          false
         );
 
         setMensaje(
           "No se pudieron activar las notificaciones."
         );
       } finally {
-        setCargando(false);
+        setCargando(
+          false
+        );
       }
     };
 
-  if (!soportado) {
+  if (
+    !soportado
+  ) {
     return null;
   }
 
   if (
+    verificando
+  ) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xl">
+            🔔
+          </div>
+
+          <div>
+            <p className="text-sm font-black text-slate-700">
+              Verificando notificaciones...
+            </p>
+
+            <p className="mt-0.5 text-xs font-semibold text-slate-400">
+              Comprobando este dispositivo.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (
     activado &&
-    permiso === "granted"
+    permiso ===
+      "granted"
   ) {
     return (
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
@@ -272,7 +477,9 @@ export default function EnablePushNotifications({
             onClick={
               activarNotificaciones
             }
-            disabled={cargando}
+            disabled={
+              cargando
+            }
             className="mt-3 rounded-xl bg-[#0a3183] px-4 py-2 text-xs font-black text-white shadow transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cargando
