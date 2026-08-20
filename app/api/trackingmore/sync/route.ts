@@ -52,8 +52,17 @@ function extraerGuias(valor: unknown) {
 }
 
 function extraerTracking(data: any) {
-  if (!data) return null;
+  if (!data) {
+    return null;
+  }
 
+  /*
+   * Caso:
+   * {
+   *   tracking_number: "...",
+   *   delivery_status: "..."
+   * }
+   */
   if (
     data.tracking_number ||
     data.tracking_number === 0
@@ -61,6 +70,13 @@ function extraerTracking(data: any) {
     return data;
   }
 
+  /*
+   * Respuesta habitual:
+   * {
+   *   meta: {...},
+   *   data: {...}
+   * }
+   */
   if (data.data) {
     if (Array.isArray(data.data)) {
       return data.data[0] || null;
@@ -80,6 +96,13 @@ function extraerTracking(data: any) {
     ) {
       return data.data.items[0];
     }
+
+    if (
+      Array.isArray(data.data.trackings) &&
+      data.data.trackings.length > 0
+    ) {
+      return data.data.trackings[0];
+    }
   }
 
   if (
@@ -94,15 +117,23 @@ function extraerTracking(data: any) {
 
 function obtenerUltimoEvento(tracking: any) {
   if (tracking?.latest_event) {
-    return String(tracking.latest_event);
+    return String(
+      tracking.latest_event
+    );
   }
 
-  if (tracking?.latest_checkpoint?.message) {
+  if (
+    tracking?.latest_checkpoint?.message
+  ) {
     return String(
       tracking.latest_checkpoint.message
     );
   }
 
+  /*
+   * Algunas respuestas de TrackingMore
+   * traen los eventos en origin_info.trackinfo.
+   */
   const origen =
     tracking?.origin_info?.trackinfo;
 
@@ -123,15 +154,22 @@ function obtenerUltimoEvento(tracking: any) {
 }
 
 function obtenerCheckpoint(tracking: any) {
-  if (tracking?.latest_checkpoint_time) {
-    return tracking.latest_checkpoint_time;
+  if (
+    tracking?.latest_checkpoint_time
+  ) {
+    return (
+      tracking.latest_checkpoint_time
+    );
   }
 
   if (
-    tracking?.latest_checkpoint?.checkpoint_date
+    tracking?.latest_checkpoint
+      ?.checkpoint_date
   ) {
-    return tracking.latest_checkpoint
-      .checkpoint_date;
+    return (
+      tracking.latest_checkpoint
+        .checkpoint_date
+    );
   }
 
   const origen =
@@ -151,15 +189,181 @@ function obtenerCheckpoint(tracking: any) {
   return null;
 }
 
-export async function GET(request: Request) {
+function obtenerDeliveryStatus(
+  tracking: any
+) {
+  return String(
+    tracking?.delivery_status ||
+      tracking?.status ||
+      tracking
+        ?.checkpoint_delivery_status ||
+      ""
+  )
+    .trim()
+    .toLowerCase();
+}
+
+function obtenerSubstatus(
+  tracking: any
+) {
+  return String(
+    tracking?.substatus ||
+      tracking
+        ?.checkpoint_delivery_substatus ||
+      ""
+  ).trim();
+}
+
+/*
+ * CONSULTAR UNA GUÍA EN TRACKINGMORE V4
+ *
+ * En API V4, create-a-tracking funciona
+ * como create & get para una sola guía.
+ */
+async function consultarTrackingMore(
+  apiKey: string,
+  guia: string,
+  courierCode: string
+) {
+  const response = await fetch(
+    "https://api.trackingmore.com/v4/trackings/create",
+    {
+      method: "POST",
+
+      headers: {
+        Accept: "application/json",
+        "Content-Type":
+          "application/json",
+        "Tracking-Api-Key": apiKey,
+      },
+
+      body: JSON.stringify({
+        tracking_number: guia,
+        courier_code: courierCode,
+      }),
+
+      cache: "no-store",
+    }
+  );
+
+  const rawText =
+    await response.text();
+
+  let data: any = null;
+
   try {
-    const url = new URL(request.url);
+    data = JSON.parse(rawText);
+  } catch {
+    return {
+      ok: false,
+      tipo: "json_invalido",
+      httpStatus: response.status,
+      data: null,
+      raw: rawText.slice(0, 500),
+    };
+  }
+
+  /*
+   * HTTP exitoso.
+   */
+  if (response.ok) {
+    const tracking =
+      extraerTracking(data);
+
+    if (tracking) {
+      return {
+        ok: true,
+        tipo: "tracking",
+        httpStatus: response.status,
+        data,
+        tracking,
+      };
+    }
+
+    return {
+      ok: false,
+      tipo: "sin_tracking",
+      httpStatus: response.status,
+      data,
+    };
+  }
+
+  /*
+   * Si TrackingMore responde que ya existe,
+   * lo dejamos claramente identificado.
+   *
+   * Esto nos permitirá saber exactamente
+   * qué devuelve la cuenta/API en producción
+   * sin confundirlo con otro error.
+   */
+  const metaCode =
+    Number(data?.meta?.code || 0);
+
+  const metaMessage =
+    String(
+      data?.meta?.message || ""
+    ).toLowerCase();
+
+  const yaExiste =
+    metaCode === 4016 ||
+    metaMessage.includes(
+      "already exists"
+    ) ||
+    metaMessage.includes("exist");
+
+  if (yaExiste) {
+    /*
+     * Algunas respuestas pueden incluir
+     * información del tracking aun cuando
+     * indican que ya existía.
+     */
+    const tracking =
+      extraerTracking(data);
+
+    if (tracking) {
+      return {
+        ok: true,
+        tipo:
+          "tracking_existente_con_datos",
+        httpStatus: response.status,
+        data,
+        tracking,
+      };
+    }
+
+    return {
+      ok: false,
+      tipo: "tracking_ya_existia",
+      httpStatus: response.status,
+      data,
+    };
+  }
+
+  return {
+    ok: false,
+    tipo: "error_trackingmore",
+    httpStatus: response.status,
+    data,
+  };
+}
+
+export async function GET(
+  request: Request
+) {
+  try {
+    const url =
+      new URL(request.url);
 
     /*
+     * ==============================
      * SEGURIDAD
+     * ==============================
      */
+
     const secret =
-      url.searchParams.get("secret") || "";
+      url.searchParams.get(
+        "secret"
+      ) || "";
 
     const syncSecret =
       process.env.SYNC_SECRET || "";
@@ -181,7 +385,8 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "No autorizado.",
+          error:
+            "No autorizado.",
         },
         {
           status: 401,
@@ -190,19 +395,26 @@ export async function GET(request: Request) {
     }
 
     /*
-     * VARIABLES
+     * ==============================
+     * VARIABLES DE ENTORNO
+     * ==============================
      */
+
     const apiKey =
-      process.env.TRACKINGMORE_API_KEY;
+      process.env
+        .TRACKINGMORE_API_KEY;
 
     const supabaseUrl =
-      process.env.NEXT_PUBLIC_SUPABASE_URL;
+      process.env
+        .NEXT_PUBLIC_SUPABASE_URL;
 
     const serviceRoleKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY;
+      process.env
+        .SUPABASE_SERVICE_ROLE_KEY;
 
     const webhookSecret =
-      process.env.TRACKINGMORE_WEBHOOK_SECRET;
+      process.env
+        .TRACKINGMORE_WEBHOOK_SECRET;
 
     if (!apiKey) {
       return NextResponse.json(
@@ -246,61 +458,82 @@ export async function GET(request: Request) {
       );
     }
 
-    const supabase = createClient(
-      supabaseUrl,
-      serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
+    /*
+     * ==============================
+     * SUPABASE
+     * ==============================
+     */
+
+    const supabase =
+      createClient(
+        supabaseUrl,
+        serviceRoleKey,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+          },
+        }
+      );
 
     /*
-     * MODO DE PRUEBA
+     * ==============================
+     * MODO PRUEBA
+     * ==============================
      *
-     * Si recibimos ?guia=XXXXXXXXXX,
-     * solamente revisamos esa guía.
+     * ?guia=2697872914
+     *
+     * Si viene una guía,
+     * solamente revisamos esa.
      */
+
     const guiaPrueba =
       limpiarGuia(
-        url.searchParams.get("guia")
+        url.searchParams.get(
+          "guia"
+        )
       );
 
-    let consulta = supabase
-      .from("envios")
-      .select(
-        `
-          id,
-          guia,
-          paqueteria,
-          estatus_actual,
-          entregado,
-          trackingmore_courier
-        `
-      );
+    let consulta =
+      supabase
+        .from("envios")
+        .select(
+          `
+            id,
+            guia,
+            paqueteria,
+            estatus_actual,
+            entregado,
+            trackingmore_courier
+          `
+        );
 
     if (guiaPrueba) {
-      consulta = consulta.eq(
-        "guia",
-        guiaPrueba
-      );
+      consulta =
+        consulta.eq(
+          "guia",
+          guiaPrueba
+        );
     } else {
       /*
        * MODO AUTOMÁTICO
        *
-       * Solamente revisamos envíos
-       * que todavía NO estén entregados.
+       * Solo revisar envíos
+       * que todavía no estén
+       * marcados como entregados.
        */
-      consulta = consulta
-        .or(
-          "entregado.eq.false,entregado.is.null"
-        )
-        .order("id", {
-          ascending: false,
-        })
-        .limit(300);
+      consulta =
+        consulta
+          .or(
+            "entregado.eq.false,entregado.is.null"
+          )
+          .order(
+            "id",
+            {
+              ascending: false,
+            }
+          )
+          .limit(300);
     }
 
     const {
@@ -312,7 +545,8 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: errorEnvios.message,
+          error:
+            errorEnvios.message,
         },
         {
           status: 500,
@@ -320,29 +554,51 @@ export async function GET(request: Request) {
       );
     }
 
-    const resultados: any[] = [];
+    /*
+     * ==============================
+     * RESULTADOS
+     * ==============================
+     */
+
+    const resultados: any[] =
+      [];
 
     /*
+     * ==============================
      * PROCESAR ENVÍOS
+     * ==============================
      */
-    for (const envio of envios || []) {
-      const guias =
-        extraerGuias(envio.guia);
 
-      if (guias.length === 0) {
+    for (
+      const envio of envios || []
+    ) {
+      const guias =
+        extraerGuias(
+          envio.guia
+        );
+
+      if (
+        guias.length === 0
+      ) {
         resultados.push({
           envio_id: envio.id,
           estado: "omitido",
-          motivo: "Sin guía válida",
+          motivo:
+            "Sin guía válida",
         });
 
         continue;
       }
 
+      /*
+       * Obtener courier.
+       */
+
       const courierCode =
         obtenerCourierCode(
           envio.paqueteria,
-          envio.trackingmore_courier
+          envio
+            .trackingmore_courier
         );
 
       if (!courierCode) {
@@ -357,117 +613,140 @@ export async function GET(request: Request) {
         continue;
       }
 
-      for (const guia of guias) {
+      /*
+       * Puede haber más de una
+       * guía en el registro.
+       */
+
+      for (
+        const guia of guias
+      ) {
         try {
           /*
-           * CONSULTAR TRACKINGMORE
+           * ==========================
+           * TRACKINGMORE
+           * ==========================
            */
-          const trackingUrl =
-            new URL(
-              "https://api.trackingmore.com/v4/trackings/get"
+
+          const resultadoTracking =
+            await consultarTrackingMore(
+              apiKey,
+              guia,
+              courierCode
             );
 
-          trackingUrl.searchParams.set(
-            "tracknumber",
-            guia
-          );
+          /*
+           * Error JSON.
+           */
 
-          trackingUrl.searchParams.set(
-            "express",
-            courierCode
-          );
-
-          const response =
-            await fetch(
-              trackingUrl.toString(),
-              {
-                method: "GET",
-
-                headers: {
-                  Accept:
-                    "application/json",
-
-                  "Content-Type":
-                    "application/json",
-
-                  "Tracking-Api-Key":
-                    apiKey,
-                },
-
-                cache: "no-store",
-              }
-            );
-
-          const rawText =
-            await response.text();
-
-          let data: any;
-
-          try {
-            data =
-              JSON.parse(rawText);
-          } catch {
+          if (
+            resultadoTracking.tipo ===
+            "json_invalido"
+          ) {
             resultados.push({
               envio_id: envio.id,
               guia,
               estado: "error",
-              error:
-                "TrackingMore respondió con JSON inválido",
-              respuesta:
-                rawText.slice(0, 300),
-            });
-
-            continue;
-          }
-
-          if (!response.ok) {
-            resultados.push({
-              envio_id: envio.id,
-              guia,
-              estado: "error",
+              tipo:
+                resultadoTracking.tipo,
               http_status:
-                response.status,
-              respuesta: data,
+                resultadoTracking
+                  .httpStatus,
+              respuesta:
+                resultadoTracking.raw,
             });
 
             continue;
           }
 
           /*
-           * EXTRAER TRACKING
+           * La guía ya estaba registrada
+           * pero TrackingMore no devolvió
+           * los datos del tracking.
+           *
+           * Lo mostramos claramente para
+           * poder decidir el siguiente
+           * endpoint si la cuenta responde
+           * de esta manera.
            */
+
+          if (
+            resultadoTracking.tipo ===
+            "tracking_ya_existia"
+          ) {
+            resultados.push({
+              envio_id: envio.id,
+              guia,
+              estado:
+                "tracking_ya_existia",
+              http_status:
+                resultadoTracking
+                  .httpStatus,
+              respuesta:
+                resultadoTracking.data,
+            });
+
+            continue;
+          }
+
+          /*
+           * Cualquier otro error.
+           */
+
+          if (
+            !resultadoTracking.ok
+          ) {
+            resultados.push({
+              envio_id: envio.id,
+              guia,
+              estado: "error",
+              tipo:
+                resultadoTracking.tipo,
+              http_status:
+                resultadoTracking
+                  .httpStatus,
+              respuesta:
+                resultadoTracking.data,
+            });
+
+            continue;
+          }
+
+          /*
+           * ==========================
+           * TRACKING ENCONTRADO
+           * ==========================
+           */
+
           const tracking =
-            extraerTracking(data);
+            resultadoTracking.tracking;
 
           if (!tracking) {
             resultados.push({
               envio_id: envio.id,
               guia,
-              estado: "sin_resultado",
-              respuesta: data,
+              estado:
+                "sin_resultado",
+              respuesta:
+                resultadoTracking.data,
             });
 
             continue;
           }
 
+          /*
+           * Estado TrackingMore.
+           */
+
           const deliveryStatus =
-            String(
-              tracking.delivery_status ||
-                tracking.status ||
-                tracking
-                  .checkpoint_delivery_status ||
-                ""
-            )
-              .trim()
-              .toLowerCase();
+            obtenerDeliveryStatus(
+              tracking
+            );
 
           const substatus =
-            String(
-              tracking.substatus ||
-                tracking
-                  .checkpoint_delivery_substatus ||
-                ""
-            ).trim();
+            obtenerSubstatus(
+              tracking
+            );
 
           const latestEvent =
             obtenerUltimoEvento(
@@ -479,34 +758,48 @@ export async function GET(request: Request) {
               tracking
             );
 
-          if (!deliveryStatus) {
+          if (
+            !deliveryStatus
+          ) {
             resultados.push({
               envio_id: envio.id,
               guia,
               estado:
                 "sin_estado_trackingmore",
-              respuesta: tracking,
+              respuesta:
+                tracking,
             });
 
             continue;
           }
 
           /*
-           * ENVIAR LA INFORMACIÓN AL WEBHOOK
+           * ==========================
+           * REUTILIZAR WEBHOOK VIPACK
+           * ==========================
            *
-           * Así reutilizamos la lógica que ya
-           * actualiza Supabase y WhatsApp.
+           * El webhook ya contiene
+           * nuestra lógica para:
+           *
+           * - traducir estados
+           * - actualizar Supabase
+           * - marcar entregado
+           * - actualizar fecha
+           * - evitar WhatsApp duplicado
            */
+
           const webhookUrl =
             new URL(
               "/api/trackingmore/webhook",
               url.origin
             );
 
-          webhookUrl.searchParams.set(
-            "secret",
-            webhookSecret
-          );
+          webhookUrl
+            .searchParams
+            .set(
+              "secret",
+              webhookSecret
+            );
 
           const webhookResponse =
             await fetch(
@@ -519,42 +812,50 @@ export async function GET(request: Request) {
                     "application/json",
                 },
 
-                body: JSON.stringify({
-                  data: {
-                    id:
-                      tracking.id ||
-                      null,
+                body:
+                  JSON.stringify({
+                    data: {
+                      id:
+                        tracking.id ||
+                        null,
 
-                    tracking_number:
-                      guia,
+                      tracking_number:
+                        guia,
 
-                    courier_code:
-                      tracking.courier_code ||
-                      courierCode,
+                      courier_code:
+                        tracking
+                          .courier_code ||
+                        courierCode,
 
-                    delivery_status:
-                      deliveryStatus,
+                      delivery_status:
+                        deliveryStatus,
 
-                    substatus:
-                      substatus ||
-                      null,
+                      substatus:
+                        substatus ||
+                        null,
 
-                    latest_event:
-                      latestEvent ||
-                      null,
+                      latest_event:
+                        latestEvent ||
+                        null,
 
-                    latest_checkpoint_time:
-                      checkpoint ||
-                      null,
-                  },
-                }),
+                      latest_checkpoint_time:
+                        checkpoint ||
+                        null,
+                    },
+                  }),
 
-                cache: "no-store",
+                cache:
+                  "no-store",
               }
             );
 
+          /*
+           * Leer respuesta webhook.
+           */
+
           const webhookText =
-            await webhookResponse.text();
+            await webhookResponse
+              .text();
 
           let webhookData: any;
 
@@ -568,17 +869,31 @@ export async function GET(request: Request) {
               raw:
                 webhookText.slice(
                   0,
-                  300
+                  500
                 ),
             };
           }
 
+          /*
+           * Guardar resultado.
+           */
+
           resultados.push({
             envio_id: envio.id,
+
             guia,
+
+            courier_code:
+              courierCode,
 
             trackingmore_status:
               deliveryStatus,
+
+            trackingmore_substatus:
+              substatus || null,
+
+            trackingmore_event:
+              latestEvent || null,
 
             vipack_estado_anterior:
               envio.estatus_actual,
@@ -586,25 +901,41 @@ export async function GET(request: Request) {
             webhook_ok:
               webhookResponse.ok,
 
+            webhook_status:
+              webhookResponse.status,
+
             webhook:
               webhookData,
           });
 
           /*
-           * PAUSA PARA NO SATURAR API
+           * ==========================
+           * PAUSA
+           * ==========================
+           *
+           * Create V4 tiene límite
+           * predeterminado de 3 req/s.
+           *
+           * 400 ms deja margen.
            */
+
           await new Promise(
             (resolve) =>
               setTimeout(
                 resolve,
-                150
+                400
               )
           );
-        } catch (error: unknown) {
+        } catch (
+          error: unknown
+        ) {
           resultados.push({
             envio_id: envio.id,
+
             guia,
+
             estado: "error",
+
             error:
               error instanceof Error
                 ? error.message
@@ -615,8 +946,42 @@ export async function GET(request: Request) {
     }
 
     /*
-     * RESULTADO
+     * ==============================
+     * RESUMEN
+     * ==============================
      */
+
+    const errores =
+      resultados.filter(
+        (r) =>
+          r.estado === "error"
+      ).length;
+
+    const omitidos =
+      resultados.filter(
+        (r) =>
+          r.estado === "omitido"
+      ).length;
+
+    const yaExistian =
+      resultados.filter(
+        (r) =>
+          r.estado ===
+          "tracking_ya_existia"
+      ).length;
+
+    const webhookCorrectos =
+      resultados.filter(
+        (r) =>
+          r.webhook_ok === true
+      ).length;
+
+    /*
+     * ==============================
+     * RESPUESTA
+     * ==============================
+     */
+
     return NextResponse.json({
       success: true,
 
@@ -629,7 +994,8 @@ export async function GET(request: Request) {
         guiaPrueba || null,
 
       fecha:
-        new Date().toISOString(),
+        new Date()
+          .toISOString(),
 
       resumen: {
         envios_revisados:
@@ -638,28 +1004,22 @@ export async function GET(request: Request) {
         guias_procesadas:
           resultados.length,
 
-        errores:
-          resultados.filter(
-            (r) =>
-              r.estado === "error"
-          ).length,
-
-        omitidos:
-          resultados.filter(
-            (r) =>
-              r.estado === "omitido"
-          ).length,
-
         webhook_correctos:
-          resultados.filter(
-            (r) =>
-              r.webhook_ok === true
-          ).length,
+          webhookCorrectos,
+
+        tracking_ya_existian:
+          yaExistian,
+
+        errores,
+
+        omitidos,
       },
 
       resultados,
     });
-  } catch (error: unknown) {
+  } catch (
+    error: unknown
+  ) {
     console.error(
       "Error TrackingMore sync:",
       error
