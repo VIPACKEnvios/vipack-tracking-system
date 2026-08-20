@@ -54,7 +54,6 @@ function extraerGuias(valor: unknown) {
 function extraerTracking(data: any) {
   if (!data) return null;
 
-  // Respuesta directa
   if (
     data.tracking_number ||
     data.tracking_number === 0
@@ -62,7 +61,6 @@ function extraerTracking(data: any) {
     return data;
   }
 
-  // data.data
   if (data.data) {
     if (Array.isArray(data.data)) {
       return data.data[0] || null;
@@ -84,7 +82,6 @@ function extraerTracking(data: any) {
     }
   }
 
-  // items
   if (
     Array.isArray(data.items) &&
     data.items.length > 0
@@ -156,15 +153,11 @@ function obtenerCheckpoint(tracking: any) {
 
 export async function GET(request: Request) {
   try {
-    /*
-     * SEGURIDAD
-     *
-     * El servicio automático deberá llamar:
-     *
-     * /api/trackingmore/sync?secret=TU_SYNC_SECRET
-     */
     const url = new URL(request.url);
 
+    /*
+     * SEGURIDAD
+     */
     const secret =
       url.searchParams.get("secret") || "";
 
@@ -196,6 +189,9 @@ export async function GET(request: Request) {
       );
     }
 
+    /*
+     * VARIABLES
+     */
     const apiKey =
       process.env.TRACKINGMORE_API_KEY;
 
@@ -262,13 +258,17 @@ export async function GET(request: Request) {
     );
 
     /*
-     * Solamente revisamos envíos que NO
-     * estén marcados como entregados.
+     * MODO DE PRUEBA
+     *
+     * Si recibimos ?guia=XXXXXXXXXX,
+     * solamente revisamos esa guía.
      */
-    const {
-      data: envios,
-      error: errorEnvios,
-    } = await supabase
+    const guiaPrueba =
+      limpiarGuia(
+        url.searchParams.get("guia")
+      );
+
+    let consulta = supabase
       .from("envios")
       .select(
         `
@@ -279,14 +279,34 @@ export async function GET(request: Request) {
           entregado,
           trackingmore_courier
         `
-      )
-      .or(
-        "entregado.eq.false,entregado.is.null"
-      )
-      .order("id", {
-        ascending: false,
-      })
-      .limit(300);
+      );
+
+    if (guiaPrueba) {
+      consulta = consulta.eq(
+        "guia",
+        guiaPrueba
+      );
+    } else {
+      /*
+       * MODO AUTOMÁTICO
+       *
+       * Solamente revisamos envíos
+       * que todavía NO estén entregados.
+       */
+      consulta = consulta
+        .or(
+          "entregado.eq.false,entregado.is.null"
+        )
+        .order("id", {
+          ascending: false,
+        })
+        .limit(300);
+    }
+
+    const {
+      data: envios,
+      error: errorEnvios,
+    } = await consulta;
 
     if (errorEnvios) {
       return NextResponse.json(
@@ -302,6 +322,9 @@ export async function GET(request: Request) {
 
     const resultados: any[] = [];
 
+    /*
+     * PROCESAR ENVÍOS
+     */
     for (const envio of envios || []) {
       const guias =
         extraerGuias(envio.guia);
@@ -337,13 +360,7 @@ export async function GET(request: Request) {
       for (const guia of guias) {
         try {
           /*
-           * Consultamos directamente el estado
-           * almacenado actualmente en TrackingMore.
-           *
-           * Esto funciona como respaldo cuando
-           * TrackingMore cambia su dashboard
-           * pero por alguna razón no dispara
-           * el webhook correspondiente.
+           * CONSULTAR TRACKINGMORE
            */
           const trackingUrl =
             new URL(
@@ -416,6 +433,9 @@ export async function GET(request: Request) {
             continue;
           }
 
+          /*
+           * EXTRAER TRACKING
+           */
           const tracking =
             extraerTracking(data);
 
@@ -472,11 +492,10 @@ export async function GET(request: Request) {
           }
 
           /*
-           * Reutilizamos EL MISMO WEBHOOK.
+           * ENVIAR LA INFORMACIÓN AL WEBHOOK
            *
-           * De esta manera no tenemos dos
-           * códigos diferentes actualizando
-           * Supabase o WhatsApp.
+           * Así reutilizamos la lógica que ya
+           * actualiza Supabase y WhatsApp.
            */
           const webhookUrl =
             new URL(
@@ -557,19 +576,22 @@ export async function GET(request: Request) {
           resultados.push({
             envio_id: envio.id,
             guia,
+
             trackingmore_status:
               deliveryStatus,
+
             vipack_estado_anterior:
               envio.estatus_actual,
+
             webhook_ok:
               webhookResponse.ok,
+
             webhook:
               webhookData,
           });
 
           /*
-           * Pausa corta para no golpear
-           * innecesariamente la API.
+           * PAUSA PARA NO SATURAR API
            */
           await new Promise(
             (resolve) =>
@@ -592,8 +614,19 @@ export async function GET(request: Request) {
       }
     }
 
+    /*
+     * RESULTADO
+     */
     return NextResponse.json({
       success: true,
+
+      modo:
+        guiaPrueba
+          ? "prueba"
+          : "automatico",
+
+      guia_prueba:
+        guiaPrueba || null,
 
       fecha:
         new Date().toISOString(),
@@ -635,6 +668,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         success: false,
+
         error:
           error instanceof Error
             ? error.message
