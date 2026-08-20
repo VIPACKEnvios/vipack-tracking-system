@@ -38,142 +38,578 @@ export default function GuiasPage() {
     }
   };
 
+  const limpiarSoloDigitos = (valor: unknown) =>
+    String(valor || "").replace(/\D/g, "");
+
+  const normalizarNombreCliente = (nombrePDF: string) =>
+    nombrePDF
+      .replace(/\.pdf$/i, "")
+      .replace(/\(\d+\)/g, "")
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const detectarPaqueteria = (
+    textoPDF: string,
+    nombrePDF: string
+  ) => {
+    const fuente = `${textoPDF} ${nombrePDF}`
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase();
+
+    if (
+      fuente.includes("ESTAFETA") ||
+      fuente.includes("ESTAFETA USA")
+    ) {
+      return "ESTAFETA";
+    }
+
+    if (
+      fuente.includes("FEDEX") ||
+      fuente.includes("FEDERAL EXPRESS")
+    ) {
+      return "FEDEX";
+    }
+
+    if (
+      fuente.includes("DHL") ||
+      fuente.includes("DHL EXPRESS")
+    ) {
+      return "DHL";
+    }
+
+    return "";
+  };
+
+  const extraerTelefonoPDF = (textoPDF: string) => {
+    const patrones = [
+      /(?:TEL(?:EFONO)?|TELÉFONO|PHONE|CEL(?:ULAR)?|WHATSAPP)\s*[:#.-]?\s*(?:\+?52\s*)?(?:1\s*)?(\d[\d\s().-]{8,18}\d)/i,
+      /(?:\+?52\s*)?(?:1\s*)?(\d{10})\b/,
+    ];
+
+    for (const patron of patrones) {
+      const match = textoPDF.match(patron);
+
+      if (!match?.[1]) continue;
+
+      let telefono = limpiarSoloDigitos(match[1]);
+
+      if (telefono.length === 12 && telefono.startsWith("52")) {
+        telefono = telefono.slice(2);
+      }
+
+      if (telefono.length === 13 && telefono.startsWith("521")) {
+        telefono = telefono.slice(3);
+      }
+
+      if (telefono.length === 10) {
+        return telefono;
+      }
+    }
+
+    return "";
+  };
+
+  const limpiarCandidatoGuia = (valor: string) =>
+    valor.replace(/[^\d]/g, "");
+
+  const guiaValida = (
+    guia: string,
+    paqueteria: string,
+    telefono: string
+  ) => {
+    if (!guia || !/^\d+$/.test(guia)) return false;
+    if (telefono && guia === telefono) return false;
+
+    // Evitar teléfonos mexicanos que aparezcan en la etiqueta.
+    if (
+      guia.length === 12 &&
+      guia.startsWith("52")
+    ) {
+      return false;
+    }
+
+    if (
+      guia.length === 13 &&
+      guia.startsWith("521")
+    ) {
+      return false;
+    }
+
+    if (paqueteria === "DHL") {
+      return guia.length === 10;
+    }
+
+    if (paqueteria === "FEDEX") {
+      return (
+        guia.length === 12 ||
+        guia.length === 15
+      );
+    }
+
+    if (paqueteria === "ESTAFETA") {
+      return (
+        guia.length === 10 ||
+        guia.length === 12 ||
+        guia.length === 20 ||
+        guia.length === 22
+      );
+    }
+
+    return guia.length >= 8 && guia.length <= 30;
+  };
+
+  const extraerGuiasPDF = (
+    textoPDF: string,
+    paqueteria: string,
+    telefono: string
+  ) => {
+    const texto = textoPDF
+      .replace(/\u00a0/g, " ")
+      .replace(/\s+/g, " ");
+
+    const candidatos: string[] = [];
+
+    const agregarMatches = (
+      regex: RegExp,
+      indice = 1
+    ) => {
+      for (const match of texto.matchAll(regex)) {
+        const bruto = match[indice];
+
+        if (!bruto) continue;
+
+        const guia =
+          limpiarCandidatoGuia(bruto);
+
+        if (
+          guiaValida(
+            guia,
+            paqueteria,
+            telefono
+          )
+        ) {
+          candidatos.push(guia);
+        }
+      }
+    };
+
+    /*
+     * Primero buscamos por etiquetas, porque es
+     * mucho más seguro que tomar cualquier número.
+     */
+    if (paqueteria === "DHL") {
+      agregarMatches(
+        /(?:WAYBILL|AWB|TRACKING\s*(?:NO|NUMBER|#)?|GUIA|GU[IÍ]A)\s*[:#.-]?\s*([\d\s-]{8,24})/gi
+      );
+    }
+
+    if (paqueteria === "ESTAFETA") {
+      agregarMatches(
+        /(?:NO\.?\s*DE\s*GUIA|NO\.?\s*DE\s*GU[IÍ]A|GUIA|GU[IÍ]A|RASTREO|TRACKING|CONFIRMACION|CONFIRMACI[ÓO]N)\s*[:#.-]?\s*([\d\s-]{8,32})/gi
+      );
+    }
+
+    if (paqueteria === "FEDEX") {
+      agregarMatches(
+        /(?:TRACKING\s*(?:ID|NO|NUMBER|#)?|MASTER\s*TRACKING|GUIA|GU[IÍ]A)\s*[:#.-]?\s*([\d\s-]{10,24})/gi
+      );
+    }
+
+    /*
+     * Fallback por formato típico de cada paquetería.
+     * Solo se usa si no encontramos nada por etiqueta.
+     */
+    if (candidatos.length === 0) {
+      if (paqueteria === "DHL") {
+        const encontrados =
+          texto.match(/(?<!\d)\d{10}(?!\d)/g) ||
+          [];
+
+        candidatos.push(
+          ...encontrados.filter((guia) =>
+            guiaValida(
+              guia,
+              paqueteria,
+              telefono
+            )
+          )
+        );
+      }
+
+      if (paqueteria === "FEDEX") {
+        const encontrados =
+          texto.match(
+            /(?<!\d)(?:\d{12}|\d{15})(?!\d)/g
+          ) || [];
+
+        candidatos.push(
+          ...encontrados.filter((guia) =>
+            guiaValida(
+              guia,
+              paqueteria,
+              telefono
+            )
+          )
+        );
+      }
+
+      if (paqueteria === "ESTAFETA") {
+        const encontrados =
+          texto.match(
+            /(?<!\d)(?:\d{10}|\d{12}|\d{20}|\d{22})(?!\d)/g
+          ) || [];
+
+        candidatos.push(
+          ...encontrados.filter((guia) =>
+            guiaValida(
+              guia,
+              paqueteria,
+              telefono
+            )
+          )
+        );
+      }
+    }
+
+    return Array.from(
+      new Set(candidatos)
+    );
+  };
+
   const handleGenerateExcelFromZip = async () => {
     if (!zipFile) {
       alert("Debes seleccionar el ZIP con PDFs");
       return;
     }
 
-    const pdfjs = await import("pdfjs-dist");
+    try {
+      setLogs([
+        "📦 Leyendo ZIP...",
+      ]);
 
-    pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-      "pdfjs-dist/build/pdf.worker.min.mjs",
-      import.meta.url
-    ).toString();
+      const pdfjs =
+        await import("pdfjs-dist");
 
-    const zipArrayBuffer = await zipFile.arrayBuffer();
-    const zip = await JSZip.loadAsync(zipArrayBuffer);
+      pdfjs.GlobalWorkerOptions.workerSrc =
+        new URL(
+          "pdfjs-dist/build/pdf.worker.min.mjs",
+          import.meta.url
+        ).toString();
 
-    const filas: any[] = [];
+      const zipArrayBuffer =
+        await zipFile.arrayBuffer();
 
-    for (const fileName of Object.keys(zip.files)) {
-      const file = zip.files[fileName];
-
-      if (!fileName.toLowerCase().endsWith(".pdf")) continue;
-
-      const nombrePDF = fileName.split("/").pop() || "";
-
-      const cliente = nombrePDF
-        .replace(/\.pdf$/i, "")
-        .replace(/\(\d+\)/g, "")
-        .replace(/_/g, " ")
-        .trim();
-
-      const arrayBuffer = await file.async("arraybuffer");
-      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-
-      let textoPDF = "";
-
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        textoPDF += content.items.map((item: any) => item.str).join(" ") + " ";
-      }
-
-      const textoLimpio = textoPDF.toUpperCase();
-
-      let paqueteria = "";
-
-      if (textoLimpio.includes("DHL")) {
-        paqueteria = "DHL";
-      } else if (textoLimpio.includes("FEDEX")) {
-        paqueteria = "FEDEX";
-      } else if (textoLimpio.includes("ESTAFETA")) {
-        paqueteria = "ESTAFETA";
-      }
-
-      let guias: string[] = [];
-
-      if (paqueteria === "DHL") {
-        const matchesDHL = textoPDF.matchAll(
-          /WAYBILL\s*[:#-]?\s*([\d\s-]{8,30})/gi
+      const zip =
+        await JSZip.loadAsync(
+          zipArrayBuffer
         );
 
-        for (const match of matchesDHL) {
-          const guia = match[1].replace(/[\s-]/g, "");
-          if (guia.length >= 8 && guia.length <= 30) guias.push(guia);
+      const filas: any[] = [];
+      const logsGeneracion: string[] = [];
+
+      let totalPDF = 0;
+      let totalGuias = 0;
+      let pdfSinGuia = 0;
+      let pdfSinPaqueteria = 0;
+
+      for (
+        const fileName of Object.keys(
+          zip.files
+        )
+      ) {
+        const file =
+          zip.files[fileName];
+
+        if (
+          file.dir ||
+          !fileName
+            .toLowerCase()
+            .endsWith(".pdf")
+        ) {
+          continue;
         }
-      }
 
-      if (paqueteria === "ESTAFETA") {
-        const matchesEstafeta = textoPDF.matchAll(
-          /CONFIRMACION\s*[:#-]?\s*([\d\s-]{8,30})/gi
-        );
+        totalPDF++;
 
-        for (const match of matchesEstafeta) {
-          const guia = match[1].replace(/[\s-]/g, "");
-          if (guia.length >= 8 && guia.length <= 30) guias.push(guia);
-        }
-      }
+        const nombrePDF =
+          fileName
+            .split("/")
+            .pop() || "";
 
-      if (paqueteria === "FEDEX") {
-        const posiblesFedex = textoPDF.match(/\b\d{12}\b|\b\d{15}\b/g) || [];
-        guias.push(...posiblesFedex);
-      }
+        const cliente =
+          normalizarNombreCliente(
+            nombrePDF
+          );
 
-      guias = guias.filter((guia) => {
-        if (!guia) return false;
-        if (!/^\d+$/.test(guia)) return false;
-        if (guia.startsWith("52")) return false;
-        if (guia.length < 8) return false;
-        if (guia.length > 30) return false;
-        return true;
-      });
+        try {
+          const arrayBuffer =
+            await file.async(
+              "arraybuffer"
+            );
 
-      const guiasUnicas = Array.from(new Set(guias));
+          const pdf =
+            await pdfjs
+              .getDocument({
+                data: arrayBuffer,
+              })
+              .promise;
 
-      if (guiasUnicas.length === 0) {
-        const numeroPedido = filas.length + 1;
+          let textoPDF = "";
 
-        filas.push({
-          pedido: `PED-${String(numeroPedido).padStart(3, "0")}`,
-          fecha_carga: new Date().toISOString(),
-          cliente,
-          telefono_whatsapp: "",
-          guia: "GUIA_NO_DETECTADA",
-          paqueteria: paqueteria || "NO_DETECTADA",
-          nombre_pdf: nombrePDF,
-          estado_17track: "Pendiente",
-          ultimo_estado_enviado: "",
-          enviado: "",
-        });
-      } else {
-        guiasUnicas.forEach((guia) => {
-          const numeroPedido = filas.length + 1;
+          for (
+            let i = 1;
+            i <= pdf.numPages;
+            i++
+          ) {
+            const page =
+              await pdf.getPage(i);
+
+            const content =
+              await page.getTextContent();
+
+            textoPDF +=
+              content.items
+                .map(
+                  (item: any) =>
+                    item?.str || ""
+                )
+                .join(" ") + " ";
+          }
+
+          textoPDF = textoPDF
+            .replace(/\u00a0/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+
+          const paqueteria =
+            detectarPaqueteria(
+              textoPDF,
+              nombrePDF
+            );
+
+          if (!paqueteria) {
+            pdfSinPaqueteria++;
+          }
+
+          const telefono =
+            extraerTelefonoPDF(
+              textoPDF
+            );
+
+          const guias =
+            extraerGuiasPDF(
+              textoPDF,
+              paqueteria,
+              telefono
+            );
+
+          if (guias.length === 0) {
+            pdfSinGuia++;
+
+            const numeroPedido =
+              filas.length + 1;
+
+            filas.push({
+              pedido: `PED-${String(
+                numeroPedido
+              ).padStart(3, "0")}`,
+              fecha_carga:
+                new Date().toISOString(),
+              cliente,
+              telefono_whatsapp:
+                telefono,
+              guia:
+                "GUIA_NO_DETECTADA",
+              paqueteria:
+                paqueteria ||
+                "NO_DETECTADA",
+              nombre_pdf: nombrePDF,
+              estado_17track:
+                "Pendiente",
+              ultimo_estado_enviado:
+                "",
+              enviado: "",
+            });
+
+            logsGeneracion.push(
+              `⚠️ ${nombrePDF}: no se detectó guía${
+                paqueteria
+                  ? ""
+                  : " ni paquetería"
+              }.`
+            );
+
+            continue;
+          }
+
+          for (
+            const guia of guias
+          ) {
+            const numeroPedido =
+              filas.length + 1;
+
+            filas.push({
+              pedido: `PED-${String(
+                numeroPedido
+              ).padStart(3, "0")}`,
+              fecha_carga:
+                new Date().toISOString(),
+              cliente,
+              telefono_whatsapp:
+                telefono,
+              guia,
+              paqueteria:
+                paqueteria ||
+                "NO_DETECTADA",
+              nombre_pdf: nombrePDF,
+              estado_17track:
+                "Pendiente",
+              ultimo_estado_enviado:
+                "",
+              enviado: "",
+            });
+
+            totalGuias++;
+          }
+
+          logsGeneracion.push(
+            `✅ ${nombrePDF}: ${
+              paqueteria ||
+              "paquetería no detectada"
+            } | ${guias.length} guía(s) detectada(s)${
+              telefono
+                ? " | teléfono detectado"
+                : ""
+            }`
+          );
+        } catch (pdfError: any) {
+          pdfSinGuia++;
+
+          const numeroPedido =
+            filas.length + 1;
 
           filas.push({
-            pedido: `PED-${String(numeroPedido).padStart(3, "0")}`,
-            fecha_carga: new Date().toISOString(),
+            pedido: `PED-${String(
+              numeroPedido
+            ).padStart(3, "0")}`,
+            fecha_carga:
+              new Date().toISOString(),
             cliente,
             telefono_whatsapp: "",
-            guia,
-            paqueteria: paqueteria || "NO_DETECTADA",
+            guia:
+              "GUIA_NO_DETECTADA",
+            paqueteria:
+              "NO_DETECTADA",
             nombre_pdf: nombrePDF,
-            estado_17track: "Pendiente",
-            ultimo_estado_enviado: "",
+            estado_17track:
+              "Pendiente",
+            ultimo_estado_enviado:
+              "",
             enviado: "",
           });
-        });
+
+          logsGeneracion.push(
+            `❌ ${nombrePDF}: no se pudo leer el PDF. ${
+              pdfError?.message ||
+              "Error desconocido"
+            }`
+          );
+        }
       }
+
+      if (filas.length === 0) {
+        alert(
+          "No se encontraron PDFs dentro del ZIP."
+        );
+        setLogs([
+          "❌ No se encontraron archivos PDF dentro del ZIP.",
+        ]);
+        return;
+      }
+
+      const encabezados = [
+        "pedido",
+        "fecha_carga",
+        "cliente",
+        "telefono_whatsapp",
+        "guia",
+        "paqueteria",
+        "nombre_pdf",
+        "estado_17track",
+        "ultimo_estado_enviado",
+        "enviado",
+      ];
+
+      const worksheet =
+        XLSX.utils.json_to_sheet(
+          filas,
+          {
+            header: encabezados,
+          }
+        );
+
+      /*
+       * Anchos para que Excel no abra
+       * columnas cortadas.
+       */
+      worksheet["!cols"] = [
+        { wch: 14 }, // pedido
+        { wch: 26 }, // fecha
+        { wch: 35 }, // cliente
+        { wch: 20 }, // teléfono
+        { wch: 24 }, // guía
+        { wch: 16 }, // paquetería
+        { wch: 45 }, // PDF
+        { wch: 18 }, // estado
+        { wch: 25 }, // último estado
+        { wch: 12 }, // enviado
+      ];
+
+      const workbook =
+        XLSX.utils.book_new();
+
+      XLSX.utils.book_append_sheet(
+        workbook,
+        worksheet,
+        "Guias"
+      );
+
+      XLSX.writeFile(
+        workbook,
+        "plantilla_guias_generada.xlsx"
+      );
+
+      setLogs([
+        `✅ Excel generado: ${filas.length} fila(s).`,
+        `📄 PDFs procesados: ${totalPDF}.`,
+        `📦 Guías detectadas: ${totalGuias}.`,
+        `⚠️ PDFs sin guía: ${pdfSinGuia}.`,
+        `⚠️ PDFs sin paquetería: ${pdfSinPaqueteria}.`,
+        ...logsGeneracion,
+      ]);
+
+      alert(
+        `Excel generado correctamente.\n\nPDFs: ${totalPDF}\nGuías detectadas: ${totalGuias}\nSin guía: ${pdfSinGuia}`
+      );
+    } catch (error: any) {
+      console.error(
+        "Error generando Excel:",
+        error
+      );
+
+      setLogs([
+        `❌ Error generando Excel: ${
+          error?.message ||
+          "Error desconocido"
+        }`,
+      ]);
+
+      alert(
+        "No se pudo generar el Excel. Revisa los logs."
+      );
     }
-
-    const worksheet = XLSX.utils.json_to_sheet(filas);
-    const workbook = XLSX.utils.book_new();
-
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Guias");
-    XLSX.writeFile(workbook, "plantilla_guias_generada.xlsx");
-
-    alert("Excel generado correctamente");
   };
 
   const handleValidate = async () => {
