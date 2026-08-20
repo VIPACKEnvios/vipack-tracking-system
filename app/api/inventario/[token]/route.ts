@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createHash } from "node:crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +11,230 @@ type RouteContext = {
     token: string;
   }>;
 };
+
+type EstadoInventario = {
+  cliente_id: number;
+  firma: string;
+  total_archivos: number;
+  archivo_ids: string[];
+  updated_at: string | null;
+};
+
+function crearFirmaInventario(items: any[]) {
+  const contenido = items
+    .filter((item) => Boolean(item?.file))
+    .map((item) => ({
+      id: String(item?.id || ""),
+      size: Number(item?.size || 0),
+      lastModifiedDateTime:
+        item?.lastModifiedDateTime || "",
+    }))
+    .sort((a, b) =>
+      a.id.localeCompare(b.id)
+    );
+
+  return createHash("sha256")
+    .update(JSON.stringify(contenido))
+    .digest("hex");
+}
+
+async function sincronizarNotificacionInventario({
+  supabase,
+  clienteId,
+  token,
+  items,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  clienteId: number;
+  token: string;
+  items: any[];
+}) {
+  try {
+    /*
+     * Solo contamos archivos reales.
+     * Las carpetas no generan una notificación.
+     */
+    const archivos = items.filter(
+      (item) => Boolean(item?.file)
+    );
+
+    const archivoIds = archivos
+      .map((item) => String(item.id))
+      .filter(Boolean)
+      .sort();
+
+    const firmaActual =
+      crearFirmaInventario(archivos);
+
+    const {
+      data: estadoAnterior,
+      error: estadoError,
+    } = await supabase
+      .from("inventario_estado_clientes")
+      .select(
+        "cliente_id, firma, total_archivos, archivo_ids, updated_at"
+      )
+      .eq("cliente_id", clienteId)
+      .maybeSingle();
+
+    /*
+     * Si la tabla todavía no existe,
+     * el inventario debe seguir funcionando.
+     */
+    if (estadoError) {
+      console.warn(
+        "No se pudo consultar inventario_estado_clientes:",
+        estadoError.message
+      );
+      return;
+    }
+
+    /*
+     * Primera lectura:
+     * guardamos el estado actual como base.
+     *
+     * IMPORTANTE:
+     * NO generamos una notificación aquí,
+     * para evitar avisar al cliente por todos
+     * los archivos que ya existían antes de
+     * activar esta función.
+     */
+    if (!estadoAnterior) {
+      const { error: insertarEstadoError } =
+        await supabase
+          .from("inventario_estado_clientes")
+          .insert({
+            cliente_id: clienteId,
+            firma: firmaActual,
+            total_archivos:
+              archivoIds.length,
+            archivo_ids: archivoIds,
+            updated_at:
+              new Date().toISOString(),
+          });
+
+      if (insertarEstadoError) {
+        console.warn(
+          "No se pudo crear el estado inicial del inventario:",
+          insertarEstadoError.message
+        );
+      }
+
+      return;
+    }
+
+    const estado =
+      estadoAnterior as EstadoInventario;
+
+    if (estado.firma === firmaActual) {
+      return;
+    }
+
+    const idsAnteriores =
+      Array.isArray(estado.archivo_ids)
+        ? estado.archivo_ids.map(String)
+        : [];
+
+    const anteriores =
+      new Set(idsAnteriores);
+
+    const nuevosIds =
+      archivoIds.filter(
+        (id) => !anteriores.has(id)
+      );
+
+    /*
+     * Actualización con control de concurrencia.
+     *
+     * Solo el proceso que todavía encuentre la
+     * firma anterior puede actualizar el estado
+     * y crear la notificación. Esto reduce el
+     * riesgo de avisos duplicados si llegan dos
+     * solicitudes al mismo tiempo.
+     */
+    const {
+      data: estadoActualizado,
+      error: actualizarEstadoError,
+    } = await supabase
+      .from("inventario_estado_clientes")
+      .update({
+        firma: firmaActual,
+        total_archivos:
+          archivoIds.length,
+        archivo_ids: archivoIds,
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq("cliente_id", clienteId)
+      .eq("firma", estado.firma)
+      .select("cliente_id")
+      .maybeSingle();
+
+    if (actualizarEstadoError) {
+      console.warn(
+        "No se pudo actualizar el estado del inventario:",
+        actualizarEstadoError.message
+      );
+      return;
+    }
+
+    /*
+     * Si otra solicitud ya actualizó la firma,
+     * no creamos otra notificación.
+     */
+    if (!estadoActualizado) {
+      return;
+    }
+
+    /*
+     * Si únicamente se modificó o eliminó un
+     * archivo, actualizamos el estado pero no
+     * avisamos "nueva mercancía".
+     */
+    if (nuevosIds.length === 0) {
+      return;
+    }
+
+    const cantidad =
+      nuevosIds.length;
+
+    const mensaje =
+      cantidad === 1
+        ? "VIPACK agregó nueva mercancía a tu inventario."
+        : `VIPACK agregó ${cantidad} archivos nuevos a tu inventario.`;
+
+    const { error: notificacionError } =
+      await supabase
+        .from("notificaciones_clientes")
+        .insert({
+          cliente_id: clienteId,
+          titulo:
+            "Nueva mercancía registrada",
+          mensaje,
+          tipo: "inventario",
+          url: `/inventario/${encodeURIComponent(
+            token
+          )}`,
+          leida: false,
+        });
+
+    if (notificacionError) {
+      console.warn(
+        "No se pudo crear la notificación del inventario:",
+        notificacionError.message
+      );
+    }
+  } catch (error) {
+    /*
+     * Las notificaciones nunca deben impedir
+     * que el cliente abra su inventario.
+     */
+    console.error(
+      "Error sincronizando notificación de inventario:",
+      error
+    );
+  }
+}
 
 /*
  * Convierte una fecha YYYY-MM-DD a una fecha ISO
@@ -623,8 +848,27 @@ export async function GET(
         ? archivosData.value
         : [];
 
+
     /*
-     * 5. Preparar respuesta segura.
+     * 5. Detectar cambios del inventario.
+     *
+     * En la primera lectura únicamente se crea
+     * una fotografía del estado actual.
+     *
+     * En lecturas posteriores, si aparecen
+     * uno o más archivos nuevos, se crea UNA
+     * sola notificación para este cliente.
+     */
+    await sincronizarNotificacionInventario({
+      supabase,
+      clienteId:
+        Number(cliente.id_cliente),
+      token,
+      items,
+    });
+
+    /*
+     * 6. Preparar respuesta segura.
      *
      * IMPORTANTE:
      *
