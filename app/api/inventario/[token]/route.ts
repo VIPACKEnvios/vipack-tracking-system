@@ -40,17 +40,31 @@ function crearFirmaInventario(items: any[]) {
 }
 
 
+type ResultadoPush = {
+  intentados: number;
+  enviados: number;
+  fallidos: number;
+};
+
 async function enviarPushCliente({
   supabase,
   clienteId,
   token,
+  titulo,
   mensaje,
 }: {
   supabase: any;
   clienteId: number;
   token: string;
+  titulo: string;
   mensaje: string;
-}) {
+}): Promise<ResultadoPush> {
+  const resultado: ResultadoPush = {
+    intentados: 0,
+    enviados: 0,
+    fallidos: 0,
+  };
+
   try {
     const vapidPublicKey =
       process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -58,23 +72,34 @@ async function enviarPushCliente({
     const vapidPrivateKey =
       process.env.VAPID_PRIVATE_KEY;
 
-    const vapidSubject =
-      process.env.VAPID_SUBJECT;
+    const vapidSubjectOriginal =
+      process.env.VAPID_SUBJECT?.trim();
 
-    /*
-     * Si todavía falta alguna variable VAPID,
-     * no rompemos el inventario ni la campanita.
-     */
     if (
       !vapidPublicKey ||
       !vapidPrivateKey ||
-      !vapidSubject
+      !vapidSubjectOriginal
     ) {
       console.warn(
         "Push omitido: faltan variables VAPID."
       );
-      return;
+
+      return resultado;
     }
+
+    /*
+     * web-push exige un subject válido:
+     * - mailto:correo@dominio.com
+     * - https://dominio.com
+     *
+     * Si en Vercel quedó solamente el correo,
+     * lo normalizamos automáticamente.
+     */
+    const vapidSubject =
+      vapidSubjectOriginal.includes("://") ||
+      vapidSubjectOriginal.startsWith("mailto:")
+        ? vapidSubjectOriginal
+        : `mailto:${vapidSubjectOriginal}`;
 
     webpush.setVapidDetails(
       vapidSubject,
@@ -98,48 +123,84 @@ async function enviarPushCliente({
         "No se pudieron consultar las suscripciones push:",
         suscripcionesError.message
       );
-      return;
+
+      return resultado;
     }
 
     if (
       !Array.isArray(suscripciones) ||
       suscripciones.length === 0
     ) {
-      return;
+      console.log(
+        `Cliente ${clienteId}: sin dispositivos push activos.`
+      );
+
+      return resultado;
     }
 
-    const payload = JSON.stringify({
-      title: "VIPACK Envíos",
-      body: mensaje,
-      url: `/inventario/${encodeURIComponent(
-        token
-      )}`,
-      icon: "/vipack-logo.jpg",
-      badge: "/vipack-logo.jpg",
-      tag: `vipack-inventario-${clienteId}`,
-    });
+    resultado.intentados =
+      suscripciones.length;
+
+    const payload =
+      JSON.stringify({
+        title: titulo,
+        body: mensaje,
+
+        /*
+         * Al tocar la notificación,
+         * el cliente abre directamente
+         * SU inventario.
+         */
+        url: `/inventario/${encodeURIComponent(
+          token
+        )}`,
+
+        icon: "/vipack-logo.jpg",
+        badge: "/vipack-logo.jpg",
+
+        /*
+         * Cada actualización utiliza un tag
+         * distinto para evitar que Android
+         * reemplace silenciosamente el aviso
+         * anterior.
+         */
+        tag:
+          `vipack-inventario-${clienteId}-${Date.now()}`,
+      });
 
     await Promise.all(
       suscripciones.map(
         async (suscripcion: any) => {
           try {
-            await webpush.sendNotification(
-              {
-                endpoint:
-                  suscripcion.endpoint,
-                keys: {
-                  p256dh:
-                    suscripcion.p256dh,
-                  auth:
-                    suscripcion.auth,
+            const response =
+              await webpush.sendNotification(
+                {
+                  endpoint:
+                    suscripcion.endpoint,
+
+                  keys: {
+                    p256dh:
+                      suscripcion.p256dh,
+
+                    auth:
+                      suscripcion.auth,
+                  },
                 },
-              },
-              payload,
-              {
-                TTL: 60 * 60,
-              }
+                payload,
+                {
+                  TTL: 60 * 60,
+                  urgency: "high",
+                }
+              );
+
+            resultado.enviados += 1;
+
+            console.log(
+              `Push enviado al cliente ${clienteId}. Status: ${response.statusCode}`
             );
           } catch (error: any) {
+            resultado.fallidos += 1;
+
             const statusCode =
               Number(
                 error?.statusCode ||
@@ -148,10 +209,8 @@ async function enviarPushCliente({
               );
 
             /*
-             * 404 / 410 significa que el navegador
-             * eliminó o venció esa suscripción.
-             * La desactivamos para no seguir
-             * intentando enviarle notificaciones.
+             * Una suscripción 404/410 ya no sirve.
+             * La desactivamos automáticamente.
              */
             if (
               statusCode === 404 ||
@@ -184,22 +243,30 @@ async function enviarPushCliente({
             }
 
             console.error(
-              "Error enviando Web Push:",
-              error
+              `Error enviando Web Push al cliente ${clienteId}:`,
+              {
+                statusCode,
+                message:
+                  error?.message ||
+                  "Error desconocido",
+                body:
+                  error?.body ||
+                  null,
+              }
             );
           }
         }
       )
     );
+
+    return resultado;
   } catch (error) {
-    /*
-     * El push nunca debe impedir que el
-     * inventario o la campanita funcionen.
-     */
     console.error(
       "Error general enviando push:",
       error
     );
+
+    return resultado;
   }
 }
 
@@ -363,25 +430,31 @@ async function sincronizarNotificacionInventario({
     const cantidad =
       nuevosIds.length;
 
+    const titulo =
+      "Nueva mercancía en tu inventario";
+
     const mensaje =
       cantidad === 1
-        ? "VIPACK agregó nueva mercancía a tu inventario."
-        : `VIPACK agregó ${cantidad} archivos nuevos a tu inventario.`;
+        ? "VIPACK registró nueva mercancía. Toca para ver tu nueva evidencia."
+        : `VIPACK registró ${cantidad} archivos nuevos. Toca para ver tus nuevas evidencias.`;
 
-    const { error: notificacionError } =
-      await supabase
-        .from("notificaciones_clientes")
-        .insert({
-          cliente_id: clienteId,
-          titulo:
-            "Nueva mercancía registrada",
-          mensaje,
-          tipo: "inventario",
-          url: `/inventario/${encodeURIComponent(
-            token
-          )}`,
-          leida: false,
-        });
+    const {
+      data: notificacionCreada,
+      error: notificacionError,
+    } = await supabase
+      .from("notificaciones_clientes")
+      .insert({
+        cliente_id: clienteId,
+        titulo,
+        mensaje,
+        tipo: "inventario",
+        url: `/inventario/${encodeURIComponent(
+          token
+        )}`,
+        leida: false,
+      })
+      .select("id")
+      .maybeSingle();
 
     if (notificacionError) {
       console.warn(
@@ -392,17 +465,32 @@ async function sincronizarNotificacionInventario({
     }
 
     /*
-     * La campanita ya quedó guardada.
+     * La campanita quedó guardada.
      * Ahora enviamos el mismo aviso a todos
-     * los celulares/navegadores activos
-     * registrados por este cliente.
+     * los dispositivos registrados del cliente.
      */
-    await enviarPushCliente({
-      supabase,
-      clienteId,
-      token,
-      mensaje,
-    });
+    const resultadoPush =
+      await enviarPushCliente({
+        supabase,
+        clienteId,
+        token,
+        titulo,
+        mensaje,
+      });
+
+    console.log(
+      "Notificación de inventario procesada:",
+      {
+        clienteId,
+        notificacionId:
+          notificacionCreada?.id ||
+          null,
+        archivosNuevos:
+          cantidad,
+        push:
+          resultadoPush,
+      }
+    );
   } catch (error) {
     /*
      * Las notificaciones nunca deben impedir
