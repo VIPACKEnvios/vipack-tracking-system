@@ -44,7 +44,7 @@ async function sincronizarNotificacionInventario({
   token,
   items,
 }: {
-  supabase: ReturnType<typeof createClient>;
+  supabase: any;
   clienteId: number;
   token: string;
   items: any[];
