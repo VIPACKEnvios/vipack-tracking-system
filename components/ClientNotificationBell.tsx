@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useEffect, useRef, useState } from "react";
 
 type Notificacion = {
-  id: string;
-  cliente_id: string;
+  id: number;
+  cliente_id: number;
   titulo: string;
   mensaje: string;
   tipo: string | null;
@@ -15,207 +14,442 @@ type Notificacion = {
 };
 
 type Props = {
-  clienteId: string;
+  clienteId: number;
+  token: string;
 };
 
-export default function ClientNotificationBell({ clienteId }: Props) {
-  const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
-  const [abierto, setAbierto] = useState(false);
-  const [cargando, setCargando] = useState(true);
+type ApiResponse = {
+  success: boolean;
+  total?: number;
+  no_leidas?: number;
+  notificaciones?: Notificacion[];
+  error?: string;
+};
+
+export default function ClientNotificationBell({
+  clienteId,
+  token,
+}: Props) {
+  const [notificaciones, setNotificaciones] =
+    useState<Notificacion[]>([]);
+
+  const [abierto, setAbierto] =
+    useState(false);
+
+  const [cargando, setCargando] =
+    useState(true);
+
+  const contenedorRef =
+    useRef<HTMLDivElement | null>(null);
 
   const cargarNotificaciones = async () => {
-    if (!clienteId) return;
-
-    const { data, error } = await supabase
-      .from("notificaciones_clientes")
-      .select("*")
-      .eq("cliente_id", clienteId)
-      .order("created_at", { ascending: false })
-      .limit(20);
-
-    if (error) {
-      console.error("Error cargando notificaciones:", error);
-      setCargando(false);
+    if (!clienteId || !token) {
       return;
     }
 
-    setNotificaciones(data || []);
-    setCargando(false);
+    try {
+      const response = await fetch(
+        `/api/inventario/${encodeURIComponent(
+          token
+        )}/notificaciones`,
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
+
+      const result =
+        (await response.json()) as ApiResponse;
+
+      if (!response.ok || !result.success) {
+        console.error(
+          "Error cargando notificaciones:",
+          result.error
+        );
+
+        setCargando(false);
+        return;
+      }
+
+      setNotificaciones(
+        result.notificaciones || []
+      );
+    } catch (error) {
+      console.error(
+        "Error cargando notificaciones:",
+        error
+      );
+    } finally {
+      setCargando(false);
+    }
   };
 
   useEffect(() => {
-    cargarNotificaciones();
-
-    const canal = supabase
-      .channel(`notificaciones-${clienteId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "notificaciones_clientes",
-          filter: `cliente_id=eq.${clienteId}`,
-        },
-        () => {
-          cargarNotificaciones();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(canal);
-    };
-  }, [clienteId]);
-
-  const noLeidas = notificaciones.filter((n) => !n.leida).length;
-
-  const marcarComoLeida = async (notificacion: Notificacion) => {
-    if (!notificacion.leida) {
-      await supabase
-        .from("notificaciones_clientes")
-        .update({ leida: true })
-        .eq("id", notificacion.id);
-
-      setNotificaciones((actuales) =>
-        actuales.map((n) =>
-          n.id === notificacion.id ? { ...n, leida: true } : n
-        )
-      );
-    }
-
-    if (notificacion.url) {
-      window.location.href = notificacion.url;
-    }
-  };
-
-  const marcarTodasComoLeidas = async () => {
-    const { error } = await supabase
-      .from("notificaciones_clientes")
-      .update({ leida: true })
-      .eq("cliente_id", clienteId)
-      .eq("leida", false);
-
-    if (error) {
-      console.error("Error marcando notificaciones:", error);
+    if (!clienteId || !token) {
       return;
     }
 
-    setNotificaciones((actuales) =>
-      actuales.map((n) => ({
-        ...n,
-        leida: true,
-      }))
+    cargarNotificaciones();
+
+    /*
+     * Por ahora hacemos una actualización
+     * sencilla cada 30 segundos.
+     *
+     * Después podemos hacerlo instantáneo
+     * si lo necesitamos.
+     */
+    const intervalo =
+      window.setInterval(() => {
+        cargarNotificaciones();
+      }, 30000);
+
+    return () => {
+      window.clearInterval(
+        intervalo
+      );
+    };
+  }, [clienteId, token]);
+
+  useEffect(() => {
+    const cerrarAlHacerClickFuera = (
+      event: MouseEvent
+    ) => {
+      if (
+        contenedorRef.current &&
+        !contenedorRef.current.contains(
+          event.target as Node
+        )
+      ) {
+        setAbierto(false);
+      }
+    };
+
+    document.addEventListener(
+      "mousedown",
+      cerrarAlHacerClickFuera
     );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        cerrarAlHacerClickFuera
+      );
+    };
+  }, []);
+
+  const noLeidas =
+    notificaciones.filter(
+      (notificacion) =>
+        !notificacion.leida
+    ).length;
+
+  const marcarComoLeida = async (
+    notificacion: Notificacion
+  ) => {
+    if (!notificacion.leida) {
+      try {
+        const response = await fetch(
+          `/api/inventario/${encodeURIComponent(
+            token
+          )}/notificaciones`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              id: notificacion.id,
+            }),
+          }
+        );
+
+        const result =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !result.success
+        ) {
+          console.error(
+            "Error marcando notificación:",
+            result.error
+          );
+        } else {
+          setNotificaciones(
+            (actuales) =>
+              actuales.map(
+                (item) =>
+                  item.id ===
+                  notificacion.id
+                    ? {
+                        ...item,
+                        leida: true,
+                      }
+                    : item
+              )
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Error marcando notificación:",
+          error
+        );
+      }
+    }
+
+    if (notificacion.url) {
+      window.location.href =
+        notificacion.url;
+    }
   };
 
-  const formatearFecha = (fecha: string) => {
-    return new Intl.DateTimeFormat("es-MX", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(fecha));
+  const marcarTodasComoLeidas =
+    async () => {
+      try {
+        const response = await fetch(
+          `/api/inventario/${encodeURIComponent(
+            token
+          )}/notificaciones`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              marcarTodas: true,
+            }),
+          }
+        );
+
+        const result =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !result.success
+        ) {
+          console.error(
+            "Error marcando todas:",
+            result.error
+          );
+
+          return;
+        }
+
+        setNotificaciones(
+          (actuales) =>
+            actuales.map(
+              (item) => ({
+                ...item,
+                leida: true,
+              })
+            )
+        );
+      } catch (error) {
+        console.error(
+          "Error marcando todas:",
+          error
+        );
+      }
+    };
+
+  const formatearFecha = (
+    fecha: string
+  ) => {
+    const date =
+      new Date(fecha);
+
+    if (
+      Number.isNaN(
+        date.getTime()
+      )
+    ) {
+      return "";
+    }
+
+    return new Intl.DateTimeFormat(
+      "es-MX",
+      {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      }
+    ).format(date);
+  };
+
+  const obtenerIcono = (
+    tipo: string | null
+  ) => {
+    if (tipo === "inventario") {
+      return "📦";
+    }
+
+    if (tipo === "foto") {
+      return "📸";
+    }
+
+    if (tipo === "video") {
+      return "🎥";
+    }
+
+    if (tipo === "envio") {
+      return "🚚";
+    }
+
+    return "🔔";
   };
 
   return (
-    <div className="relative">
+    <div
+      ref={contenedorRef}
+      className="relative"
+    >
       <button
         type="button"
-        onClick={() => setAbierto(!abierto)}
-        className="relative flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-md transition hover:bg-gray-100"
+        onClick={() =>
+          setAbierto(
+            (actual) =>
+              !actual
+          )
+        }
+        className="relative flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white shadow-lg backdrop-blur transition hover:bg-white/20 sm:h-12 sm:w-12"
         aria-label="Notificaciones"
       >
-        <span className="text-2xl">🔔</span>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="h-6 w-6"
+          aria-hidden="true"
+        >
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+          <path d="M10 21h4" />
+        </svg>
 
         {noLeidas > 0 && (
-          <span className="absolute -right-1 -top-1 flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white">
-            {noLeidas > 99 ? "99+" : noLeidas}
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#0a3183] bg-red-500 px-1 text-[10px] font-black text-white shadow">
+            {noLeidas > 99
+              ? "99+"
+              : noLeidas}
           </span>
         )}
       </button>
 
       {abierto && (
-        <div className="absolute right-0 z-50 mt-3 w-[340px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl sm:w-[380px]">
-          <div className="flex items-center justify-between border-b px-4 py-3">
+        <div className="absolute right-0 top-14 z-[80] w-[330px] max-w-[calc(100vw-24px)] overflow-hidden rounded-[22px] border border-slate-200 bg-white text-slate-900 shadow-2xl sm:w-[390px]">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4">
             <div>
-              <h3 className="font-bold text-gray-900">Notificaciones</h3>
+              <p className="text-base font-black text-slate-900">
+                Notificaciones
+              </p>
 
-              {noLeidas > 0 && (
-                <p className="text-xs text-gray-500">
-                  {noLeidas} sin leer
-                </p>
-              )}
+              <p className="mt-0.5 text-xs font-semibold text-slate-400">
+                {noLeidas === 0
+                  ? "No tienes avisos nuevos"
+                  : `${noLeidas} sin leer`}
+              </p>
             </div>
 
             {noLeidas > 0 && (
               <button
                 type="button"
-                onClick={marcarTodasComoLeidas}
-                className="text-xs font-semibold text-blue-700 hover:underline"
+                onClick={
+                  marcarTodasComoLeidas
+                }
+                className="text-xs font-black text-[#0a3183] transition hover:text-blue-600"
               >
-                Marcar todas como leídas
+                Marcar leídas
               </button>
             )}
           </div>
 
-          <div className="max-h-[430px] overflow-y-auto">
+          <div className="max-h-[420px] overflow-y-auto">
             {cargando ? (
-              <div className="p-6 text-center text-sm text-gray-500">
-                Cargando...
-              </div>
-            ) : notificaciones.length === 0 ? (
-              <div className="p-8 text-center">
-                <div className="mb-2 text-4xl">🔔</div>
-                <p className="font-semibold text-gray-700">
-                  No tienes notificaciones
+              <div className="px-5 py-10 text-center">
+                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#0a3183]" />
+
+                <p className="mt-3 text-sm font-semibold text-slate-500">
+                  Cargando...
                 </p>
-                <p className="mt-1 text-sm text-gray-500">
-                  Aquí aparecerán las actualizaciones de tu mercancía.
+              </div>
+            ) : notificaciones.length ===
+              0 ? (
+              <div className="px-6 py-10 text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-2xl">
+                  🔔
+                </div>
+
+                <p className="mt-4 font-black text-slate-800">
+                  Todo está al día
+                </p>
+
+                <p className="mt-1 text-sm font-medium leading-5 text-slate-400">
+                  Aquí recibirás avisos cuando VIPACK actualice tu mercancía.
                 </p>
               </div>
             ) : (
-              notificaciones.map((notificacion) => (
-                <button
-                  key={notificacion.id}
-                  type="button"
-                  onClick={() => marcarComoLeida(notificacion)}
-                  className={`block w-full border-b px-4 py-4 text-left transition hover:bg-gray-50 ${
-                    !notificacion.leida ? "bg-blue-50" : "bg-white"
-                  }`}
-                >
-                  <div className="flex gap-3">
-                    <div className="mt-1 text-xl">
-                      {notificacion.tipo === "inventario" ? "📦" : "🔔"}
+              notificaciones.map(
+                (notificacion) => (
+                  <button
+                    key={
+                      notificacion.id
+                    }
+                    type="button"
+                    onClick={() =>
+                      marcarComoLeida(
+                        notificacion
+                      )
+                    }
+                    className={`flex w-full gap-3 border-b border-slate-100 px-4 py-4 text-left transition last:border-b-0 hover:bg-slate-50 ${
+                      !notificacion.leida
+                        ? "bg-blue-50/70"
+                        : "bg-white"
+                    }`}
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-xl shadow-sm">
+                      {obtenerIcono(
+                        notificacion.tipo
+                      )}
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2">
                         <p
-                          className={`text-sm ${
+                          className={`min-w-0 flex-1 text-sm leading-5 ${
                             !notificacion.leida
-                              ? "font-bold text-gray-900"
-                              : "font-semibold text-gray-700"
+                              ? "font-black text-slate-900"
+                              : "font-bold text-slate-700"
                           }`}
                         >
-                          {notificacion.titulo}
+                          {
+                            notificacion.titulo
+                          }
                         </p>
 
                         {!notificacion.leida && (
-                          <span className="mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-blue-600" />
+                          <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-600" />
                         )}
                       </div>
 
-                      <p className="mt-1 text-sm text-gray-600">
-                        {notificacion.mensaje}
+                      <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
+                        {
+                          notificacion.mensaje
+                        }
                       </p>
 
-                      <p className="mt-2 text-xs text-gray-400">
-                        {formatearFecha(notificacion.created_at)}
+                      <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                        {formatearFecha(
+                          notificacion.created_at
+                        )}
                       </p>
                     </div>
-                  </div>
-                </button>
-              ))
+                  </button>
+                )
+              )
             )}
           </div>
         </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import ClientNotificationBell from "@/components/ClientNotificationBell";
 
 type InventarioItem = {
   id: string;
@@ -598,8 +599,15 @@ export default function InventarioClientePage() {
                 </div>
               </div>
 
-              <div className="pointer-events-none absolute right-1 top-6 text-blue-100/55 sm:static sm:block sm:text-blue-100/80">
-                <IconoCaja className="h-16 w-16 sm:h-24 sm:w-24 lg:h-32 lg:w-32" />
+              <div className="absolute right-1 top-1 z-20 flex items-start gap-2 sm:static sm:gap-4">
+                <ClientNotificationBell
+                  clienteId={data.cliente?.id_cliente || 0}
+                  token={token}
+                />
+
+                <div className="pointer-events-none hidden text-blue-100/80 sm:block">
+                  <IconoCaja className="h-24 w-24 lg:h-32 lg:w-32" />
+                </div>
               </div>
             </div>
           </div>
