@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 const BATCH_SIZE = 30;
 
 /*
- * El cron de cron-job.org se ejecutará
+ * cron-job.org ejecutará este endpoint
  * cada 15 minutos.
  */
 const INTERVALO_MINUTOS = 15;
@@ -46,6 +46,7 @@ const supabaseAdmin =
 type ClienteInventario = {
   id_cliente: number;
   token_inventario: string | null;
+  onedrive_folder_id: string | null;
   activo: boolean;
 };
 
@@ -56,26 +57,12 @@ type ResultadoCliente = {
   error?: string;
 };
 
-/*
- * Calcula automáticamente qué grupo
- * de clientes corresponde revisar.
- *
- * Ejemplo con 20 clientes:
- *
- * 02:00 -> clientes 1-5
- * 02:15 -> clientes 6-10
- * 02:30 -> clientes 11-15
- * 02:45 -> clientes 16-20
- * 03:00 -> vuelve a clientes 1-5
- */
 function obtenerIndiceLote(
   totalLotes: number
 ) {
   if (totalLotes <= 1) {
     return 0;
   }
-
-  const ahora = Date.now();
 
   const intervaloMs =
     INTERVALO_MINUTOS *
@@ -84,7 +71,8 @@ function obtenerIndiceLote(
 
   const numeroIntervalo =
     Math.floor(
-      ahora / intervaloMs
+      Date.now() /
+        intervaloMs
     );
 
   return (
@@ -119,13 +107,6 @@ async function sincronizarCliente(
         request.nextUrl.origin
       );
 
-    /*
-     * Máximo 20 segundos por cliente.
-     *
-     * Como el lote corre en paralelo,
-     * no esperamos 20 segundos por
-     * cada cliente individualmente.
-     */
     const controller =
       new AbortController();
 
@@ -163,7 +144,8 @@ async function sincronizarCliente(
         result =
           await response.json();
       } catch {
-        result = null;
+        result =
+          null;
       }
 
       return {
@@ -277,7 +259,8 @@ export async function GET(
 
     /*
      * =========================
-     * 2. CONSULTAR CLIENTES
+     * 2. CONSULTAR SOLO
+     * CLIENTES CON INVENTARIO
      * =========================
      */
 
@@ -293,6 +276,7 @@ export async function GET(
         `
           id_cliente,
           token_inventario,
+          onedrive_folder_id,
           activo
         `
       )
@@ -304,6 +288,15 @@ export async function GET(
         "token_inventario",
         "is",
         null
+      )
+      .not(
+        "onedrive_folder_id",
+        "is",
+        null
+      )
+      .neq(
+        "onedrive_folder_id",
+        ""
       )
       .order(
         "id_cliente",
@@ -347,7 +340,7 @@ export async function GET(
         success: true,
 
         mensaje:
-          "No hay clientes activos para sincronizar.",
+          "No hay clientes activos con carpeta de OneDrive para sincronizar.",
 
         total_clientes: 0,
 
