@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import ClientNotificationBell from "@/components/ClientNotificationBell";
+import EnablePushNotifications from "@/components/EnablePushNotifications";
 
 type InventarioItem = {
   id: string;
@@ -686,6 +687,10 @@ export default function InventarioClientePage() {
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="mt-5 sm:mt-6">
+            <EnablePushNotifications token={token} />
           </div>
 
           <div className="mt-5 sm:mt-8">
