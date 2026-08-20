@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
+import webpush from "web-push";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,6 +37,170 @@ function crearFirmaInventario(items: any[]) {
   return createHash("sha256")
     .update(JSON.stringify(contenido))
     .digest("hex");
+}
+
+
+async function enviarPushCliente({
+  supabase,
+  clienteId,
+  token,
+  mensaje,
+}: {
+  supabase: any;
+  clienteId: number;
+  token: string;
+  mensaje: string;
+}) {
+  try {
+    const vapidPublicKey =
+      process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+
+    const vapidPrivateKey =
+      process.env.VAPID_PRIVATE_KEY;
+
+    const vapidSubject =
+      process.env.VAPID_SUBJECT;
+
+    /*
+     * Si todavía falta alguna variable VAPID,
+     * no rompemos el inventario ni la campanita.
+     */
+    if (
+      !vapidPublicKey ||
+      !vapidPrivateKey ||
+      !vapidSubject
+    ) {
+      console.warn(
+        "Push omitido: faltan variables VAPID."
+      );
+      return;
+    }
+
+    webpush.setVapidDetails(
+      vapidSubject,
+      vapidPublicKey,
+      vapidPrivateKey
+    );
+
+    const {
+      data: suscripciones,
+      error: suscripcionesError,
+    } = await supabase
+      .from("push_subscriptions")
+      .select(
+        "id, endpoint, p256dh, auth, activo"
+      )
+      .eq("cliente_id", clienteId)
+      .eq("activo", true);
+
+    if (suscripcionesError) {
+      console.warn(
+        "No se pudieron consultar las suscripciones push:",
+        suscripcionesError.message
+      );
+      return;
+    }
+
+    if (
+      !Array.isArray(suscripciones) ||
+      suscripciones.length === 0
+    ) {
+      return;
+    }
+
+    const payload = JSON.stringify({
+      title: "VIPACK Envíos",
+      body: mensaje,
+      url: `/inventario/${encodeURIComponent(
+        token
+      )}`,
+      icon: "/vipack-logo.jpg",
+      badge: "/vipack-logo.jpg",
+      tag: `vipack-inventario-${clienteId}`,
+    });
+
+    await Promise.all(
+      suscripciones.map(
+        async (suscripcion: any) => {
+          try {
+            await webpush.sendNotification(
+              {
+                endpoint:
+                  suscripcion.endpoint,
+                keys: {
+                  p256dh:
+                    suscripcion.p256dh,
+                  auth:
+                    suscripcion.auth,
+                },
+              },
+              payload,
+              {
+                TTL: 60 * 60,
+              }
+            );
+          } catch (error: any) {
+            const statusCode =
+              Number(
+                error?.statusCode ||
+                  error?.status ||
+                  0
+              );
+
+            /*
+             * 404 / 410 significa que el navegador
+             * eliminó o venció esa suscripción.
+             * La desactivamos para no seguir
+             * intentando enviarle notificaciones.
+             */
+            if (
+              statusCode === 404 ||
+              statusCode === 410
+            ) {
+              const {
+                error: desactivarError,
+              } = await supabase
+                .from(
+                  "push_subscriptions"
+                )
+                .update({
+                  activo: false,
+                  updated_at:
+                    new Date().toISOString(),
+                })
+                .eq(
+                  "id",
+                  suscripcion.id
+                );
+
+              if (desactivarError) {
+                console.warn(
+                  "No se pudo desactivar una suscripción vencida:",
+                  desactivarError.message
+                );
+              }
+
+              return;
+            }
+
+            console.error(
+              "Error enviando Web Push:",
+              error
+            );
+          }
+        }
+      )
+    );
+  } catch (error) {
+    /*
+     * El push nunca debe impedir que el
+     * inventario o la campanita funcionen.
+     */
+    console.error(
+      "Error general enviando push:",
+      error
+    );
+  }
 }
 
 async function sincronizarNotificacionInventario({
@@ -223,7 +388,21 @@ async function sincronizarNotificacionInventario({
         "No se pudo crear la notificación del inventario:",
         notificacionError.message
       );
+      return;
     }
+
+    /*
+     * La campanita ya quedó guardada.
+     * Ahora enviamos el mismo aviso a todos
+     * los celulares/navegadores activos
+     * registrados por este cliente.
+     */
+    await enviarPushCliente({
+      supabase,
+      clienteId,
+      token,
+      mensaje,
+    });
   } catch (error) {
     /*
      * Las notificaciones nunca deben impedir
