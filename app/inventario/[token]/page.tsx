@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import ClientNotificationBell from "@/components/ClientNotificationBell";
 import EnablePushNotifications from "@/components/EnablePushNotifications";
 
@@ -302,6 +302,19 @@ export default function InventarioClientePage() {
       ? params.token[0]
       : "";
 
+  const searchParams =
+    useSearchParams();
+
+  const archivoSolicitado =
+    searchParams.get("archivo") || "";
+
+  /*
+   * Evita volver a abrir automáticamente la misma
+   * evidencia si el cliente ya cerró la galería.
+   */
+  const archivoAbiertoRef =
+    useRef<string>("");
+
   const [data, setData] =
     useState<InventarioResponse | null>(null);
 
@@ -433,6 +446,79 @@ export default function InventarioClientePage() {
   }, [
     data?.cliente?.id_cliente,
     mesesDisponibles.join("|"),
+  ]);
+
+  /*
+   * Si la página fue abierta desde una notificación con
+   * ?archivo=ID, localizamos esa evidencia, cambiamos al
+   * mes correcto y abrimos directamente la galería.
+   */
+  useEffect(() => {
+    if (
+      !archivoSolicitado ||
+      imagenes.length === 0 ||
+      archivoAbiertoRef.current ===
+        archivoSolicitado
+    ) {
+      return;
+    }
+
+    const indiceGlobal =
+      imagenes.findIndex(
+        (item) =>
+          item.id ===
+          archivoSolicitado
+      );
+
+    if (indiceGlobal < 0) {
+      return;
+    }
+
+    const imagenObjetivo =
+      imagenes[indiceGlobal];
+
+    const mesObjetivo =
+      obtenerClaveMes(
+        imagenObjetivo.modificado
+      );
+
+    const mesParaAbrir =
+      mesObjetivo || "todos";
+
+    const listaObjetivo =
+      mesParaAbrir === "todos"
+        ? imagenes
+        : imagenes.filter(
+            (item) =>
+              obtenerClaveMes(
+                item.modificado
+              ) === mesParaAbrir
+          );
+
+    const indiceObjetivo =
+      listaObjetivo.findIndex(
+        (item) =>
+          item.id ===
+          archivoSolicitado
+      );
+
+    if (indiceObjetivo < 0) {
+      return;
+    }
+
+    archivoAbiertoRef.current =
+      archivoSolicitado;
+
+    setMesActivo(
+      mesParaAbrir
+    );
+
+    setFotoActiva(
+      indiceObjetivo
+    );
+  }, [
+    archivoSolicitado,
+    imagenes,
   ]);
 
   const cambiarMes = (mes: string) => {

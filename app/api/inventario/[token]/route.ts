@@ -52,12 +52,14 @@ async function enviarPushCliente({
   token,
   titulo,
   mensaje,
+  urlDestino,
 }: {
   supabase: any;
   clienteId: number;
   token: string;
   titulo: string;
   mensaje: string;
+  urlDestino: string;
 }): Promise<ResultadoPush> {
   const resultado: ResultadoPush = {
     intentados: 0,
@@ -151,9 +153,7 @@ async function enviarPushCliente({
          * el cliente abre directamente
          * SU inventario.
          */
-        url: `/inventario/${encodeURIComponent(
-          token
-        )}`,
+        url: urlDestino,
 
         icon: "/vipack-logo.jpg",
         badge: "/vipack-logo.jpg",
@@ -430,6 +430,21 @@ async function sincronizarNotificacionInventario({
     const cantidad =
       nuevosIds.length;
 
+    /*
+     * Abrimos directamente la primera evidencia nueva.
+     * Si llegaron varias juntas, desde la galería el cliente
+     * podrá avanzar a las demás.
+     */
+    const archivoDestino =
+      nuevosIds[0];
+
+    const urlDestino =
+      `/inventario/${encodeURIComponent(
+        token
+      )}?archivo=${encodeURIComponent(
+        archivoDestino
+      )}`;
+
     const titulo =
       "Nueva mercancía en tu inventario";
 
@@ -448,9 +463,7 @@ async function sincronizarNotificacionInventario({
         titulo,
         mensaje,
         tipo: "inventario",
-        url: `/inventario/${encodeURIComponent(
-          token
-        )}`,
+        url: urlDestino,
         leida: false,
       })
       .select("id")
@@ -476,6 +489,7 @@ async function sincronizarNotificacionInventario({
         token,
         titulo,
         mensaje,
+        urlDestino,
       });
 
     console.log(
@@ -487,6 +501,8 @@ async function sincronizarNotificacionInventario({
           null,
         archivosNuevos:
           cantidad,
+        archivoDestino,
+        urlDestino,
         push:
           resultadoPush,
       }
