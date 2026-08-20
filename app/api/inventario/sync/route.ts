@@ -9,11 +9,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const BATCH_SIZE = 30;
-
-/*
- * cron-job.org ejecutará este endpoint
- * cada 15 minutos.
- */
 const INTERVALO_MINUTOS = 15;
 
 const supabaseUrl =
@@ -123,13 +118,9 @@ async function sincronizarCliente(
           url,
           {
             method: "GET",
-
-            cache:
-              "no-store",
-
+            cache: "no-store",
             signal:
               controller.signal,
-
             headers: {
               "User-Agent":
                 "VIPACK-Inventory-Sync/1.0",
@@ -184,9 +175,7 @@ async function sincronizarCliente(
       return {
         id_cliente:
           cliente.id_cliente,
-
         success: false,
-
         error:
           "Tiempo de espera agotado al sincronizar este cliente.",
       };
@@ -195,9 +184,7 @@ async function sincronizarCliente(
     return {
       id_cliente:
         cliente.id_cliente,
-
       success: false,
-
       error:
         error instanceof Error
           ? error.message
@@ -212,7 +199,7 @@ export async function GET(
   try {
     /*
      * =========================
-     * 1. SEGURIDAD DEL CRON
+     * 1. SEGURIDAD
      * =========================
      */
 
@@ -259,8 +246,47 @@ export async function GET(
 
     /*
      * =========================
-     * 2. CONSULTAR SOLO
-     * CLIENTES CON INVENTARIO
+     * 2. CLIENTE FORZADO
+     * =========================
+     */
+
+    const clienteForzadoParam =
+      request.nextUrl.searchParams.get(
+        "cliente"
+      );
+
+    const clienteForzado =
+      clienteForzadoParam
+        ? Number(
+            clienteForzadoParam
+          )
+        : null;
+
+    if (
+      clienteForzadoParam &&
+      (
+        !Number.isInteger(
+          clienteForzado
+        ) ||
+        !clienteForzado ||
+        clienteForzado <= 0
+      )
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "El parámetro cliente no es válido.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    /*
+     * =========================
+     * 3. CONSULTAR CLIENTES
      * =========================
      */
 
@@ -314,10 +340,8 @@ export async function GET(
       return NextResponse.json(
         {
           success: false,
-
           error:
             "No se pudieron consultar los clientes.",
-
           detalle:
             clientesError.message,
         },
@@ -338,21 +362,74 @@ export async function GET(
     ) {
       return NextResponse.json({
         success: true,
-
         mensaje:
           "No hay clientes activos con carpeta de OneDrive para sincronizar.",
-
         total_clientes: 0,
-
         procesados: 0,
-
         resultados: [],
       });
     }
 
     /*
      * =========================
-     * 3. DIVIDIR EN LOTES
+     * 4. MODO CLIENTE FORZADO
+     * =========================
+     */
+
+    if (
+      clienteForzado &&
+      Number.isInteger(
+        clienteForzado
+      ) &&
+      clienteForzado > 0
+    ) {
+      const cliente =
+        clientes.find(
+          (item) =>
+            item.id_cliente ===
+            clienteForzado
+        );
+
+      if (!cliente) {
+        return NextResponse.json(
+          {
+            success: false,
+            modo:
+              "cliente_forzado",
+            cliente:
+              clienteForzado,
+            error:
+              "Cliente no encontrado, inactivo o sin carpeta de OneDrive vinculada.",
+          },
+          {
+            status: 404,
+          }
+        );
+      }
+
+      const resultado =
+        await sincronizarCliente(
+          request,
+          cliente
+        );
+
+      return NextResponse.json({
+        success:
+          resultado.success,
+
+        modo:
+          "cliente_forzado",
+
+        cliente:
+          clienteForzado,
+
+        resultado,
+      });
+    }
+
+    /*
+     * =========================
+     * 5. DIVIDIR EN LOTES
      * =========================
      */
 
@@ -383,7 +460,7 @@ export async function GET(
 
     /*
      * =========================
-     * 4. SINCRONIZAR EN PARALELO
+     * 6. SINCRONIZAR EN PARALELO
      * =========================
      */
 
@@ -400,7 +477,7 @@ export async function GET(
 
     /*
      * =========================
-     * 5. RESULTADOS
+     * 7. RESULTADOS
      * =========================
      */
 
@@ -458,7 +535,6 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-
         error:
           error instanceof Error
             ? error.message
