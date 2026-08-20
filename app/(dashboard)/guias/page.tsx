@@ -58,9 +58,16 @@ export default function GuiasPage() {
       .replace(/[\u0300-\u036f]/g, "")
       .toUpperCase();
 
+    /*
+     * ESTAFETA:
+     * En las etiquetas reales el logotipo puede no formar parte
+     * del texto extraído por PDF.js, pero sí aparecen frases como
+     * "Código de Rastreo" y "CONFIRMACION".
+     */
     if (
       fuente.includes("ESTAFETA") ||
-      fuente.includes("ESTAFETA USA")
+      fuente.includes("CODIGO DE RASTREO") ||
+      fuente.includes("CONFIRMACION")
     ) {
       return "ESTAFETA";
     }
@@ -74,7 +81,8 @@ export default function GuiasPage() {
 
     if (
       fuente.includes("DHL") ||
-      fuente.includes("DHL EXPRESS")
+      fuente.includes("DHL EXPRESS") ||
+      fuente.includes("WAYBILL")
     ) {
       return "DHL";
     }
@@ -82,29 +90,80 @@ export default function GuiasPage() {
     return "";
   };
 
-  const extraerTelefonoPDF = (textoPDF: string) => {
-    const patrones = [
-      /(?:TEL(?:EFONO)?|TELÉFONO|PHONE|CEL(?:ULAR)?|WHATSAPP)\s*[:#.-]?\s*(?:\+?52\s*)?(?:1\s*)?(\d[\d\s().-]{8,18}\d)/i,
-      /(?:\+?52\s*)?(?:1\s*)?(\d{10})\b/,
-    ];
+  const extraerTelefonoDestinatario = (
+    textoPDF: string
+  ) => {
+    const texto = String(textoPDF || "")
+      .replace(/\u00a0/g, " ")
+      .replace(/\s+/g, " ");
 
-    for (const patron of patrones) {
-      const match = textoPDF.match(patron);
+    /*
+     * Las etiquetas reales de Estafeta traen primero el teléfono
+     * del remitente (ej. CEL: 663... TEL: 663...) y más adelante
+     * el teléfono del DESTINATARIO como "cel.222..." o
+     * "cel.722 362 4729".
+     *
+     * Por eso tomamos la ÚLTIMA coincidencia "cel".
+     */
+    const matches = Array.from(
+      texto.matchAll(
+        /\bCEL(?:ULAR)?\.?\s*[:.-]?\s*(\d[\d\s().-]{8,18}\d)/gi
+      )
+    );
 
-      if (!match?.[1]) continue;
+    for (let i = matches.length - 1; i >= 0; i--) {
+      const candidato =
+        limpiarSoloDigitos(matches[i][1]);
 
-      let telefono = limpiarSoloDigitos(match[1]);
-
-      if (telefono.length === 12 && telefono.startsWith("52")) {
-        telefono = telefono.slice(2);
+      if (candidato.length === 10) {
+        return candidato;
       }
 
-      if (telefono.length === 13 && telefono.startsWith("521")) {
-        telefono = telefono.slice(3);
+      if (
+        candidato.length === 12 &&
+        candidato.startsWith("52")
+      ) {
+        return candidato.slice(2);
       }
 
-      if (telefono.length === 10) {
-        return telefono;
+      if (
+        candidato.length === 13 &&
+        candidato.startsWith("521")
+      ) {
+        return candidato.slice(3);
+      }
+    }
+
+    /*
+     * Respaldo: buscar PHONE/TELÉFONO/WHATSAPP,
+     * pero evitar el teléfono corporativo/remitente si se puede.
+     */
+    const alternos = Array.from(
+      texto.matchAll(
+        /(?:TEL(?:EFONO)?|TELÉFONO|PHONE|WHATSAPP)\s*[:#.-]?\s*(?:\+?52\s*)?(?:1\s*)?(\d[\d\s().-]{8,18}\d)/gi
+      )
+    );
+
+    for (let i = alternos.length - 1; i >= 0; i--) {
+      let candidato =
+        limpiarSoloDigitos(alternos[i][1]);
+
+      if (
+        candidato.length === 12 &&
+        candidato.startsWith("52")
+      ) {
+        candidato = candidato.slice(2);
+      }
+
+      if (
+        candidato.length === 13 &&
+        candidato.startsWith("521")
+      ) {
+        candidato = candidato.slice(3);
+      }
+
+      if (candidato.length === 10) {
+        return candidato;
       }
     }
 
@@ -122,7 +181,6 @@ export default function GuiasPage() {
     if (!guia || !/^\d+$/.test(guia)) return false;
     if (telefono && guia === telefono) return false;
 
-    // Evitar teléfonos mexicanos que aparezcan en la etiqueta.
     if (
       guia.length === 12 &&
       guia.startsWith("52")
@@ -148,13 +206,12 @@ export default function GuiasPage() {
       );
     }
 
+    /*
+     * En las etiquetas reales de Estafeta que revisamos,
+     * "Código de Rastreo" usa 10 dígitos.
+     */
     if (paqueteria === "ESTAFETA") {
-      return (
-        guia.length === 10 ||
-        guia.length === 12 ||
-        guia.length === 20 ||
-        guia.length === 22
-      );
+      return guia.length === 10;
     }
 
     return guia.length >= 8 && guia.length <= 30;
@@ -165,7 +222,7 @@ export default function GuiasPage() {
     paqueteria: string,
     telefono: string
   ) => {
-    const texto = textoPDF
+    const texto = String(textoPDF || "")
       .replace(/\u00a0/g, " ")
       .replace(/\s+/g, " ");
 
@@ -196,9 +253,17 @@ export default function GuiasPage() {
     };
 
     /*
-     * Primero buscamos por etiquetas, porque es
-     * mucho más seguro que tomar cualquier número.
+     * REGLA PRINCIPAL ESTAFETA REAL:
+     *
+     * Código de Rastreo: 3455849102
+     *
+     * Un solo PDF puede tener varias páginas y cada página
+     * puede traer una guía distinta. matchAll obtiene TODAS.
      */
+    agregarMatches(
+      /C[ÓO]DIGO\s+DE\s+RASTREO\s*[:#.-]?\s*([0-9][0-9\s-]{8,20}[0-9])/gi
+    );
+
     if (paqueteria === "DHL") {
       agregarMatches(
         /(?:WAYBILL|AWB|TRACKING\s*(?:NO|NUMBER|#)?|GUIA|GU[IÍ]A)\s*[:#.-]?\s*([\d\s-]{8,24})/gi
@@ -207,7 +272,7 @@ export default function GuiasPage() {
 
     if (paqueteria === "ESTAFETA") {
       agregarMatches(
-        /(?:NO\.?\s*DE\s*GUIA|NO\.?\s*DE\s*GU[IÍ]A|GUIA|GU[IÍ]A|RASTREO|TRACKING|CONFIRMACION|CONFIRMACI[ÓO]N)\s*[:#.-]?\s*([\d\s-]{8,32})/gi
+        /(?:NO\.?\s*DE\s*GUIA|NO\.?\s*DE\s*GU[IÍ]A|GUIA|GU[IÍ]A|RASTREO|TRACKING)\s*[:#.-]?\s*([\d\s-]{8,24})/gi
       );
     }
 
@@ -218,14 +283,17 @@ export default function GuiasPage() {
     }
 
     /*
-     * Fallback por formato típico de cada paquetería.
-     * Solo se usa si no encontramos nada por etiqueta.
+     * Fallback por longitud, SOLO si las etiquetas no dieron nada.
      */
     if (candidatos.length === 0) {
-      if (paqueteria === "DHL") {
+      if (
+        paqueteria === "DHL" ||
+        paqueteria === "ESTAFETA"
+      ) {
         const encontrados =
-          texto.match(/(?<!\d)\d{10}(?!\d)/g) ||
-          [];
+          texto.match(
+            /(?<!\d)\d{10}(?!\d)/g
+          ) || [];
 
         candidatos.push(
           ...encontrados.filter((guia) =>
@@ -242,23 +310,6 @@ export default function GuiasPage() {
         const encontrados =
           texto.match(
             /(?<!\d)(?:\d{12}|\d{15})(?!\d)/g
-          ) || [];
-
-        candidatos.push(
-          ...encontrados.filter((guia) =>
-            guiaValida(
-              guia,
-              paqueteria,
-              telefono
-            )
-          )
-        );
-      }
-
-      if (paqueteria === "ESTAFETA") {
-        const encontrados =
-          texto.match(
-            /(?<!\d)(?:\d{10}|\d{12}|\d{20}|\d{22})(?!\d)/g
           ) || [];
 
         candidatos.push(
@@ -394,7 +445,7 @@ export default function GuiasPage() {
           }
 
           const telefono =
-            extraerTelefonoPDF(
+            extraerTelefonoDestinatario(
               textoPDF
             );
 
