@@ -215,32 +215,50 @@ function obtenerSubstatus(
 }
 
 /*
- * CONSULTAR UNA GUÍA EN TRACKINGMORE V4
+ * CONSULTAR UNA GUÍA YA REGISTRADA EN TRACKINGMORE V4
  *
- * En API V4, create-a-tracking funciona
- * como create & get para una sola guía.
+ * /trackings/get usa los parámetros oficiales:
+ * tracking_numbers y courier_code.
  */
 async function consultarTrackingMore(
   apiKey: string,
   guia: string,
   courierCode: string
 ) {
+  const trackingUrl = new URL(
+    "https://api.trackingmore.com/v4/trackings/get"
+  );
+
+  trackingUrl.searchParams.set(
+    "tracking_numbers",
+    guia
+  );
+
+  trackingUrl.searchParams.set(
+    "courier_code",
+    courierCode
+  );
+
+  trackingUrl.searchParams.set(
+    "items_amount",
+    "10"
+  );
+
+  trackingUrl.searchParams.set(
+    "pages_amount",
+    "1"
+  );
+
   const response = await fetch(
-    "https://api.trackingmore.com/v4/trackings/create",
+    trackingUrl.toString(),
     {
-      method: "POST",
+      method: "GET",
 
       headers: {
         Accept: "application/json",
-        "Content-Type":
-          "application/json",
+        "Content-Type": "application/json",
         "Tracking-Api-Key": apiKey,
       },
-
-      body: JSON.stringify({
-        tracking_number: guia,
-        courier_code: courierCode,
-      }),
 
       cache: "no-store",
     }
@@ -263,23 +281,34 @@ async function consultarTrackingMore(
     };
   }
 
-  /*
-   * HTTP exitoso.
-   */
-  if (response.ok) {
-    const tracking =
-      extraerTracking(data);
+  if (!response.ok) {
+    return {
+      ok: false,
+      tipo: "error_trackingmore",
+      httpStatus: response.status,
+      data,
+    };
+  }
 
-    if (tracking) {
-      return {
-        ok: true,
-        tipo: "tracking",
-        httpStatus: response.status,
-        data,
-        tracking,
-      };
-    }
+  const metaCode =
+    Number(data?.meta?.code || 0);
 
+  if (
+    metaCode &&
+    metaCode !== 200
+  ) {
+    return {
+      ok: false,
+      tipo: "error_trackingmore",
+      httpStatus: response.status,
+      data,
+    };
+  }
+
+  const tracking =
+    extraerTracking(data);
+
+  if (!tracking) {
     return {
       ok: false,
       tipo: "sin_tracking",
@@ -288,62 +317,12 @@ async function consultarTrackingMore(
     };
   }
 
-  /*
-   * Si TrackingMore responde que ya existe,
-   * lo dejamos claramente identificado.
-   *
-   * Esto nos permitirá saber exactamente
-   * qué devuelve la cuenta/API en producción
-   * sin confundirlo con otro error.
-   */
-  const metaCode =
-    Number(data?.meta?.code || 0);
-
-  const metaMessage =
-    String(
-      data?.meta?.message || ""
-    ).toLowerCase();
-
-  const yaExiste =
-    metaCode === 4016 ||
-    metaMessage.includes(
-      "already exists"
-    ) ||
-    metaMessage.includes("exist");
-
-  if (yaExiste) {
-    /*
-     * Algunas respuestas pueden incluir
-     * información del tracking aun cuando
-     * indican que ya existía.
-     */
-    const tracking =
-      extraerTracking(data);
-
-    if (tracking) {
-      return {
-        ok: true,
-        tipo:
-          "tracking_existente_con_datos",
-        httpStatus: response.status,
-        data,
-        tracking,
-      };
-    }
-
-    return {
-      ok: false,
-      tipo: "tracking_ya_existia",
-      httpStatus: response.status,
-      data,
-    };
-  }
-
   return {
-    ok: false,
-    tipo: "error_trackingmore",
+    ok: true,
+    tipo: "tracking",
     httpStatus: response.status,
     data,
+    tracking,
   };
 }
 
