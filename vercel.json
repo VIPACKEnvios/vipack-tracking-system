@@ -3,6 +3,10 @@
     {
       "path": "/api/trackingmore/sync",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/inventario/sync",
+      "schedule": "0 * * * *"
     }
   ]
 }
