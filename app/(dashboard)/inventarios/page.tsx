@@ -843,15 +843,21 @@ export default function InventariosAdminPage() {
         cliente
       );
 
-    const mensajeWhatsApp = `*VIPACK Envíos*
+    const mensajeWhatsApp = `*VIPACK Envíos 📦*
 
-Hola ${cliente.nombre}
+Hola *${cliente.nombre}* 👋
 
-Ya puedes consultar tu inventario y las evidencias de tus paquetes desde el siguiente enlace:
+Ya puedes consultar tu *inventario y las evidencias de tus paquetes* desde el siguiente enlace:
 
 ${url}
 
-Este enlace es personal. Te recomendamos conservarlo para consultar tus evidencias cuando lo necesites.`;
+🔔 *¡Nuevo! Ya puedes activar las notificaciones.*
+Al ingresar a tu inventario, activa las notificaciones para recibir avisos de *nuevas recolecciones y actualizaciones de tu inventario*.
+
+🔐 Este enlace es *personal*. Te recomendamos conservarlo para consultar tus evidencias cuando lo necesites.
+
+*VIPACK Envíos*
+Tu mercancía, siempre más cerca de ti.`;
 
     const whatsappUrl =
       `https://wa.me/?text=${encodeURIComponent(
