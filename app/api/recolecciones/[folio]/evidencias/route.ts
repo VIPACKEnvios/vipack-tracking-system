@@ -690,15 +690,165 @@ async function obtenerIdCarpetaPorRuta(
   return id;
 }
 
+async function listarArchivosCarpeta(
+  accessToken: string,
+  ruta: string
+): Promise<ArchivoOneDrive[]> {
+  const url =
+    `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
+      ruta
+    )}:/children?$select=id,name,size,file,webUrl,lastModifiedDateTime&$top=999`;
+
+  const response =
+    await fetch(
+      url,
+      {
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+        },
+
+        cache:
+          "no-store",
+      }
+    );
+
+  if (
+    response.status === 404
+  ) {
+    return [];
+  }
+
+  const data =
+    await leerJsonSeguro(
+      response
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      data?.error?.message ||
+        `No se pudo leer la carpeta ${ruta}.`
+    );
+  }
+
+  const items =
+    Array.isArray(
+      data?.value
+    )
+      ? data.value
+      : [];
+
+  return items
+    .filter(
+      (
+        item: any
+      ) =>
+        Boolean(
+          item?.file
+        )
+    )
+    .map(
+      (
+        item: any
+      ): ArchivoOneDrive => ({
+        id:
+          String(
+            item.id || ""
+          ),
+
+        nombre:
+          String(
+            item.name || ""
+          ),
+
+        tamaño:
+          Number(
+            item.size || 0
+          ),
+
+        webUrl:
+          item.webUrl
+            ? String(
+                item.webUrl
+              )
+            : null,
+
+        modificado:
+          item.lastModifiedDateTime
+            ? String(
+                item.lastModifiedDateTime
+              )
+            : null,
+      })
+    );
+}
+
+function perteneceAlFolio(
+  nombre: string,
+  folio: string
+) {
+  return nombre
+    .toLowerCase()
+    .startsWith(
+      folio.toLowerCase()
+    );
+}
+
+
 async function buscarFotosPorFolio(
   accessToken: string,
   folio: string
 ): Promise<ArchivoOneDrive[]> {
   /*
-   * Microsoft Graph busca de forma
-   * recursiva dentro de "Recoleccion por cliente".
-   * Esto permite encontrar fotos antiguas y nuevas
-   * aunque estén dentro de carpetas distintas.
+   * Primero leemos la carpeta exacta del cliente.
+   * Esto refleja una foto nueva inmediatamente y
+   * evita esperar al índice de búsqueda de Graph.
+   */
+  try {
+    const destino =
+      await resolverRutaFotosCliente(
+        accessToken,
+        folio
+      );
+
+    const archivosCliente =
+      await listarArchivosCarpeta(
+        accessToken,
+        destino.ruta
+      );
+
+    const directos =
+      archivosCliente.filter(
+        (
+          archivo:
+            ArchivoOneDrive
+        ) =>
+          perteneceAlFolio(
+            archivo.nombre,
+            folio
+          )
+      );
+
+    if (
+      directos.length > 0
+    ) {
+      return directos;
+    }
+  } catch (
+    error: unknown
+  ) {
+    console.warn(
+      "Lectura directa de carpeta no disponible; usando búsqueda histórica:",
+      error instanceof Error
+        ? error.message
+        : error
+    );
+  }
+
+  /*
+   * Respaldo para archivos históricos:
+   * búsqueda recursiva dentro de todas las
+   * carpetas de "Recoleccion por cliente".
    */
   const carpetaId =
     await obtenerIdCarpetaPorRuta(
@@ -790,99 +940,6 @@ async function buscarFotosPorFolio(
               )
             : null,
       })
-    );
-}
-
-
-async function listarArchivosCarpeta(
-  accessToken: string,
-  ruta: string
-): Promise<ArchivoOneDrive[]> {
-  const url =
-    `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
-      ruta
-    )}:/children?$select=id,name,size,file,webUrl,lastModifiedDateTime&$top=999`;
-
-  const response =
-    await fetch(
-      url,
-      {
-        headers: {
-          Authorization:
-            `Bearer ${accessToken}`,
-        },
-
-        cache:
-          "no-store",
-      }
-    );
-
-  if (
-    response.status === 404
-  ) {
-    return [];
-  }
-
-  const data =
-    await leerJsonSeguro(
-      response
-    );
-
-  if (!response.ok) {
-    throw new Error(
-      data?.error?.message ||
-        `No se pudo leer la carpeta ${ruta}.`
-    );
-  }
-
-  const items =
-    Array.isArray(
-      data?.value
-    )
-      ? data.value
-      : [];
-
-  return items
-    .filter(
-      (item: any) =>
-        Boolean(
-          item?.file
-        )
-    )
-    .map(
-      (item: any): ArchivoOneDrive => ({
-        id:
-          String(item.id || ""),
-
-        nombre:
-          String(item.name || ""),
-
-        tamaño:
-          Number(item.size || 0),
-
-        webUrl:
-          item.webUrl
-            ? String(item.webUrl)
-            : null,
-
-        modificado:
-          item.lastModifiedDateTime
-            ? String(
-                item.lastModifiedDateTime
-              )
-            : null,
-      })
-    );
-}
-
-function perteneceAlFolio(
-  nombre: string,
-  folio: string
-) {
-  return nombre
-    .toLowerCase()
-    .startsWith(
-      folio.toLowerCase()
     );
 }
 

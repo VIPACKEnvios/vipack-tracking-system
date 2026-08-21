@@ -3357,6 +3357,11 @@ function Detalle({
   ] = useState("");
 
   const [
+    mensajeEvidencias,
+    setMensajeEvidencias,
+  ] = useState("");
+
+  const [
     visor,
     setVisor,
   ] = useState<{
@@ -3465,6 +3470,7 @@ function Detalle({
     try {
       setSubiendoTipo(tipo);
       setErrorEvidencias("");
+      setMensajeEvidencias("");
 
       const formData =
         new FormData();
@@ -3500,6 +3506,18 @@ function Detalle({
         (await response.json()) as {
           success?: boolean;
           error?: string;
+          agregados?: number;
+          archivos?: Array<{
+            id?: string;
+            nombre?: string;
+            tamaño?: number;
+            webUrl?: string | null;
+          }>;
+          destino?: {
+            cliente?: string | null;
+            carpeta?: string | null;
+            ruta?: string;
+          };
         };
 
       if (
@@ -3512,10 +3530,125 @@ function Detalle({
         );
       }
 
-      await cargarEvidencias();
+      const nuevos:
+        EvidenciaArchivo[] =
+        Array.isArray(
+          data.archivos
+        )
+          ? data.archivos
+              .filter(
+                (archivo) =>
+                  Boolean(
+                    archivo?.id &&
+                    archivo?.nombre
+                  )
+              )
+              .map(
+                (archivo) => ({
+                  id:
+                    String(
+                      archivo.id
+                    ),
+
+                  nombre:
+                    String(
+                      archivo.nombre
+                    ),
+
+                  tamaño:
+                    Number(
+                      archivo.tamaño ||
+                      0
+                    ),
+
+                  webUrl:
+                    archivo.webUrl
+                      ? String(
+                          archivo.webUrl
+                        )
+                      : null,
+
+                  modificado:
+                    new Date()
+                      .toISOString(),
+                })
+              )
+          : [];
+
+      /*
+       * Mostrar de inmediato sin esperar
+       * a volver a consultar OneDrive.
+       */
+      if (
+        tipo === "nota"
+      ) {
+        setNotas(
+          (actuales) => [
+            ...actuales,
+            ...nuevos.filter(
+              (nuevo) =>
+                !actuales.some(
+                  (actual) =>
+                    actual.id ===
+                    nuevo.id
+                )
+            ),
+          ]
+        );
+      } else {
+        setFotos(
+          (actuales) => [
+            ...actuales,
+            ...nuevos.filter(
+              (nuevo) =>
+                !actuales.some(
+                  (actual) =>
+                    actual.id ===
+                    nuevo.id
+                )
+            ),
+          ]
+        );
+      }
+
+      const cantidad =
+        data.agregados ??
+        nuevos.length;
+
+      setMensajeEvidencias(
+        tipo === "nota"
+          ? `✓ ${
+              cantidad === 1
+                ? "Nota subida correctamente."
+                : `${cantidad} notas subidas correctamente.`
+            }`
+          : `✓ ${
+              cantidad === 1
+                ? "Foto subida correctamente"
+                : `${cantidad} fotos subidas correctamente`
+            }${
+              data.destino?.cliente
+                ? ` en la carpeta de ${data.destino.cliente}.`
+                : "."
+            }`
+      );
+
+      /*
+       * Verificación secundaria. El backend
+       * ya consulta primero la carpeta exacta,
+       * así que el contador debe mantenerse.
+       */
+      window.setTimeout(
+        () => {
+          void cargarEvidencias();
+        },
+        1200
+      );
     } catch (
       error: unknown
     ) {
+      setMensajeEvidencias("");
+
       setErrorEvidencias(
         error instanceof Error
           ? error.message
@@ -3930,6 +4063,27 @@ function Detalle({
               {errorEvidencias && (
                 <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
                   {errorEvidencias}
+                </div>
+              )}
+
+              {mensajeEvidencias && (
+                <div className="mb-4 flex items-start justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+                  <span>
+                    {mensajeEvidencias}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMensajeEvidencias(
+                        ""
+                      )
+                    }
+                    className="shrink-0 text-lg leading-none text-emerald-700"
+                    aria-label="Cerrar mensaje"
+                  >
+                    ×
+                  </button>
                 </div>
               )}
 
