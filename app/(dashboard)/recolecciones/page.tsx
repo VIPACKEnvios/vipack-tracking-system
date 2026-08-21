@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -2194,7 +2195,9 @@ function Detalle({
   async function subirEvidencias(
     tipo: "nota" | "foto",
     archivos:
-      FileList | null
+      FileList |
+      File[] |
+      null
   ) {
     if (
       !archivos ||
@@ -2702,7 +2705,9 @@ function SeccionEvidencias({
     string | null;
   onSeleccionar: (
     archivos:
-      FileList | null
+      FileList |
+      File[] |
+      null
   ) => void;
   onVer: (
     index: number
@@ -2713,154 +2718,602 @@ function SeccionEvidencias({
   ) => void;
   legado: string;
 }) {
-  const inputId =
-    `evidencias-${tipo}`;
+  const [
+    camaraAbierta,
+    setCamaraAbierta,
+  ] = useState(false);
+
+  const inputArchivoId =
+    `evidencias-archivo-${tipo}`;
+
+  const inputGaleriaId =
+    `evidencias-galeria-${tipo}`;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-black text-slate-900">
-            {titulo}
-          </p>
+    <>
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-black text-slate-900">
+              {titulo}
+            </p>
 
-          <p className="mt-1 text-xs text-slate-500">
-            {subtitulo}
-          </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {subtitulo}
+            </p>
+          </div>
+
+          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-[#072c74] shadow-sm">
+            {archivos.length}
+          </span>
         </div>
 
-        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-[#072c74] shadow-sm">
-          {archivos.length}
-        </span>
-      </div>
+        {/* =========================
+            OPCIÓN 1: ARCHIVOS
+        ========================== */}
+        <input
+          id={inputArchivoId}
+          type="file"
+          accept="image/*"
+          multiple
+          disabled={subiendo}
+          className="hidden"
+          onChange={(event) => {
+            const files =
+              event.target.files;
 
-      <input
-        id={inputId}
-        type="file"
-        accept="image/*"
-        multiple
-        disabled={subiendo}
-        className="hidden"
-        onChange={(event) => {
-          const files =
-            event.target.files;
+            onSeleccionar(
+              files
+            );
 
-          onSeleccionar(
-            files
-          );
+            event.currentTarget.value =
+              "";
+          }}
+        />
 
-          event.currentTarget.value =
-            "";
-        }}
-      />
+        {/* =========================
+            OPCIÓN 2: GALERÍA
+        ========================== */}
+        <input
+          id={inputGaleriaId}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+          multiple
+          disabled={subiendo}
+          className="hidden"
+          onChange={(event) => {
+            const files =
+              event.target.files;
 
-      <label
-        htmlFor={inputId}
-        className={`mt-4 flex min-h-11 cursor-pointer items-center justify-center rounded-xl px-4 py-3 text-center text-sm font-black text-white ${
-          subiendo
-            ? "pointer-events-none bg-slate-400"
-            : "bg-[#072c74] active:scale-[0.99]"
-        }`}
-      >
-        {subiendo
-          ? "Subiendo..."
-          : tipo === "nota"
-            ? "+ Agregar notas"
-            : "+ Agregar fotos"}
-      </label>
+            onSeleccionar(
+              files
+            );
 
-      {archivos.length >
-      0 ? (
-        <div className="mt-3 space-y-2">
-          {archivos.map(
-            (
-              archivo,
-              index
-            ) => {
-              const eliminando =
-                eliminandoId ===
-                archivo.id;
+            event.currentTarget.value =
+              "";
+          }}
+        />
 
-              return (
-                <div
-                  key={
-                    archivo.id ||
-                    `${archivo.nombre}-${index}`
-                  }
-                  className="rounded-xl border border-slate-200 bg-white p-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onVer(index)
-                      }
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-sm font-black text-blue-700"
-                      aria-label={`Ver ${archivo.nombre}`}
-                    >
-                      {index + 1}
-                    </button>
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          <label
+            htmlFor={
+              inputArchivoId
+            }
+            className={`flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border px-3 py-3 text-center text-xs font-black transition ${
+              subiendo
+                ? "pointer-events-none border-slate-200 bg-slate-100 text-slate-400"
+                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100 active:scale-[0.99]"
+            }`}
+          >
+            <span className="text-lg">
+              📁
+            </span>
 
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-black text-slate-800">
-                        {
-                          archivo.nombre
+            <span>
+              Subir archivo
+            </span>
+          </label>
+
+          <label
+            htmlFor={
+              inputGaleriaId
+            }
+            className={`flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border px-3 py-3 text-center text-xs font-black transition ${
+              subiendo
+                ? "pointer-events-none border-slate-200 bg-slate-100 text-slate-400"
+                : "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 active:scale-[0.99]"
+            }`}
+          >
+            <span className="text-lg">
+              🖼️
+            </span>
+
+            <span>
+              Elegir imágenes
+            </span>
+          </label>
+
+          <button
+            type="button"
+            disabled={subiendo}
+            onClick={() =>
+              setCamaraAbierta(
+                true
+              )
+            }
+            className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#072c74] px-3 py-3 text-center text-xs font-black text-white transition hover:bg-blue-900 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-400"
+          >
+            <span className="text-lg">
+              📷
+            </span>
+
+            <span>
+              Tomar foto ahora
+            </span>
+          </button>
+        </div>
+
+        {subiendo && (
+          <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-center text-xs font-black text-blue-700">
+            Subiendo evidencia...
+          </div>
+        )}
+
+        {archivos.length >
+        0 ? (
+          <div className="mt-3 space-y-2">
+            {archivos.map(
+              (
+                archivo,
+                index
+              ) => {
+                const eliminando =
+                  eliminandoId ===
+                  archivo.id;
+
+                return (
+                  <div
+                    key={
+                      archivo.id ||
+                      `${archivo.nombre}-${index}`
+                    }
+                    className="rounded-xl border border-slate-200 bg-white p-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onVer(index)
                         }
-                      </p>
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-sm font-black text-blue-700"
+                        aria-label={`Ver ${archivo.nombre}`}
+                      >
+                        {index + 1}
+                      </button>
 
-                      <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
-                        {formatoBytes(
-                          archivo.tamaño
-                        )}
-                      </p>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-black text-slate-800">
+                          {
+                            archivo.nombre
+                          }
+                        </p>
+
+                        <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
+                          {formatoBytes(
+                            archivo.tamaño
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onVer(index)
+                        }
+                        className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700"
+                      >
+                        Ver
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={
+                          eliminando
+                        }
+                        onClick={() =>
+                          onEliminar(
+                            archivo
+                          )
+                        }
+                        className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 disabled:opacity-50"
+                      >
+                        {eliminando
+                          ? "Eliminando..."
+                          : "Eliminar"}
+                      </button>
                     </div>
                   </div>
+                );
+              }
+            )}
+          </div>
+        ) : (
+          <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-4 text-center">
+            <p className="text-xs font-bold text-slate-500">
+              {legado
+                ? "Existe una evidencia histórica registrada en el Excel."
+                : "Todavía no hay archivos para este folio."}
+            </p>
+          </div>
+        )}
+      </div>
 
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onVer(index)
-                      }
-                      className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700"
-                    >
-                      Ver
-                    </button>
+      {camaraAbierta && (
+        <CamaraEvidencia
+          tipo={tipo}
+          onCerrar={() =>
+            setCamaraAbierta(
+              false
+            )
+          }
+          onCapturar={(
+            archivo
+          ) => {
+            setCamaraAbierta(
+              false
+            );
 
-                    <button
-                      type="button"
-                      disabled={
-                        eliminando
-                      }
-                      onClick={() =>
-                        onEliminar(
-                          archivo
-                        )
-                      }
-                      className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 disabled:opacity-50"
-                    >
-                      {eliminando
-                        ? "Eliminando..."
-                        : "Eliminar"}
-                    </button>
-                  </div>
-                </div>
-              );
+            onSeleccionar([
+              archivo,
+            ]);
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function CamaraEvidencia({
+  tipo,
+  onCerrar,
+  onCapturar,
+}: {
+  tipo:
+    "nota" | "foto";
+  onCerrar: () => void;
+  onCapturar: (
+    archivo: File
+  ) => void;
+}) {
+  const videoRef =
+    useRef<HTMLVideoElement | null>(
+      null
+    );
+
+  const canvasRef =
+    useRef<HTMLCanvasElement | null>(
+      null
+    );
+
+  const streamRef =
+    useRef<MediaStream | null>(
+      null
+    );
+
+  const [
+    iniciando,
+    setIniciando,
+  ] = useState(true);
+
+  const [
+    errorCamara,
+    setErrorCamara,
+  ] = useState("");
+
+  const detenerCamara =
+    useCallback(() => {
+      const stream =
+        streamRef.current;
+
+      if (stream) {
+        stream
+          .getTracks()
+          .forEach(
+            (track) =>
+              track.stop()
+          );
+      }
+
+      streamRef.current =
+        null;
+    }, []);
+
+  useEffect(() => {
+    let activo = true;
+
+    async function iniciarCamara() {
+      try {
+        setIniciando(true);
+        setErrorCamara("");
+
+        if (
+          !navigator.mediaDevices ||
+          !navigator.mediaDevices
+            .getUserMedia
+        ) {
+          throw new Error(
+            "Este dispositivo o navegador no permite abrir la cámara desde la página."
+          );
+        }
+
+        const stream =
+          await navigator.mediaDevices
+            .getUserMedia({
+              video: {
+                facingMode: {
+                  ideal:
+                    "environment",
+                },
+              },
+              audio:
+                false,
+            });
+
+        if (!activo) {
+          stream
+            .getTracks()
+            .forEach(
+              (track) =>
+                track.stop()
+            );
+          return;
+        }
+
+        streamRef.current =
+          stream;
+
+        const video =
+          videoRef.current;
+
+        if (video) {
+          video.srcObject =
+            stream;
+
+          await video.play();
+        }
+      } catch (
+        error: unknown
+      ) {
+        setErrorCamara(
+          error instanceof Error
+            ? error.message
+            : "No se pudo abrir la cámara."
+        );
+      } finally {
+        if (activo) {
+          setIniciando(false);
+        }
+      }
+    }
+
+    void iniciarCamara();
+
+    return () => {
+      activo = false;
+      detenerCamara();
+    };
+  }, [detenerCamara]);
+
+  function cerrarCamara() {
+    detenerCamara();
+    onCerrar();
+  }
+
+  function tomarFoto() {
+    const video =
+      videoRef.current;
+
+    const canvas =
+      canvasRef.current;
+
+    if (
+      !video ||
+      !canvas
+    ) {
+      return;
+    }
+
+    const ancho =
+      video.videoWidth;
+
+    const alto =
+      video.videoHeight;
+
+    if (
+      !ancho ||
+      !alto
+    ) {
+      setErrorCamara(
+        "La cámara todavía no está lista."
+      );
+      return;
+    }
+
+    canvas.width =
+      ancho;
+
+    canvas.height =
+      alto;
+
+    const contexto =
+      canvas.getContext(
+        "2d"
+      );
+
+    if (!contexto) {
+      setErrorCamara(
+        "No se pudo procesar la fotografía."
+      );
+      return;
+    }
+
+    contexto.drawImage(
+      video,
+      0,
+      0,
+      ancho,
+      alto
+    );
+
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          setErrorCamara(
+            "No se pudo generar la fotografía."
+          );
+          return;
+        }
+
+        const fecha =
+          new Date()
+            .toISOString()
+            .replace(
+              /[:.]/g,
+              "-"
+            );
+
+        const nombre =
+          tipo === "nota"
+            ? `nota-camara-${fecha}.jpg`
+            : `foto-camara-${fecha}.jpg`;
+
+        const archivo =
+          new File(
+            [blob],
+            nombre,
+            {
+              type:
+                "image/jpeg",
             }
-          )}
-        </div>
-      ) : (
-        <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-4 text-center">
-          <p className="text-xs font-bold text-slate-500">
-            {legado
-              ? "Existe una evidencia histórica registrada en el Excel."
-              : "Todavía no hay archivos para este folio."}
+          );
+
+        detenerCamara();
+
+        onCapturar(
+          archivo
+        );
+      },
+      "image/jpeg",
+      0.92
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-[260] flex flex-col bg-black">
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-slate-950 px-4 py-3 text-white">
+        <div>
+          <p className="text-xs font-black uppercase tracking-wide text-cyan-300">
+            Cámara VIPACK
+          </p>
+
+          <p className="mt-0.5 text-sm font-black">
+            {tipo === "nota"
+              ? "Fotografiar nota"
+              : "Fotografiar mercancía"}
           </p>
         </div>
-      )}
+
+        <button
+          type="button"
+          onClick={
+            cerrarCamara
+          }
+          className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-xl font-black"
+          aria-label="Cerrar cámara"
+        >
+          ×
+        </button>
+      </div>
+
+      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black">
+        {iniciando && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black text-sm font-black text-white">
+            Abriendo cámara...
+          </div>
+        )}
+
+        {errorCamara ? (
+          <div className="mx-5 max-w-md rounded-2xl border border-red-400/30 bg-red-950/50 p-5 text-center text-white">
+            <p className="font-black">
+              No se pudo abrir la cámara
+            </p>
+
+            <p className="mt-2 text-sm text-red-100">
+              {errorCamara}
+            </p>
+
+            <p className="mt-3 text-xs text-slate-300">
+              Revisa que hayas permitido el acceso a la cámara en tu navegador. También puedes cerrar esta pantalla y usar “Elegir imágenes”.
+            </p>
+          </div>
+        ) : (
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="h-full w-full object-contain"
+          />
+        )}
+
+        <canvas
+          ref={canvasRef}
+          className="hidden"
+        />
+      </div>
+
+      <div className="border-t border-white/10 bg-slate-950 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
+        <div className="mx-auto flex max-w-md items-center gap-3">
+          <button
+            type="button"
+            onClick={
+              cerrarCamara
+            }
+            className="h-14 flex-1 rounded-2xl border border-white/20 bg-white/10 text-sm font-black text-white"
+          >
+            Cancelar
+          </button>
+
+          <button
+            type="button"
+            disabled={
+              iniciando ||
+              Boolean(
+                errorCamara
+              )
+            }
+            onClick={
+              tomarFoto
+            }
+            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-4 border-white bg-white/20 text-2xl disabled:opacity-40"
+            aria-label="Tomar fotografía"
+          >
+            📷
+          </button>
+
+          <div className="flex-1" />
+        </div>
+
+        <p className="mt-3 text-center text-[11px] font-semibold text-slate-400">
+          La fotografía se subirá a esta recolección al capturarla.
+        </p>
+      </div>
     </div>
   );
 }
+
 
 function VisorEvidencia({
   folio,
