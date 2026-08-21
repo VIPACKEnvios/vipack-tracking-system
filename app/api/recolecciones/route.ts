@@ -12,6 +12,23 @@ const RUTA_EXCEL =
 const HOJA_SOLICITUDES =
   "Solicitudes";
 
+type ConexionOneDrive = {
+  id: number;
+  drive_id: string | null;
+  refresh_token: string;
+};
+
+type NuevaRecoleccionBody = {
+  cliente?: string;
+  telefono?: string;
+  bodega?: string;
+  direccion?: string;
+  mercancia?: string;
+  cantidad?: string;
+  fechaRecoleccion?: string;
+  observaciones?: string;
+};
+
 async function leerJsonSeguro(
   response: Response
 ) {
@@ -20,6 +37,34 @@ async function leerJsonSeguro(
   } catch {
     return null;
   }
+}
+
+function crearSupabase() {
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  const supabaseServiceRoleKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (
+    !supabaseUrl ||
+    !supabaseServiceRoleKey
+  ) {
+    throw new Error(
+      "Faltan variables de configuración de Supabase."
+    );
+  }
+
+  return createClient(
+    supabaseUrl,
+    supabaseServiceRoleKey,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
 }
 
 async function renovarTokenOneDrive(
@@ -56,8 +101,7 @@ async function renovarTokenOneDrive(
               "openid profile offline_access User.Read Files.ReadWrite",
           }),
 
-        cache:
-          "no-store",
+        cache: "no-store",
       }
     );
 
@@ -75,286 +119,322 @@ async function renovarTokenOneDrive(
   };
 }
 
-export async function GET() {
-  try {
-    const clientId =
-      process.env.ONEDRIVE_CLIENT_ID;
+async function obtenerAccessToken() {
+  const clientId =
+    process.env.ONEDRIVE_CLIENT_ID;
 
-    const clientSecret =
-      process.env.ONEDRIVE_CLIENT_SECRET;
+  const clientSecret =
+    process.env.ONEDRIVE_CLIENT_SECRET;
 
-    const supabaseUrl =
-      process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (
+    !clientId ||
+    !clientSecret
+  ) {
+    throw new Error(
+      "Faltan variables de configuración de OneDrive."
+    );
+  }
 
-    const supabaseServiceRoleKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabase =
+    crearSupabase();
 
-    if (
-      !clientId ||
-      !clientSecret ||
-      !supabaseUrl ||
-      !supabaseServiceRoleKey
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
+  const {
+    data: conexion,
+    error: connectionError,
+  } = await supabase
+    .from("onedrive_connections")
+    .select(
+      "id, drive_id, refresh_token"
+    )
+    .order(
+      "id",
+      {
+        ascending: false,
+      }
+    )
+    .limit(1)
+    .maybeSingle();
 
-          error:
-            "Faltan variables de configuración de OneDrive.",
-        },
-        {
-          status: 500,
-        }
-      );
-    }
+  if (connectionError) {
+    throw new Error(
+      `No se pudo consultar la conexión de OneDrive: ${connectionError.message}`
+    );
+  }
 
-    /*
-     * Supabase solamente se usa aquí
-     * para recuperar el refresh_token
-     * de la conexión existente.
-     *
-     * Las recolecciones NO se guardan
-     * en Supabase.
-     */
-    const supabase =
-      createClient(
-        supabaseUrl,
-        supabaseServiceRoleKey,
-        {
-          auth: {
-            autoRefreshToken:
-              false,
+  if (
+    !conexion?.refresh_token
+  ) {
+    throw new Error(
+      "No existe una conexión activa de OneDrive."
+    );
+  }
 
-            persistSession:
-              false,
-          },
-        }
-      );
+  const {
+    response:
+      tokenResponse,
 
-    /*
-     * 1. Obtener conexión actual
-     * de OneDrive.
-     */
+    data:
+      tokenData,
+  } =
+    await renovarTokenOneDrive(
+      clientId,
+      clientSecret,
+      conexion.refresh_token
+    );
+
+  if (
+    !tokenResponse.ok
+  ) {
+    throw new Error(
+      tokenData
+        ?.error_description ||
+        tokenData?.error ||
+        "No se pudo renovar el acceso a OneDrive."
+    );
+  }
+
+  const accessToken =
+    tokenData
+      ?.access_token;
+
+  const newRefreshToken =
+    tokenData
+      ?.refresh_token;
+
+  if (!accessToken) {
+    throw new Error(
+      "Microsoft no devolvió access_token."
+    );
+  }
+
+  if (
+    newRefreshToken &&
+    newRefreshToken !==
+      conexion.refresh_token
+  ) {
     const {
-      data:
-        conexion,
-
       error:
-        connectionError,
+        updateTokenError,
     } = await supabase
       .from(
         "onedrive_connections"
       )
-      .select(
-        "id, drive_id, refresh_token"
-      )
-      .order(
+      .update({
+        refresh_token:
+          newRefreshToken,
+
+        updated_at:
+          new Date()
+            .toISOString(),
+      })
+      .eq(
         "id",
-        {
-          ascending:
-            false,
-        }
-      )
-      .limit(1)
-      .maybeSingle();
-
-    if (
-      connectionError
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-
-          error:
-            "No se pudo consultar la conexión de OneDrive.",
-
-          detalle:
-            connectionError.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    if (
-      !conexion
-        ?.refresh_token
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-
-          error:
-            "No existe una conexión activa de OneDrive.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    /*
-     * 2. Renovar token de Microsoft.
-     */
-    const {
-      response:
-        tokenResponse,
-
-      data:
-        tokenData,
-    } =
-      await renovarTokenOneDrive(
-        clientId,
-        clientSecret,
-        conexion.refresh_token
+        conexion.id
       );
 
     if (
-      !tokenResponse.ok
+      updateTokenError
     ) {
-      return NextResponse.json(
-        {
-          success: false,
-
-          error:
-            "No se pudo renovar el acceso a OneDrive.",
-
-          detalle:
-            tokenData
-              ?.error_description ||
-            tokenData?.error ||
-            tokenData,
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    const accessToken =
-      tokenData
-        ?.access_token;
-
-    const newRefreshToken =
-      tokenData
-        ?.refresh_token;
-
-    if (!accessToken) {
-      return NextResponse.json(
-        {
-          success: false,
-
-          error:
-            "Microsoft no devolvió access_token.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    /*
-     * Microsoft puede cambiar
-     * el refresh_token.
-     */
-    if (
-      newRefreshToken &&
-      newRefreshToken !==
-        conexion.refresh_token
-    ) {
-      const {
-        error:
-          updateTokenError,
-      } = await supabase
-        .from(
-          "onedrive_connections"
-        )
-        .update({
-          refresh_token:
-            newRefreshToken,
-
-          updated_at:
-            new Date()
-              .toISOString(),
-        })
-        .eq(
-          "id",
-          conexion.id
-        );
-
-      if (
+      console.error(
+        "No se pudo actualizar refresh_token:",
         updateTokenError
-      ) {
-        console.error(
-          "No se pudo actualizar refresh_token:",
-          updateTokenError
-        );
-      }
-    }
-
-    /*
-     * 3. Descargar el Excel
-     * directamente desde OneDrive.
-     */
-    const excelUrl =
-      `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
-        RUTA_EXCEL
-      )}:/content`;
-
-    const excelResponse =
-      await fetch(
-        excelUrl,
-        {
-          headers: {
-            Authorization:
-              `Bearer ${accessToken}`,
-          },
-
-          cache:
-            "no-store",
-        }
       );
+    }
+  }
 
-    if (
-      !excelResponse.ok
-    ) {
-      const detalle =
-        await excelResponse.text();
+  return {
+    accessToken,
+    conexion:
+      conexion as ConexionOneDrive,
+  };
+}
 
-      return NextResponse.json(
-        {
-          success: false,
+async function descargarExcel(
+  accessToken: string
+) {
+  const excelUrl =
+    `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
+      RUTA_EXCEL
+    )}:/content`;
 
-          error:
-            "No se pudo descargar el Excel de recolecciones.",
-
-          detalle,
-
-          archivo:
-            RUTA_EXCEL,
+  const excelResponse =
+    await fetch(
+      excelUrl,
+      {
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
         },
-        {
-          status: 400,
-        }
-      );
-    }
+
+        cache:
+          "no-store",
+      }
+    );
+
+  if (
+    !excelResponse.ok
+  ) {
+    const detalle =
+      await excelResponse.text();
+
+    throw new Error(
+      `No se pudo descargar el Excel de recolecciones. ${detalle}`
+    );
+  }
+
+  return await excelResponse
+    .arrayBuffer();
+}
+
+async function subirExcel(
+  accessToken: string,
+  buffer: Buffer
+) {
+  const excelUrl =
+    `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
+      RUTA_EXCEL
+    )}:/content`;
+
+  const response =
+    await fetch(
+      excelUrl,
+      {
+        method: "PUT",
+
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+
+          "Content-Type":
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        },
+
+        body: new Uint8Array(
+          buffer
+        ),
+
+        cache:
+          "no-store",
+      }
+    );
+
+  if (!response.ok) {
+    const detalle =
+      await response.text();
+
+    throw new Error(
+      `No se pudo guardar el Excel en OneDrive. ${detalle}`
+    );
+  }
+
+  return await leerJsonSeguro(
+    response
+  );
+}
+
+function generarFolio(
+  existentes: Set<string>
+) {
+  const ahora =
+    new Date();
+
+  const yy =
+    String(
+      ahora.getFullYear()
+    ).slice(-2);
+
+  const mm =
+    String(
+      ahora.getMonth() + 1
+    ).padStart(2, "0");
+
+  const dd =
+    String(
+      ahora.getDate()
+    ).padStart(2, "0");
+
+  const hh =
+    String(
+      ahora.getHours()
+    ).padStart(2, "0");
+
+  const mi =
+    String(
+      ahora.getMinutes()
+    ).padStart(2, "0");
+
+  const ss =
+    String(
+      ahora.getSeconds()
+    ).padStart(2, "0");
+
+  const base =
+    `REC-${yy}${mm}${dd}-${hh}${mi}${ss}`;
+
+  if (
+    !existentes.has(base)
+  ) {
+    return base;
+  }
+
+  let contador = 1;
+
+  while (
+    existentes.has(
+      `${base}-${contador}`
+    )
+  ) {
+    contador += 1;
+  }
+
+  return `${base}-${contador}`;
+}
+
+function fechaSolicitudActual() {
+  const ahora =
+    new Date();
+
+  const mes =
+    ahora.getMonth() + 1;
+
+  const dia =
+    ahora.getDate();
+
+  const anio =
+    String(
+      ahora.getFullYear()
+    ).slice(-2);
+
+  const horas =
+    ahora.getHours();
+
+  const minutos =
+    String(
+      ahora.getMinutes()
+    ).padStart(2, "0");
+
+  return `${mes}/${dia}/${anio} ${horas}:${minutos}`;
+}
+
+export async function GET() {
+  try {
+    const {
+      accessToken,
+    } =
+      await obtenerAccessToken();
 
     const arrayBuffer =
-      await excelResponse
-        .arrayBuffer();
+      await descargarExcel(
+        accessToken
+      );
 
-    /*
-     * 4. Abrir el Excel.
-     */
     const workbook =
       XLSX.read(
         Buffer.from(
           arrayBuffer
         ),
         {
-          type:
-            "buffer",
+          type: "buffer",
         }
       );
 
@@ -377,10 +457,6 @@ export async function GET() {
       );
     }
 
-    /*
-     * 5. Convertir filas
-     * de Solicitudes a JSON.
-     */
     const filas =
       XLSX.utils
         .sheet_to_json<
@@ -391,17 +467,11 @@ export async function GET() {
         >(
           hoja,
           {
-            defval:
-              "",
-
-            raw:
-              false,
+            defval: "",
+            raw: false,
           }
         );
 
-    /*
-     * 6. Limpiar filas vacías.
-     */
     const registros =
       filas.filter(
         (fila) => {
@@ -420,9 +490,6 @@ export async function GET() {
         }
       );
 
-    /*
-     * 7. Resumen por estado.
-     */
     const contarEstado =
       (
         estado:
@@ -495,6 +562,259 @@ export async function GET() {
   ) {
     console.error(
       "Error leyendo Excel de recolecciones:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+
+        error:
+          error instanceof Error
+            ? error.message
+            : "Error desconocido.",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+export async function POST(
+  request: Request
+) {
+  try {
+    const body =
+      (await request.json()) as NuevaRecoleccionBody;
+
+    const cliente =
+      String(
+        body.cliente || ""
+      ).trim();
+
+    const bodega =
+      String(
+        body.bodega || ""
+      ).trim();
+
+    if (!cliente) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          error:
+            "El cliente es obligatorio.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (!bodega) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          error:
+            "La bodega es obligatoria.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const {
+      accessToken,
+    } =
+      await obtenerAccessToken();
+
+    const arrayBuffer =
+      await descargarExcel(
+        accessToken
+      );
+
+    const workbook =
+      XLSX.read(
+        Buffer.from(
+          arrayBuffer
+        ),
+        {
+          type: "buffer",
+        }
+      );
+
+    const hoja =
+      workbook.Sheets[
+        HOJA_SOLICITUDES
+      ];
+
+    if (!hoja) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          error:
+            `El Excel no contiene la hoja "${HOJA_SOLICITUDES}".`,
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const filas =
+      XLSX.utils
+        .sheet_to_json<
+          Record<
+            string,
+            unknown
+          >
+        >(
+          hoja,
+          {
+            defval: "",
+            raw: false,
+          }
+        );
+
+    const foliosExistentes =
+      new Set(
+        filas.map(
+          (fila) =>
+            String(
+              fila.Folio || ""
+            ).trim()
+        )
+      );
+
+    const folio =
+      generarFolio(
+        foliosExistentes
+      );
+
+    const nuevaFila = {
+      Folio:
+        folio,
+
+      "Fecha de solicitud":
+        fechaSolicitudActual(),
+
+      Cliente:
+        cliente,
+
+      TelefonoWhatsApp:
+        String(
+          body.telefono || ""
+        ).trim(),
+
+      "Lugar / Bodega de recolección":
+        bodega,
+
+      "Orden ruta":
+        "",
+
+      "Dirección de recolección":
+        String(
+          body.direccion || ""
+        ).trim(),
+
+      "Nota de recolección":
+        "",
+
+      Mercancía:
+        String(
+          body.mercancia || ""
+        ).trim(),
+
+      "Cantidad / Bultos":
+        String(
+          body.cantidad || ""
+        ).trim(),
+
+      "Fecha de recolección":
+        String(
+          body.fechaRecoleccion || ""
+        ).trim(),
+
+      Estatus:
+        "Pendiente",
+
+      Observaciones:
+        String(
+          body.observaciones || ""
+        ).trim(),
+
+      "Foto mercancía":
+        "",
+    };
+
+    const nuevasFilas = [
+      ...filas,
+      nuevaFila,
+    ];
+
+    const nuevaHoja =
+      XLSX.utils.json_to_sheet(
+        nuevasFilas,
+        {
+          header: [
+            "Folio",
+            "Fecha de solicitud",
+            "Cliente",
+            "TelefonoWhatsApp",
+            "Lugar / Bodega de recolección",
+            "Orden ruta",
+            "Dirección de recolección",
+            "Nota de recolección",
+            "Mercancía",
+            "Cantidad / Bultos",
+            "Fecha de recolección",
+            "Estatus",
+            "Observaciones",
+            "Foto mercancía",
+          ],
+
+          skipHeader: false,
+        }
+      );
+
+    workbook.Sheets[
+      HOJA_SOLICITUDES
+    ] = nuevaHoja;
+
+    const salida =
+      XLSX.write(
+        workbook,
+        {
+          type: "buffer",
+          bookType: "xlsx",
+        }
+      );
+
+    await subirExcel(
+      accessToken,
+      salida
+    );
+
+    return NextResponse.json({
+      success: true,
+
+      mensaje:
+        "Recolección creada correctamente.",
+
+      folio,
+
+      registro:
+        nuevaFila,
+    });
+  } catch (
+    error: unknown
+  ) {
+    console.error(
+      "Error creando recolección:",
       error
     );
 

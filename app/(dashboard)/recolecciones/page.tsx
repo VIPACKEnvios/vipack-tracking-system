@@ -312,6 +312,11 @@ export default function RecoleccionesPage() {
       null
     );
 
+  const [
+    modalNueva,
+    setModalNueva,
+  ] = useState(false);
+
   const cargar =
     useCallback(
       async (
@@ -606,6 +611,9 @@ export default function RecoleccionesPage() {
 
               <button
                 type="button"
+                onClick={() =>
+                  setModalNueva(true)
+                }
                 className="rounded-2xl bg-[#072c74] px-5 py-3 text-sm font-black text-white shadow-lg"
               >
                 + Nueva
@@ -967,6 +975,9 @@ export default function RecoleccionesPage() {
         <button
           type="button"
           aria-label="Nueva recolección"
+          onClick={() =>
+            setModalNueva(true)
+          }
           className="fixed bottom-24 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[#072c74] text-3xl font-light text-white shadow-xl shadow-blue-950/30 active:scale-95"
         >
           +
@@ -1039,6 +1050,358 @@ export default function RecoleccionesPage() {
           }
         />
       )}
+
+      {modalNueva && (
+        <FormularioNuevaRecoleccion
+          onCerrar={() =>
+            setModalNueva(false)
+          }
+          onCreada={async () => {
+            setModalNueva(false);
+            await cargar(true);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function FormularioNuevaRecoleccion({
+  onCerrar,
+  onCreada,
+}: {
+  onCerrar: () => void;
+  onCreada: () => Promise<void>;
+}) {
+  const [
+    cliente,
+    setCliente,
+  ] = useState("");
+
+  const [
+    telefono,
+    setTelefono,
+  ] = useState("");
+
+  const [
+    bodega,
+    setBodega,
+  ] = useState("");
+
+  const [
+    direccion,
+    setDireccion,
+  ] = useState("");
+
+  const [
+    mercancia,
+    setMercancia,
+  ] = useState("");
+
+  const [
+    cantidad,
+    setCantidad,
+  ] = useState("");
+
+  const [
+    fechaRecoleccion,
+    setFechaRecoleccion,
+  ] = useState("");
+
+  const [
+    observaciones,
+    setObservaciones,
+  ] = useState("");
+
+  const [
+    guardando,
+    setGuardando,
+  ] = useState(false);
+
+  const [
+    errorFormulario,
+    setErrorFormulario,
+  ] = useState("");
+
+  async function guardar() {
+    const clienteLimpio =
+      cliente.trim();
+
+    const bodegaLimpia =
+      bodega.trim();
+
+    if (!clienteLimpio) {
+      setErrorFormulario(
+        "Escribe el nombre del cliente."
+      );
+      return;
+    }
+
+    if (!bodegaLimpia) {
+      setErrorFormulario(
+        "Escribe la bodega de recolección."
+      );
+      return;
+    }
+
+    try {
+      setGuardando(true);
+      setErrorFormulario("");
+
+      const response =
+        await fetch(
+          "/api/recolecciones",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                cliente:
+                  clienteLimpio,
+
+                telefono:
+                  telefono.trim(),
+
+                bodega:
+                  bodegaLimpia,
+
+                direccion:
+                  direccion.trim(),
+
+                mercancia:
+                  mercancia.trim(),
+
+                cantidad:
+                  cantidad.trim(),
+
+                fechaRecoleccion,
+
+                observaciones:
+                  observaciones.trim(),
+              }),
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        throw new Error(
+          data.error ||
+            "No se pudo crear la recolección."
+        );
+      }
+
+      await onCreada();
+    } catch (
+      err: unknown
+    ) {
+      setErrorFormulario(
+        err instanceof Error
+          ? err.message
+          : "No se pudo crear la recolección."
+      );
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
+      <button
+        type="button"
+        aria-label="Cerrar"
+        onClick={onCerrar}
+        className="absolute inset-0"
+      />
+
+      <div className="relative z-10 max-h-[94vh] w-full overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:max-w-2xl sm:rounded-3xl">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.15em] text-cyan-700">
+              Recolecciones
+            </p>
+
+            <h2 className="mt-1 text-xl font-black text-slate-950">
+              Nueva recolección
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            onClick={onCerrar}
+            disabled={guardando}
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-xl font-bold text-slate-600 disabled:opacity-40"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="space-y-4 p-5">
+          <CampoFormulario
+            titulo="Cliente *"
+            value={cliente}
+            onChange={setCliente}
+            placeholder="Nombre completo del cliente"
+          />
+
+          <CampoFormulario
+            titulo="Teléfono"
+            value={telefono}
+            onChange={setTelefono}
+            placeholder="Número de WhatsApp"
+            inputMode="tel"
+          />
+
+          <CampoFormulario
+            titulo="Bodega *"
+            value={bodega}
+            onChange={setBodega}
+            placeholder="Ej. Lady Ventas"
+          />
+
+          <CampoFormulario
+            titulo="Dirección / ubicación"
+            value={direccion}
+            onChange={setDireccion}
+            placeholder="Dirección o enlace de Google Maps"
+          />
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <CampoFormulario
+              titulo="Mercancía"
+              value={mercancia}
+              onChange={setMercancia}
+              placeholder="Ej. Venta de grupo"
+            />
+
+            <CampoFormulario
+              titulo="Cantidad / Bultos"
+              value={cantidad}
+              onChange={setCantidad}
+              placeholder="Ej. 2 bolsas / 15 piezas"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">
+              Fecha programada de recolección
+            </label>
+
+            <input
+              type="date"
+              value={fechaRecoleccion}
+              onChange={(event) =>
+                setFechaRecoleccion(
+                  event.target.value
+                )
+              }
+              className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">
+              Observaciones
+            </label>
+
+            <textarea
+              value={observaciones}
+              onChange={(event) =>
+                setObservaciones(
+                  event.target.value
+                )
+              }
+              rows={4}
+              placeholder="Notas importantes de la recolección"
+              className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
+            />
+          </div>
+
+          {errorFormulario && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+              {errorFormulario}
+            </div>
+          )}
+
+          <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={onCerrar}
+              disabled={guardando}
+              className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                void guardar()
+              }
+              disabled={
+                guardando ||
+                !cliente.trim() ||
+                !bodega.trim()
+              }
+              className="rounded-2xl bg-[#072c74] px-5 py-3 text-sm font-black text-white shadow-lg transition hover:bg-blue-900 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {guardando
+                ? "Guardando..."
+                : "Crear recolección"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CampoFormulario({
+  titulo,
+  value,
+  onChange,
+  placeholder,
+  inputMode,
+}: {
+  titulo: string;
+  value: string;
+  onChange: (
+    value: string
+  ) => void;
+  placeholder: string;
+  inputMode?:
+    | "text"
+    | "tel"
+    | "email"
+    | "numeric";
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">
+        {titulo}
+      </label>
+
+      <input
+        type="text"
+        inputMode={inputMode}
+        value={value}
+        onChange={(event) =>
+          onChange(
+            event.target.value
+          )
+        }
+        placeholder={placeholder}
+        className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
+      />
     </div>
   );
 }
