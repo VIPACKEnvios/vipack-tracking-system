@@ -50,6 +50,11 @@ type Recoleccion = {
   foto: string;
 };
 
+type ClienteOption = {
+  nombre: string;
+  telefono: string;
+};
+
 type RespuestaApi = {
   success: boolean;
   registros?: RegistroExcel[];
@@ -1053,6 +1058,7 @@ export default function RecoleccionesPage() {
 
       {modalNueva && (
         <FormularioNuevaRecoleccion
+          recolecciones={recolecciones}
           onCerrar={() =>
             setModalNueva(false)
           }
@@ -1067,41 +1073,31 @@ export default function RecoleccionesPage() {
 }
 
 function FormularioNuevaRecoleccion({
+  recolecciones,
   onCerrar,
   onCreada,
 }: {
+  recolecciones: Recoleccion[];
   onCerrar: () => void;
   onCreada: () => Promise<void>;
 }) {
-  const [
-    cliente,
-    setCliente,
-  ] = useState("");
+  const [cliente, setCliente] =
+    useState("");
 
-  const [
-    telefono,
-    setTelefono,
-  ] = useState("");
+  const [telefono, setTelefono] =
+    useState("");
 
-  const [
-    bodega,
-    setBodega,
-  ] = useState("");
+  const [bodega, setBodega] =
+    useState("");
 
-  const [
-    direccion,
-    setDireccion,
-  ] = useState("");
+  const [direccion, setDireccion] =
+    useState("");
 
-  const [
-    mercancia,
-    setMercancia,
-  ] = useState("");
+  const [mercancia, setMercancia] =
+    useState("");
 
-  const [
-    cantidad,
-    setCantidad,
-  ] = useState("");
+  const [cantidad, setCantidad] =
+    useState("");
 
   const [
     fechaRecoleccion,
@@ -1123,6 +1119,336 @@ function FormularioNuevaRecoleccion({
     setErrorFormulario,
   ] = useState("");
 
+  const [
+    clientesApi,
+    setClientesApi,
+  ] = useState<ClienteOption[]>([]);
+
+  const [
+    cargandoClientes,
+    setCargandoClientes,
+  ] = useState(true);
+
+  const [
+    clienteAbierto,
+    setClienteAbierto,
+  ] = useState(false);
+
+  /*
+   * Fallback seguro:
+   * aunque /api/clientes todavía no exista o falle,
+   * se construye la lista con los clientes que ya
+   * aparecen en las recolecciones cargadas.
+   */
+  const clientesDeRecolecciones =
+    useMemo(() => {
+      const mapa =
+        new Map<
+          string,
+          ClienteOption
+        >();
+
+      for (const item of recolecciones) {
+        const nombre =
+          item.cliente.trim();
+
+        if (!nombre) {
+          continue;
+        }
+
+        const key =
+          nombre.toLocaleLowerCase(
+            "es"
+          );
+
+        const actual =
+          mapa.get(key);
+
+        mapa.set(key, {
+          nombre,
+          telefono:
+            actual?.telefono ||
+            item.telefono.trim(),
+        });
+      }
+
+      return Array.from(
+        mapa.values()
+      ).sort((a, b) =>
+        a.nombre.localeCompare(
+          b.nombre,
+          "es"
+        )
+      );
+    }, [recolecciones]);
+
+  /*
+   * Intenta cargar el catálogo maestro de clientes.
+   * Es tolerante a respuestas como:
+   *   { clientes: [...] }
+   *   { registros: [...] }
+   *   { data: [...] }
+   *   [...]
+   *
+   * También acepta nombres de campos comunes:
+   * nombre, name, cliente, Cliente, Nombre...
+   */
+  useEffect(() => {
+    let cancelado = false;
+
+    async function cargarClientes() {
+      try {
+        setCargandoClientes(true);
+
+        const response =
+          await fetch(
+            "/api/clientes",
+            {
+              cache: "no-store",
+            }
+          );
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data: unknown =
+          await response.json();
+
+        const raiz =
+          data as
+            | Record<
+                string,
+                unknown
+              >
+            | unknown[];
+
+        const filas =
+          Array.isArray(raiz)
+            ? raiz
+            : Array.isArray(
+                  raiz?.clientes
+                )
+              ? raiz.clientes
+              : Array.isArray(
+                    raiz?.registros
+                  )
+                ? raiz.registros
+                : Array.isArray(
+                      raiz?.data
+                    )
+                  ? raiz.data
+                  : [];
+
+        const mapa =
+          new Map<
+            string,
+            ClienteOption
+          >();
+
+        for (const fila of filas) {
+          if (
+            !fila ||
+            typeof fila !== "object"
+          ) {
+            continue;
+          }
+
+          const item =
+            fila as Record<
+              string,
+              unknown
+            >;
+
+          const nombre =
+            txt(
+              item.nombre ??
+                item.Nombre ??
+                item.name ??
+                item.cliente ??
+                item.Cliente ??
+                item.razonSocial ??
+                item.razon_social
+            );
+
+          if (!nombre) {
+            continue;
+          }
+
+          const telefonoCliente =
+            txt(
+              item.telefono ??
+                item.Telefono ??
+                item.whatsapp ??
+                item.WhatsApp ??
+                item.telefonoWhatsApp ??
+                item.TelefonoWhatsApp
+            );
+
+          const key =
+            nombre.toLocaleLowerCase(
+              "es"
+            );
+
+          const actual =
+            mapa.get(key);
+
+          mapa.set(key, {
+            nombre,
+            telefono:
+              telefonoCliente ||
+              actual?.telefono ||
+              "",
+          });
+        }
+
+        if (!cancelado) {
+          setClientesApi(
+            Array.from(
+              mapa.values()
+            ).sort((a, b) =>
+              a.nombre.localeCompare(
+                b.nombre,
+                "es"
+              )
+            )
+          );
+        }
+      } catch {
+        /*
+         * No bloqueamos el formulario.
+         * Si falla el endpoint, se usa el
+         * fallback de recolecciones.
+         */
+      } finally {
+        if (!cancelado) {
+          setCargandoClientes(
+            false
+          );
+        }
+      }
+    }
+
+    void cargarClientes();
+
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  const clientes =
+    useMemo(() => {
+      const mapa =
+        new Map<
+          string,
+          ClienteOption
+        >();
+
+      for (const item of [
+        ...clientesDeRecolecciones,
+        ...clientesApi,
+      ]) {
+        const key =
+          item.nombre
+            .trim()
+            .toLocaleLowerCase(
+              "es"
+            );
+
+        if (!key) {
+          continue;
+        }
+
+        const actual =
+          mapa.get(key);
+
+        mapa.set(key, {
+          nombre: item.nombre.trim(),
+          telefono:
+            item.telefono.trim() ||
+            actual?.telefono ||
+            "",
+        });
+      }
+
+      return Array.from(
+        mapa.values()
+      ).sort((a, b) =>
+        a.nombre.localeCompare(
+          b.nombre,
+          "es"
+        )
+      );
+    }, [
+      clientesApi,
+      clientesDeRecolecciones,
+    ]);
+
+  const clientesFiltrados =
+    useMemo(() => {
+      const q =
+        cliente
+          .trim()
+          .toLocaleLowerCase(
+            "es"
+          );
+
+      if (!q) {
+        return clientes.slice(
+          0,
+          50
+        );
+      }
+
+      return clientes
+        .filter((item) =>
+          item.nombre
+            .toLocaleLowerCase(
+              "es"
+            )
+            .includes(q)
+        )
+        .slice(0, 50);
+    }, [cliente, clientes]);
+
+  const bodegas =
+    useMemo(() => {
+      const valores =
+        new Set<string>();
+
+      for (const item of recolecciones) {
+        const nombre =
+          item.bodega.trim();
+
+        if (nombre) {
+          valores.add(nombre);
+        }
+      }
+
+      return Array.from(
+        valores
+      ).sort((a, b) =>
+        a.localeCompare(b, "es")
+      );
+    }, [recolecciones]);
+
+  function seleccionarCliente(
+    seleccionado: ClienteOption
+  ) {
+    setCliente(
+      seleccionado.nombre
+    );
+
+    if (seleccionado.telefono) {
+      setTelefono(
+        seleccionado.telefono
+      );
+    }
+
+    setClienteAbierto(false);
+    setErrorFormulario("");
+  }
+
   async function guardar() {
     const clienteLimpio =
       cliente.trim();
@@ -1132,7 +1458,7 @@ function FormularioNuevaRecoleccion({
 
     if (!clienteLimpio) {
       setErrorFormulario(
-        "Escribe el nombre del cliente."
+        "Selecciona o escribe el nombre del cliente."
       );
       return;
     }
@@ -1224,7 +1550,7 @@ function FormularioNuevaRecoleccion({
       />
 
       <div className="relative z-10 max-h-[94vh] w-full overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:max-w-2xl sm:rounded-3xl">
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur">
+        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.15em] text-cyan-700">
               Recolecciones
@@ -1246,11 +1572,54 @@ function FormularioNuevaRecoleccion({
         </div>
 
         <div className="space-y-4 p-5">
-          <CampoFormulario
-            titulo="Cliente *"
+          <SelectorCliente
             value={cliente}
-            onChange={setCliente}
-            placeholder="Nombre completo del cliente"
+            onChange={(value) => {
+              setCliente(value);
+              setClienteAbierto(true);
+
+              /*
+               * Si el usuario cambia manualmente
+               * el nombre después de seleccionar,
+               * evitamos conservar por accidente
+               * el teléfono de otra persona.
+               */
+              const exacto =
+                clientes.find(
+                  (item) =>
+                    item.nombre.toLocaleLowerCase(
+                      "es"
+                    ) ===
+                    value
+                      .trim()
+                      .toLocaleLowerCase(
+                        "es"
+                      )
+                );
+
+              if (exacto) {
+                if (
+                  exacto.telefono
+                ) {
+                  setTelefono(
+                    exacto.telefono
+                  );
+                }
+              }
+            }}
+            abierto={clienteAbierto}
+            setAbierto={
+              setClienteAbierto
+            }
+            opciones={
+              clientesFiltrados
+            }
+            cargando={
+              cargandoClientes
+            }
+            onSeleccionar={
+              seleccionarCliente
+            }
           />
 
           <CampoFormulario
@@ -1266,7 +1635,19 @@ function FormularioNuevaRecoleccion({
             value={bodega}
             onChange={setBodega}
             placeholder="Ej. Lady Ventas"
+            list="vipack-bodegas"
           />
+
+          <datalist id="vipack-bodegas">
+            {bodegas.map(
+              (nombre) => (
+                <option
+                  key={nombre}
+                  value={nombre}
+                />
+              )
+            )}
+          </datalist>
 
           <CampoFormulario
             titulo="Dirección / ubicación"
@@ -1365,12 +1746,181 @@ function FormularioNuevaRecoleccion({
   );
 }
 
+function SelectorCliente({
+  value,
+  onChange,
+  abierto,
+  setAbierto,
+  opciones,
+  cargando,
+  onSeleccionar,
+}: {
+  value: string;
+  onChange: (
+    value: string
+  ) => void;
+  abierto: boolean;
+  setAbierto: (
+    value: boolean
+  ) => void;
+  opciones: ClienteOption[];
+  cargando: boolean;
+  onSeleccionar: (
+    cliente: ClienteOption
+  ) => void;
+}) {
+  return (
+    <div className="relative">
+      <label className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">
+        Cliente *
+      </label>
+
+      <div className="relative">
+        <input
+          type="text"
+          autoComplete="off"
+          value={value}
+          onFocus={() =>
+            setAbierto(true)
+          }
+          onChange={(event) =>
+            onChange(
+              event.target.value
+            )
+          }
+          onKeyDown={(event) => {
+            if (
+              event.key ===
+              "Escape"
+            ) {
+              setAbierto(false);
+            }
+          }}
+          placeholder="Buscar o seleccionar cliente"
+          className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 pr-11 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
+        />
+
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label="Mostrar clientes"
+          onMouseDown={(event) =>
+            event.preventDefault()
+          }
+          onClick={() =>
+            setAbierto(!abierto)
+          }
+          className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-500"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className={`h-4 w-4 transition ${
+              abierto
+                ? "rotate-180"
+                : ""
+            }`}
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+      </div>
+
+      {abierto && (
+        <div className="absolute left-0 right-0 z-[150] mt-2 max-h-64 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
+          {cargando &&
+            opciones.length ===
+              0 && (
+              <p className="px-3 py-3 text-sm font-semibold text-slate-500">
+                Cargando
+                clientes...
+              </p>
+            )}
+
+          {!cargando &&
+            opciones.length ===
+              0 && (
+              <div className="px-3 py-3">
+                <p className="text-sm font-black text-slate-700">
+                  No hay
+                  coincidencias
+                </p>
+
+                <p className="mt-1 text-xs text-slate-500">
+                  Puedes escribir el
+                  nombre manualmente.
+                </p>
+              </div>
+            )}
+
+          {opciones.map(
+            (item) => (
+              <button
+                key={`${item.nombre}-${item.telefono}`}
+                type="button"
+                onMouseDown={(
+                  event
+                ) =>
+                  event.preventDefault()
+                }
+                onClick={() =>
+                  onSeleccionar(
+                    item
+                  )
+                }
+                className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-blue-50"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black text-slate-900">
+                    {item.nombre}
+                  </p>
+
+                  {item.telefono && (
+                    <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
+                      {
+                        item.telefono
+                      }
+                    </p>
+                  )}
+                </div>
+
+                <span className="shrink-0 text-xs font-black text-blue-700">
+                  Elegir
+                </span>
+              </button>
+            )
+          )}
+        </div>
+      )}
+
+      <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
+        {cargando
+          ? "Sincronizando catálogo de clientes..."
+          : `${opciones.length} cliente${
+              opciones.length ===
+              1
+                ? ""
+                : "s"
+            } disponible${
+              opciones.length ===
+              1
+                ? ""
+                : "s"
+            } en esta búsqueda`}
+      </p>
+    </div>
+  );
+}
+
 function CampoFormulario({
   titulo,
   value,
   onChange,
   placeholder,
   inputMode,
+  list,
 }: {
   titulo: string;
   value: string;
@@ -1383,6 +1933,7 @@ function CampoFormulario({
     | "tel"
     | "email"
     | "numeric";
+  list?: string;
 }) {
   return (
     <div>
@@ -1393,6 +1944,7 @@ function CampoFormulario({
       <input
         type="text"
         inputMode={inputMode}
+        list={list}
         value={value}
         onChange={(event) =>
           onChange(
