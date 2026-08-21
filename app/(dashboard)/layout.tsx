@@ -59,12 +59,16 @@ const menuBazares: EnlaceMenu[] = [
   },
 ];
 
-
 const menuInventario: EnlaceMenu[] = [
   {
     etiqueta: "Inventarios",
     href: "/inventarios",
     icono: <IconoInventario />,
+  },
+  {
+    etiqueta: "Recolecciones",
+    href: "/recolecciones",
+    icono: <IconoUbicacion />,
   },
 ];
 
@@ -129,12 +133,6 @@ export default function DashboardLayout({
               <BotonProximamente
                 etiqueta="Clientes"
                 icono={<IconoUsuarios />}
-                contraido={menuContraido}
-              />
-
-              <BotonProximamente
-                etiqueta="Recolecciones"
-                icono={<IconoUbicacion />}
                 contraido={menuContraido}
               />
 
@@ -204,6 +202,26 @@ export default function DashboardLayout({
                   pathname={pathname}
                   contraido={false}
                 />
+
+                <div className="mt-6 border-t border-white/10 pt-5">
+                  <BotonProximamente
+                    etiqueta="Clientes"
+                    icono={<IconoUsuarios />}
+                    contraido={false}
+                  />
+
+                  <BotonProximamente
+                    etiqueta="Empaque"
+                    icono={<IconoCaja />}
+                    contraido={false}
+                  />
+
+                  <BotonProximamente
+                    etiqueta="Reportes"
+                    icono={<IconoGrafica />}
+                    contraido={false}
+                  />
+                </div>
               </nav>
 
               <EstadoSistema contraido={false} />
