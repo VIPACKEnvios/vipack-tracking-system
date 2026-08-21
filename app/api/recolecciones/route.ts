@@ -477,6 +477,64 @@ function normalizarEstadoPermitido(
   );
 }
 
+
+function siguienteNumeroRuta(
+  filas: Array<
+    Record<
+      string,
+      unknown
+    >
+  >
+) {
+  let mayor = 0;
+
+  for (
+    const fila
+    of filas
+  ) {
+    const valor =
+      String(
+        fila[
+          "Orden ruta"
+        ] ?? ""
+      ).trim();
+
+    if (!valor) {
+      continue;
+    }
+
+    /*
+     * Solo consideramos números enteros
+     * positivos para el consecutivo
+     * automático de ruta.
+     */
+    if (
+      !/^\d+$/.test(
+        valor
+      )
+    ) {
+      continue;
+    }
+
+    const numero =
+      Number(valor);
+
+    if (
+      Number.isSafeInteger(
+        numero
+      ) &&
+      numero > mayor
+    ) {
+      mayor = numero;
+    }
+  }
+
+  return String(
+    mayor + 1
+  );
+}
+
+
 export async function GET() {
   try {
     const {
@@ -1158,6 +1216,11 @@ export async function PATCH(
       ...filas[indice],
     };
 
+    /*
+     * Ruta manual:
+     * si el usuario envía ordenRuta,
+     * respetamos exactamente ese cambio.
+     */
     if (
       tieneOrdenRuta
     ) {
@@ -1172,6 +1235,39 @@ export async function PATCH(
     ) {
       actualizada.Estatus =
         estado;
+    }
+
+    /*
+     * Ruta automática:
+     * al marcar "En ruta", si la
+     * recolección todavía no tiene
+     * número de ruta y en este PATCH
+     * no se envió una ruta manual,
+     * asignamos el siguiente número
+     * disponible.
+     *
+     * Si ya tenía una ruta, se conserva.
+     */
+    const rutaActual =
+      String(
+        actualizada[
+          "Orden ruta"
+        ] ?? ""
+      ).trim();
+
+    if (
+      tieneEstado &&
+      estado ===
+        "En ruta" &&
+      !rutaActual &&
+      !tieneOrdenRuta
+    ) {
+      actualizada[
+        "Orden ruta"
+      ] =
+        siguienteNumeroRuta(
+          filas
+        );
     }
 
     if (
@@ -1255,6 +1351,13 @@ export async function PATCH(
 
       registro:
         actualizada,
+
+      rutaAsignada:
+        String(
+          actualizada[
+            "Orden ruta"
+          ] ?? ""
+        ).trim(),
     });
   } catch (
     error: unknown
