@@ -609,6 +609,7 @@ export default function RecoleccionesPage() {
     EditorOperacion | null
   >(null);
 
+
   const aplicarActualizacionLocal =
     useCallback(
       (
@@ -720,17 +721,37 @@ export default function RecoleccionesPage() {
 
           setError("");
 
-          const response =
-            await fetch(
-              "/api/recolecciones",
-              {
-                cache:
-                  "no-store",
-              }
-            );
+          const [
+            response,
+            eliminadasResponse,
+          ] =
+            await Promise.all([
+              fetch(
+                "/api/recolecciones",
+                {
+                  cache:
+                    "no-store",
+                }
+              ),
+
+              fetch(
+                "/api/recolecciones/eliminadas",
+                {
+                  cache:
+                    "no-store",
+                }
+              ),
+            ]);
 
           const data =
             (await response.json()) as RespuestaApi;
+
+          const eliminadasData =
+            (await eliminadasResponse.json()) as {
+              success?: boolean;
+              folios?: string[];
+              error?: string;
+            };
 
           if (
             !response.ok ||
@@ -741,6 +762,26 @@ export default function RecoleccionesPage() {
                 "No se pudieron cargar las recolecciones."
             );
           }
+
+          if (
+            !eliminadasResponse.ok ||
+            !eliminadasData.success
+          ) {
+            throw new Error(
+              eliminadasData.error ||
+                "No se pudo consultar la lista de recolecciones eliminadas."
+            );
+          }
+
+          const eliminados =
+            new Set(
+              Array.isArray(
+                eliminadasData.folios
+              )
+                ? eliminadasData.folios
+                : []
+            );
+
 
           const filas =
             Array.isArray(
@@ -761,7 +802,12 @@ export default function RecoleccionesPage() {
               );
 
           setRecolecciones(
-            registros
+            registros.filter(
+              (registro) =>
+                !eliminados.has(
+                  registro.folio
+                )
+            )
           );
         } catch (
           e: unknown
@@ -1180,6 +1226,74 @@ export default function RecoleccionesPage() {
     vistaMovil,
     resumenEvidencias,
   ]);
+
+  const eliminarDelSistema =
+    useCallback(
+      async (
+        item: Recoleccion
+      ) => {
+        const confirmar =
+          window.confirm(
+            `¿Eliminar esta recolección de la vista de VIPACK?\n\n${item.folio}\n${item.cliente}\n\nLa fila NO se borrará del Excel y las evidencias NO se eliminarán.`
+          );
+
+        if (!confirmar) {
+          return false;
+        }
+
+        const response =
+          await fetch(
+            "/api/recolecciones/eliminadas",
+            {
+              method:
+                "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body:
+                JSON.stringify({
+                  folio:
+                    item.folio,
+                }),
+            }
+          );
+
+        const data =
+          (await response.json()) as {
+            success?: boolean;
+            error?: string;
+          };
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+          throw new Error(
+            data.error ||
+              "No se pudo eliminar la recolección de la vista."
+          );
+        }
+
+        setRecolecciones(
+          (actuales) =>
+            actuales.filter(
+              (registro) =>
+                registro.folio !==
+                item.folio
+            )
+        );
+
+        setSeleccionada(
+          null
+        );
+
+        return true;
+      },
+      []
+    );
 
   const marcarComoRecolectada =
     useCallback(
@@ -2101,6 +2215,21 @@ export default function RecoleccionesPage() {
                 error instanceof Error
                   ? error.message
                   : "No se pudo marcar como recolectada."
+              );
+            }
+          }}
+          onEliminarDelSistema={async () => {
+            try {
+              await eliminarDelSistema(
+                seleccionada
+              );
+            } catch (
+              error: unknown
+            ) {
+              window.alert(
+                error instanceof Error
+                  ? error.message
+                  : "No se pudo eliminar la recolección de la vista."
               );
             }
           }}
@@ -3305,6 +3434,7 @@ function Detalle({
   onEditarEstado,
   onEditarCita,
   onMarcarRecolectada,
+  onEliminarDelSistema,
 }: {
   item: Recoleccion;
   cerrar: () => void;
@@ -3312,6 +3442,7 @@ function Detalle({
   onEditarEstado: () => void;
   onEditarCita: () => void;
   onMarcarRecolectada: () => Promise<void>;
+  onEliminarDelSistema: () => Promise<void>;
 }) {
   const [
     notas,
@@ -3335,6 +3466,11 @@ function Detalle({
   const [
     marcandoRecolectada,
     setMarcandoRecolectada,
+  ] = useState(false);
+
+  const [
+    eliminandoRecoleccion,
+    setEliminandoRecoleccion,
   ] = useState(false);
 
   const [
@@ -3379,6 +3515,20 @@ function Detalle({
       await onMarcarRecolectada();
     } finally {
       setMarcandoRecolectada(
+        false
+      );
+    }
+  }
+
+  async function confirmarEliminacionVista() {
+    try {
+      setEliminandoRecoleccion(
+        true
+      );
+
+      await onEliminarDelSistema();
+    } finally {
+      setEliminandoRecoleccion(
         false
       );
     }
@@ -4019,6 +4169,35 @@ function Detalle({
                 </p>
               </div>
             )}
+
+            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-red-700">
+                Quitar de la vista
+              </p>
+
+              <p className="mt-1 text-sm font-semibold text-slate-600">
+                Elimina esta recolección del panel de VIPACK sin borrar la fila del Excel, las notas ni las fotos.
+              </p>
+
+              <button
+                type="button"
+                disabled={
+                  eliminandoRecoleccion
+                }
+                onClick={() =>
+                  void confirmarEliminacionVista()
+                }
+                className="mt-4 flex min-h-12 w-full items-center justify-center rounded-2xl border border-red-300 bg-white px-4 py-3 text-sm font-black text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {eliminandoRecoleccion
+                  ? "Eliminando..."
+                  : "Eliminar del sistema"}
+              </button>
+
+              <p className="mt-2 text-center text-[10px] font-semibold text-red-700/75">
+                El registro original seguirá disponible en control_recolecciones_bodega.xlsx.
+              </p>
+            </div>
 
             <div className="mt-5 border-t border-slate-200 pt-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
