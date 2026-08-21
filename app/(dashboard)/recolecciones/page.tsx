@@ -1181,6 +1181,98 @@ export default function RecoleccionesPage() {
     resumenEvidencias,
   ]);
 
+  const marcarComoRecolectada =
+    useCallback(
+      async (
+        item: Recoleccion
+      ) => {
+        const confirmar =
+          window.confirm(
+            `¿Marcar como recolectada la mercancía de ${item.cliente}?`
+          );
+
+        if (!confirmar) {
+          return false;
+        }
+
+        const response =
+          await fetch(
+            "/api/recolecciones",
+            {
+              method:
+                "PATCH",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body:
+                JSON.stringify({
+                  folio:
+                    item.folio,
+
+                  estado:
+                    "Recolectada",
+                }),
+            }
+          );
+
+        const data =
+          (await response.json()) as {
+            success?: boolean;
+            error?: string;
+            rutaAsignada?: string;
+            registro?: {
+              "Orden ruta"?: unknown;
+            };
+          };
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+          throw new Error(
+            data.error ||
+              "No se pudo marcar la recolección como recolectada."
+          );
+        }
+
+        const rutaDevuelta =
+          String(
+            data.rutaAsignada ??
+              data.registro?.[
+                "Orden ruta"
+              ] ??
+              item.ordenRuta ??
+              ""
+          ).trim();
+
+        aplicarActualizacionLocal(
+          item.folio,
+          {
+            estado:
+              "Recolectada",
+
+            ...(rutaDevuelta
+              ? {
+                  ordenRuta:
+                    rutaDevuelta,
+                }
+              : {}),
+          }
+        );
+
+        await cargar(true);
+
+        return true;
+      },
+      [
+        aplicarActualizacionLocal,
+        cargar,
+      ]
+    );
+
   return (
     <div className="min-h-full bg-slate-100">
       {/* =========================
@@ -1863,6 +1955,21 @@ export default function RecoleccionesPage() {
                           "estado",
                       })
                     }
+                    onMarcarRecolectada={() => {
+                      void marcarComoRecolectada(
+                        item
+                      ).catch(
+                        (
+                          error: unknown
+                        ) => {
+                          window.alert(
+                            error instanceof Error
+                              ? error.message
+                              : "No se pudo marcar como recolectada."
+                          );
+                        }
+                      );
+                    }}
                   />
                 )
               )}
@@ -1975,6 +2082,28 @@ export default function RecoleccionesPage() {
                 "cita",
             })
           }
+          onMarcarRecolectada={async () => {
+            try {
+              const ok =
+                await marcarComoRecolectada(
+                  seleccionada
+                );
+
+              if (ok) {
+                setSeleccionada(
+                  null
+                );
+              }
+            } catch (
+              error: unknown
+            ) {
+              window.alert(
+                error instanceof Error
+                  ? error.message
+                  : "No se pudo marcar como recolectada."
+              );
+            }
+          }}
         />
       )}
 
@@ -2947,6 +3076,7 @@ function TarjetaMovil({
   onVer,
   onEditarRuta,
   onEditarEstado,
+  onMarcarRecolectada,
 }: {
   item: Recoleccion;
   evidencia?:
@@ -2954,6 +3084,7 @@ function TarjetaMovil({
   onVer: () => void;
   onEditarRuta: () => void;
   onEditarEstado: () => void;
+  onMarcarRecolectada: () => void;
 }) {
   const notas =
     evidencia?.cargado
@@ -3128,6 +3259,19 @@ function TarjetaMovil({
           Cambiar estado
         </button>
 
+        {item.estado !==
+          "Recolectada" && (
+          <button
+            type="button"
+            onClick={
+              onMarcarRecolectada
+            }
+            className="col-span-2 rounded-xl bg-emerald-600 px-3 py-3 text-center text-xs font-black text-white"
+          >
+            ✓ Marcar como recolectada
+          </button>
+        )}
+
         {whatsapp && (
           <a
             href={whatsapp}
@@ -3160,12 +3304,14 @@ function Detalle({
   onEditarRuta,
   onEditarEstado,
   onEditarCita,
+  onMarcarRecolectada,
 }: {
   item: Recoleccion;
   cerrar: () => void;
   onEditarRuta: () => void;
   onEditarEstado: () => void;
   onEditarCita: () => void;
+  onMarcarRecolectada: () => Promise<void>;
 }) {
   const [
     notas,
@@ -3185,6 +3331,11 @@ function Detalle({
     cargandoEvidencias,
     setCargandoEvidencias,
   ] = useState(true);
+
+  const [
+    marcandoRecolectada,
+    setMarcandoRecolectada,
+  ] = useState(false);
 
   const [
     subiendoTipo,
@@ -3213,6 +3364,20 @@ function Detalle({
       "nota" | "foto";
     index: number;
   } | null>(null);
+
+  async function confirmarRecolectada() {
+    try {
+      setMarcandoRecolectada(
+        true
+      );
+
+      await onMarcarRecolectada();
+    } finally {
+      setMarcandoRecolectada(
+        false
+      );
+    }
+  }
 
   const cargarEvidencias =
     useCallback(
@@ -3671,6 +3836,54 @@ function Detalle({
                     item.observaciones
                   }
                 />
+              </div>
+            )}
+
+            {item.estado !==
+              "Recolectada" && (
+              <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
+                  Finalizar recolección
+                </p>
+
+                <p className="mt-1 text-sm font-semibold text-slate-600">
+                  Cuando la mercancía ya esté contigo, marca esta solicitud como recolectada.
+                </p>
+
+                <button
+                  type="button"
+                  disabled={
+                    marcandoRecolectada
+                  }
+                  onClick={() =>
+                    void confirmarRecolectada()
+                  }
+                  className="mt-4 flex min-h-14 w-full items-center justify-center rounded-2xl bg-emerald-600 px-5 py-4 text-base font-black text-white shadow-lg shadow-emerald-900/10 transition hover:bg-emerald-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {marcandoRecolectada
+                    ? "Guardando..."
+                    : "✓ Marcar como recolectada"}
+                </button>
+
+                {item.estado !==
+                  "En ruta" && (
+                  <p className="mt-2 text-center text-[11px] font-semibold text-amber-700">
+                    Estado actual: {item.estado}. También puedes cambiarlo manualmente desde Control operativo.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {item.estado ===
+              "Recolectada" && (
+              <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-center">
+                <p className="text-sm font-black text-emerald-700">
+                  ✓ Recolección completada
+                </p>
+
+                <p className="mt-1 text-xs font-semibold text-emerald-700/80">
+                  Esta mercancía ya está marcada como recolectada.
+                </p>
               </div>
             )}
 
