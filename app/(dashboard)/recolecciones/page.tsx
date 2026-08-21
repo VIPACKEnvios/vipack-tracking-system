@@ -61,6 +61,27 @@ type RespuestaApi = {
   error?: string;
 };
 
+type EvidenciaArchivo = {
+  id: string;
+  nombre: string;
+  tamaño: number;
+  webUrl: string | null;
+  modificado: string | null;
+};
+
+type RespuestaEvidencias = {
+  success: boolean;
+  folio?: string;
+  resumen?: {
+    notas: number;
+    fotos: number;
+    total: number;
+  };
+  notas?: EvidenciaArchivo[];
+  fotos?: EvidenciaArchivo[];
+  error?: string;
+};
+
 type VistaMovil =
   | "Solicitudes"
   | "Recolectadas";
@@ -2054,6 +2075,182 @@ function Detalle({
   item: Recoleccion;
   cerrar: () => void;
 }) {
+  const [
+    notas,
+    setNotas,
+  ] = useState<
+    EvidenciaArchivo[]
+  >([]);
+
+  const [
+    fotos,
+    setFotos,
+  ] = useState<
+    EvidenciaArchivo[]
+  >([]);
+
+  const [
+    cargandoEvidencias,
+    setCargandoEvidencias,
+  ] = useState(true);
+
+  const [
+    subiendoTipo,
+    setSubiendoTipo,
+  ] = useState<
+    "nota" | "foto" | null
+  >(null);
+
+  const [
+    errorEvidencias,
+    setErrorEvidencias,
+  ] = useState("");
+
+  const cargarEvidencias =
+    useCallback(
+      async () => {
+        try {
+          setCargandoEvidencias(
+            true
+          );
+          setErrorEvidencias("");
+
+          const response =
+            await fetch(
+              `/api/recolecciones/${encodeURIComponent(
+                item.folio
+              )}/evidencias`,
+              {
+                cache:
+                  "no-store",
+              }
+            );
+
+          const data =
+            (await response.json()) as RespuestaEvidencias;
+
+          if (
+            !response.ok ||
+            !data.success
+          ) {
+            throw new Error(
+              data.error ||
+                "No se pudieron cargar las evidencias."
+            );
+          }
+
+          setNotas(
+            Array.isArray(
+              data.notas
+            )
+              ? data.notas
+              : []
+          );
+
+          setFotos(
+            Array.isArray(
+              data.fotos
+            )
+              ? data.fotos
+              : []
+          );
+        } catch (
+          error: unknown
+        ) {
+          setErrorEvidencias(
+            error instanceof Error
+              ? error.message
+              : "No se pudieron cargar las evidencias."
+          );
+        } finally {
+          setCargandoEvidencias(
+            false
+          );
+        }
+      },
+      [item.folio]
+    );
+
+  useEffect(() => {
+    void cargarEvidencias();
+  }, [cargarEvidencias]);
+
+  async function subirEvidencias(
+    tipo: "nota" | "foto",
+    archivos:
+      FileList | null
+  ) {
+    if (
+      !archivos ||
+      archivos.length === 0
+    ) {
+      return;
+    }
+
+    try {
+      setSubiendoTipo(tipo);
+      setErrorEvidencias("");
+
+      const formData =
+        new FormData();
+
+      formData.append(
+        "tipo",
+        tipo
+      );
+
+      Array.from(
+        archivos
+      ).forEach(
+        (archivo: File) => {
+          formData.append(
+            "archivos",
+            archivo
+          );
+        }
+      );
+
+      const response =
+        await fetch(
+          `/api/recolecciones/${encodeURIComponent(
+            item.folio
+          )}/evidencias`,
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
+
+      const data =
+        (await response.json()) as {
+          success?: boolean;
+          error?: string;
+        };
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        throw new Error(
+          data.error ||
+            "No se pudieron subir los archivos."
+        );
+      }
+
+      await cargarEvidencias();
+    } catch (
+      error: unknown
+    ) {
+      setErrorEvidencias(
+        error instanceof Error
+          ? error.message
+          : "No se pudieron subir los archivos."
+      );
+    } finally {
+      setSubiendoTipo(null);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-[100] flex items-end bg-slate-950/55 md:items-center md:justify-center md:p-5">
       <button
@@ -2063,8 +2260,8 @@ function Detalle({
         aria-label="Cerrar"
       />
 
-      <div className="relative z-10 max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-white md:max-w-2xl md:rounded-3xl">
-        <div className="sticky top-0 flex items-start justify-between border-b border-slate-200 bg-white p-5">
+      <div className="relative z-10 max-h-[94vh] w-full overflow-y-auto rounded-t-3xl bg-white md:max-w-3xl md:rounded-3xl">
+        <div className="sticky top-0 z-20 flex items-start justify-between border-b border-slate-200 bg-white p-5">
           <div>
             <p className="text-xs font-black text-[#072c74]">
               {item.folio}
@@ -2168,20 +2365,97 @@ function Detalle({
             </div>
           )}
 
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <Archivo
-              titulo="Nota"
-              existe={
-                Boolean(item.nota)
-              }
-            />
+          <div className="mt-5 border-t border-slate-200 pt-5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-700">
+                  Evidencias
+                </p>
 
-            <Archivo
-              titulo="Foto"
-              existe={
-                Boolean(item.foto)
-              }
-            />
+                <h3 className="mt-1 text-lg font-black text-slate-950">
+                  Evidencias de recolección
+                </h3>
+
+                <p className="mt-1 text-xs font-semibold text-slate-500">
+                  {notas.length}{" "}
+                  {notas.length === 1
+                    ? "nota"
+                    : "notas"}
+                  {" · "}
+                  {fotos.length}{" "}
+                  {fotos.length === 1
+                    ? "foto"
+                    : "fotos"}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  void cargarEvidencias()
+                }
+                disabled={
+                  cargandoEvidencias
+                }
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 disabled:opacity-50"
+              >
+                {cargandoEvidencias
+                  ? "Cargando..."
+                  : "Actualizar"}
+              </button>
+            </div>
+
+            {errorEvidencias && (
+              <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                {errorEvidencias}
+              </div>
+            )}
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <SeccionEvidencias
+                titulo="Notas de recolección"
+                subtitulo="Puedes seleccionar varias imágenes."
+                archivos={notas}
+                tipo="nota"
+                subiendo={
+                  subiendoTipo ===
+                  "nota"
+                }
+                onSeleccionar={(
+                  archivos
+                ) =>
+                  void subirEvidencias(
+                    "nota",
+                    archivos
+                  )
+                }
+                legado={
+                  item.nota
+                }
+              />
+
+              <SeccionEvidencias
+                titulo="Fotos de mercancía"
+                subtitulo="Puedes agregar varias fotos al mismo folio."
+                archivos={fotos}
+                tipo="foto"
+                subiendo={
+                  subiendoTipo ===
+                  "foto"
+                }
+                onSeleccionar={(
+                  archivos
+                ) =>
+                  void subirEvidencias(
+                    "foto",
+                    archivos
+                  )
+                }
+                legado={
+                  item.foto
+                }
+              />
+            </div>
           </div>
 
           <button
@@ -2196,6 +2470,176 @@ function Detalle({
     </div>
   );
 }
+
+function SeccionEvidencias({
+  titulo,
+  subtitulo,
+  archivos,
+  tipo,
+  subiendo,
+  onSeleccionar,
+  legado,
+}: {
+  titulo: string;
+  subtitulo: string;
+  archivos: EvidenciaArchivo[];
+  tipo: "nota" | "foto";
+  subiendo: boolean;
+  onSeleccionar: (
+    archivos:
+      FileList | null
+  ) => void;
+  legado: string;
+}) {
+  const inputId =
+    `evidencias-${tipo}`;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-black text-slate-900">
+            {titulo}
+          </p>
+
+          <p className="mt-1 text-xs text-slate-500">
+            {subtitulo}
+          </p>
+        </div>
+
+        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-[#072c74] shadow-sm">
+          {archivos.length}
+        </span>
+      </div>
+
+      <input
+        id={inputId}
+        type="file"
+        accept="image/*"
+        multiple
+        disabled={subiendo}
+        className="hidden"
+        onChange={(event) => {
+          const files =
+            event.target.files;
+
+          onSeleccionar(
+            files
+          );
+
+          event.currentTarget.value =
+            "";
+        }}
+      />
+
+      <label
+        htmlFor={inputId}
+        className={`mt-4 flex min-h-11 cursor-pointer items-center justify-center rounded-xl px-4 py-3 text-center text-sm font-black text-white ${
+          subiendo
+            ? "pointer-events-none bg-slate-400"
+            : "bg-[#072c74] active:scale-[0.99]"
+        }`}
+      >
+        {subiendo
+          ? "Subiendo..."
+          : tipo === "nota"
+            ? "+ Agregar notas"
+            : "+ Agregar fotos"}
+      </label>
+
+      {archivos.length >
+      0 ? (
+        <div className="mt-3 space-y-2">
+          {archivos.map(
+            (
+              archivo,
+              index
+            ) => (
+              <div
+                key={
+                  archivo.id ||
+                  `${archivo.nombre}-${index}`
+                }
+                className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-sm font-black text-blue-700">
+                  {index + 1}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-black text-slate-800">
+                    {
+                      archivo.nombre
+                    }
+                  </p>
+
+                  <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
+                    {formatoBytes(
+                      archivo.tamaño
+                    )}
+                  </p>
+                </div>
+
+                {archivo.webUrl && (
+                  <a
+                    href={
+                      archivo.webUrl
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[10px] font-black text-[#072c74]"
+                  >
+                    Ver
+                  </a>
+                )}
+              </div>
+            )
+          )}
+        </div>
+      ) : (
+        <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-4 text-center">
+          <p className="text-xs font-bold text-slate-500">
+            {legado
+              ? "Existe una evidencia histórica registrada en el Excel."
+              : "Todavía no hay archivos para este folio."}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatoBytes(
+  bytes: number
+) {
+  if (
+    !Number.isFinite(
+      bytes
+    ) ||
+    bytes <= 0
+  ) {
+    return "Archivo";
+  }
+
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (
+    bytes <
+    1024 * 1024
+  ) {
+    return `${(
+      bytes / 1024
+    ).toFixed(1)} KB`;
+  }
+
+  return `${(
+    bytes /
+    (1024 * 1024)
+  ).toFixed(1)} MB`;
+}
+
 
 function Dato({
   titulo,
