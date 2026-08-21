@@ -26,6 +26,7 @@ type NuevaRecoleccionBody = {
   mercancia?: string;
   cantidad?: string;
   fechaRecoleccion?: string;
+  horaCita?: string;
   observaciones?: string;
 };
 
@@ -33,6 +34,8 @@ type ActualizarRecoleccionBody = {
   folio?: string;
   ordenRuta?: string | null;
   estado?: string | null;
+  fechaRecoleccion?: string | null;
+  horaCita?: string | null;
 };
 
 const ESTADOS_VALIDOS = new Set([
@@ -797,6 +800,11 @@ export async function POST(
           body.fechaRecoleccion || ""
         ).trim(),
 
+      "Hora de cita":
+        String(
+          body.horaCita || ""
+        ).trim(),
+
       Estatus:
         "Pendiente",
 
@@ -830,6 +838,7 @@ export async function POST(
             "Mercancía",
             "Cantidad / Bultos",
             "Fecha de recolección",
+            "Hora de cita",
             "Estatus",
             "Observaciones",
             "Foto mercancía",
@@ -929,15 +938,29 @@ export async function PATCH(
         "estado"
       );
 
+    const tieneFechaRecoleccion =
+      Object.prototype.hasOwnProperty.call(
+        body,
+        "fechaRecoleccion"
+      );
+
+    const tieneHoraCita =
+      Object.prototype.hasOwnProperty.call(
+        body,
+        "horaCita"
+      );
+
     if (
       !tieneOrdenRuta &&
-      !tieneEstado
+      !tieneEstado &&
+      !tieneFechaRecoleccion &&
+      !tieneHoraCita
     ) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "Debes enviar ordenRuta, estado o ambos.",
+            "Debes enviar ordenRuta, estado, fechaRecoleccion, horaCita o una combinación de ellos.",
         },
         {
           status: 400,
@@ -957,6 +980,20 @@ export async function PATCH(
         ? normalizarEstadoPermitido(
             body.estado
           )
+        : null;
+
+    const fechaRecoleccion =
+      tieneFechaRecoleccion
+        ? String(
+            body.fechaRecoleccion ?? ""
+          ).trim()
+        : null;
+
+    const horaCita =
+      tieneHoraCita
+        ? String(
+            body.horaCita ?? ""
+          ).trim()
         : null;
 
     if (
@@ -992,6 +1029,47 @@ export async function PATCH(
           success: false,
           error:
             "La ruta contiene caracteres no permitidos.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      tieneFechaRecoleccion &&
+      fechaRecoleccion &&
+      !/^\d{4}-\d{2}-\d{2}$/.test(
+        fechaRecoleccion
+      ) &&
+      !/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(
+        fechaRecoleccion
+      )
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "La fecha de recolección no tiene un formato válido.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      tieneHoraCita &&
+      horaCita &&
+      !/^([01]\d|2[0-3]):[0-5]\d$/.test(
+        horaCita
+      )
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "La hora de cita debe tener formato HH:MM.",
         },
         {
           status: 400,
@@ -1096,6 +1174,24 @@ export async function PATCH(
         estado;
     }
 
+    if (
+      tieneFechaRecoleccion
+    ) {
+      actualizada[
+        "Fecha de recolección"
+      ] =
+        fechaRecoleccion || "";
+    }
+
+    if (
+      tieneHoraCita
+    ) {
+      actualizada[
+        "Hora de cita"
+      ] =
+        horaCita || "";
+    }
+
     filas[indice] =
       actualizada;
 
@@ -1115,6 +1211,7 @@ export async function PATCH(
             "Mercancía",
             "Cantidad / Bultos",
             "Fecha de recolección",
+            "Hora de cita",
             "Estatus",
             "Observaciones",
             "Foto mercancía",

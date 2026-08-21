@@ -29,6 +29,7 @@ type RegistroExcel = {
   Mercancía?: unknown;
   "Cantidad / Bultos"?: unknown;
   "Fecha de recolección"?: unknown;
+  "Hora de cita"?: unknown;
   Estatus?: unknown;
   Observaciones?: unknown;
   "Foto mercancía"?: unknown;
@@ -46,6 +47,7 @@ type Recoleccion = {
   mercancia: string;
   cantidad: string;
   fechaRecoleccion: string;
+  horaCita: string;
   estado: Estado;
   observaciones: string;
   foto: string;
@@ -112,6 +114,23 @@ type ResumenEvidenciaFila = {
   fotos: number;
   cargado: boolean;
 };
+
+type EditorOperacion = {
+  item: Recoleccion;
+  tipo:
+    | "ruta"
+    | "estado"
+    | "cita";
+};
+
+const ESTADOS_RECOLECCION: Estado[] = [
+  "Pendiente",
+  "En ruta",
+  "Recolectada",
+  "No lista",
+  "Reprogramada",
+  "Cancelada",
+];
 
 function txt(valor: unknown) {
   return String(
@@ -225,6 +244,13 @@ function convertirRegistro(
         ]
       ),
 
+    horaCita:
+      txt(
+        fila[
+          "Hora de cita"
+        ]
+      ),
+
     estado:
       normalizarEstado(
         fila.Estatus
@@ -274,6 +300,21 @@ function formatoFecha(
   const soloFecha =
     fecha.split(" ")[0];
 
+  if (
+    /^\d{4}-\d{2}-\d{2}$/.test(
+      soloFecha
+    )
+  ) {
+    const [
+      anio,
+      mes,
+      dia,
+    ] =
+      soloFecha.split("-");
+
+    return `${dia}/${mes}/${anio}`;
+  }
+
   const partes =
     soloFecha.split("/");
 
@@ -295,13 +336,96 @@ function formatoFecha(
       "0"
     );
 
-  let anio = partes[2];
+  let anio =
+    partes[2];
 
-  if (anio.length === 2) {
-    anio = `20${anio}`;
+  if (
+    anio.length === 2
+  ) {
+    anio =
+      `20${anio}`;
   }
 
   return `${dia}/${mes}/${anio}`;
+}
+
+function fechaParaInput(
+  fecha: string
+) {
+  if (!fecha) {
+    return "";
+  }
+
+  const soloFecha =
+    fecha.split(" ")[0];
+
+  if (
+    /^\d{4}-\d{2}-\d{2}$/.test(
+      soloFecha
+    )
+  ) {
+    return soloFecha;
+  }
+
+  const partes =
+    soloFecha.split("/");
+
+  if (
+    partes.length !== 3
+  ) {
+    return "";
+  }
+
+  const mes =
+    partes[0].padStart(
+      2,
+      "0"
+    );
+
+  const dia =
+    partes[1].padStart(
+      2,
+      "0"
+    );
+
+  let anio =
+    partes[2];
+
+  if (
+    anio.length === 2
+  ) {
+    anio =
+      `20${anio}`;
+  }
+
+  return `${anio}-${mes}-${dia}`;
+}
+
+function formatoHora(
+  hora: string
+) {
+  if (!hora) {
+    return "Sin hora";
+  }
+
+  const match =
+    hora.match(
+      /^(\d{1,2}):(\d{2})/
+    );
+
+  if (!match) {
+    return hora;
+  }
+
+  const h =
+    Number(match[1]);
+
+  const periodo =
+    h >= 12
+      ? "PM"
+      : "AM";
+
+  return `${h % 12 || 12}:${match[2]} ${periodo}`;
 }
 
 
@@ -477,6 +601,106 @@ export default function RecoleccionesPage() {
       ResumenEvidenciaFila
     >
   >({});
+
+  const [
+    editorOperacion,
+    setEditorOperacion,
+  ] = useState<
+    EditorOperacion | null
+  >(null);
+
+  const aplicarActualizacionLocal =
+    useCallback(
+      (
+        folio: string,
+        cambios: {
+          ordenRuta?: string;
+          estado?: Estado;
+          fechaRecoleccion?: string;
+          horaCita?: string;
+        }
+      ) => {
+        setRecolecciones(
+          (actuales) =>
+            actuales.map(
+              (registro) =>
+                registro.folio ===
+                folio
+                  ? {
+                      ...registro,
+                      ...(cambios.ordenRuta !==
+                      undefined
+                        ? {
+                            ordenRuta:
+                              cambios.ordenRuta,
+                          }
+                        : {}),
+                      ...(cambios.estado !==
+                      undefined
+                        ? {
+                            estado:
+                              cambios.estado,
+                          }
+                        : {}),
+                      ...(cambios.fechaRecoleccion !==
+                      undefined
+                        ? {
+                            fechaRecoleccion:
+                              cambios.fechaRecoleccion,
+                          }
+                        : {}),
+                      ...(cambios.horaCita !==
+                      undefined
+                        ? {
+                            horaCita:
+                              cambios.horaCita,
+                          }
+                        : {}),
+                    }
+                  : registro
+            )
+        );
+
+        setSeleccionada(
+          (actual) =>
+            actual?.folio ===
+            folio
+              ? {
+                  ...actual,
+                  ...(cambios.ordenRuta !==
+                  undefined
+                    ? {
+                        ordenRuta:
+                          cambios.ordenRuta,
+                      }
+                    : {}),
+                  ...(cambios.estado !==
+                  undefined
+                    ? {
+                        estado:
+                          cambios.estado,
+                      }
+                    : {}),
+                  ...(cambios.fechaRecoleccion !==
+                  undefined
+                    ? {
+                        fechaRecoleccion:
+                          cambios.fechaRecoleccion,
+                      }
+                    : {}),
+                  ...(cambios.horaCita !==
+                  undefined
+                    ? {
+                        horaCita:
+                          cambios.horaCita,
+                      }
+                    : {}),
+                }
+              : actual
+        );
+      },
+      []
+    );
 
   const cargar =
     useCallback(
@@ -1217,17 +1441,30 @@ export default function RecoleccionesPage() {
                             className="align-top hover:bg-slate-50"
                           >
                             <td className="px-4 py-4">
-                              {item.ordenRuta ? (
-                                <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-xl bg-[#072c74] px-2 font-black text-white">
-                                  {
-                                    item.ordenRuta
-                                  }
-                                </span>
-                              ) : (
-                                <span className="inline-flex rounded-lg border border-dashed border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-black text-amber-700">
-                                  Sin ruta
-                                </span>
-                              )}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditorOperacion({
+                                    item,
+                                    tipo:
+                                      "ruta",
+                                  })
+                                }
+                                title={
+                                  item.ordenRuta
+                                    ? "Cambiar o quitar ruta"
+                                    : "Asignar ruta"
+                                }
+                                className={
+                                  item.ordenRuta
+                                    ? "inline-flex h-9 min-w-9 items-center justify-center rounded-xl bg-[#072c74] px-2 font-black text-white transition hover:bg-blue-900"
+                                    : "inline-flex rounded-lg border border-dashed border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-black text-amber-700 transition hover:bg-amber-100"
+                                }
+                              >
+                                {item.ordenRuta
+                                  ? item.ordenRuta
+                                  : "Sin ruta"}
+                              </button>
                             </td>
 
                             <td className="px-4 py-4">
@@ -1299,6 +1536,17 @@ export default function RecoleccionesPage() {
                                 Programada:{" "}
                                 {formatoFecha(
                                   item.fechaRecoleccion
+                                )}
+                              </p>
+
+                              <p className={`mt-1 text-[11px] font-black ${
+                                item.horaCita
+                                  ? "text-violet-700"
+                                  : "text-slate-400"
+                              }`}>
+                                🕐{" "}
+                                {formatoHora(
+                                  item.horaCita
                                 )}
                               </p>
 
@@ -1374,11 +1622,24 @@ export default function RecoleccionesPage() {
                             </td>
 
                             <td className="px-4 py-4">
-                              <EstadoBadge
-                                estado={
-                                  item.estado
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditorOperacion({
+                                    item,
+                                    tipo:
+                                      "estado",
+                                  })
                                 }
-                              />
+                                title="Cambiar estado"
+                                className="rounded-full transition hover:opacity-80"
+                              >
+                                <EstadoBadge
+                                  estado={
+                                    item.estado
+                                  }
+                                />
+                              </button>
                             </td>
 
                             <td className="px-4 py-4">
@@ -1588,6 +1849,20 @@ export default function RecoleccionesPage() {
                         item
                       )
                     }
+                    onEditarRuta={() =>
+                      setEditorOperacion({
+                        item,
+                        tipo:
+                          "ruta",
+                      })
+                    }
+                    onEditarEstado={() =>
+                      setEditorOperacion({
+                        item,
+                        tipo:
+                          "estado",
+                      })
+                    }
                   />
                 )
               )}
@@ -1676,6 +1951,61 @@ export default function RecoleccionesPage() {
               null
             )
           }
+          onEditarRuta={() =>
+            setEditorOperacion({
+              item:
+                seleccionada,
+              tipo:
+                "ruta",
+            })
+          }
+          onEditarEstado={() =>
+            setEditorOperacion({
+              item:
+                seleccionada,
+              tipo:
+                "estado",
+            })
+          }
+          onEditarCita={() =>
+            setEditorOperacion({
+              item:
+                seleccionada,
+              tipo:
+                "cita",
+            })
+          }
+        />
+      )}
+
+      {editorOperacion && (
+        <EditorRecoleccion
+          item={
+            editorOperacion.item
+          }
+          tipo={
+            editorOperacion.tipo
+          }
+          onCerrar={() =>
+            setEditorOperacion(
+              null
+            )
+          }
+          onGuardado={async (
+            cambios
+          ) => {
+            aplicarActualizacionLocal(
+              editorOperacion.item
+                .folio,
+              cambios
+            );
+
+            setEditorOperacion(
+              null
+            );
+
+            await cargar(true);
+          }}
         />
       )}
 
@@ -1725,6 +2055,11 @@ function FormularioNuevaRecoleccion({
   const [
     fechaRecoleccion,
     setFechaRecoleccion,
+  ] = useState("");
+
+  const [
+    horaCita,
+    setHoraCita,
   ] = useState("");
 
   const [
@@ -2130,6 +2465,8 @@ function FormularioNuevaRecoleccion({
 
                 fechaRecoleccion,
 
+                horaCita,
+
                 observaciones:
                   observaciones.trim(),
               }),
@@ -2295,21 +2632,44 @@ function FormularioNuevaRecoleccion({
             />
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">
-              Fecha programada de recolección
-            </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">
+                Fecha programada de recolección
+              </label>
 
-            <input
-              type="date"
-              value={fechaRecoleccion}
-              onChange={(event) =>
-                setFechaRecoleccion(
-                  event.target.value
-                )
-              }
-              className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
-            />
+              <input
+                type="date"
+                value={fechaRecoleccion}
+                onChange={(event) =>
+                  setFechaRecoleccion(
+                    event.target.value
+                  )
+                }
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">
+                Hora de cita
+              </label>
+
+              <input
+                type="time"
+                value={horaCita}
+                onChange={(event) =>
+                  setHoraCita(
+                    event.target.value
+                  )
+                }
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-800 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-100"
+              />
+
+              <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
+                Opcional si la bodega no maneja cita.
+              </p>
+            </div>
           </div>
 
           <div>
@@ -2585,11 +2945,15 @@ function TarjetaMovil({
   item,
   evidencia,
   onVer,
+  onEditarRuta,
+  onEditarEstado,
 }: {
   item: Recoleccion;
   evidencia?:
     ResumenEvidenciaFila;
   onVer: () => void;
+  onEditarRuta: () => void;
+  onEditarEstado: () => void;
 }) {
   const notas =
     evidencia?.cargado
@@ -2635,7 +2999,7 @@ function TarjetaMovil({
                 }
               </span>
             ) : (
-              <span className="text-[9px] font-black">
+              <span className="text-[9px] font-black leading-tight">
                 SIN
                 <br />
                 RUTA
@@ -2722,6 +3086,17 @@ function TarjetaMovil({
             <p className="mt-0.5 text-[10px] text-slate-400">
               Programada
             </p>
+
+            <p className={`mt-1 text-[11px] font-black ${
+              item.horaCita
+                ? "text-violet-700"
+                : "text-slate-400"
+            }`}>
+              🕐{" "}
+              {formatoHora(
+                item.horaCita
+              )}
+            </p>
           </div>
 
           <span className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-700">
@@ -2730,36 +3105,51 @@ function TarjetaMovil({
         </div>
       </button>
 
-      {(mapa ||
-        whatsapp) && (
-        <div className="grid grid-cols-2 gap-2 border-t border-slate-100 p-3">
-          {whatsapp ? (
-            <a
-              href={whatsapp}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-xl bg-emerald-50 px-3 py-2 text-center text-xs font-black text-emerald-700"
-            >
-              WhatsApp
-            </a>
-          ) : (
-            <div />
-          )}
+      <div className="grid grid-cols-2 gap-2 border-t border-slate-100 p-3">
+        <button
+          type="button"
+          onClick={
+            onEditarRuta
+          }
+          className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-center text-xs font-black text-blue-700"
+        >
+          {item.ordenRuta
+            ? `Ruta ${item.ordenRuta}`
+            : "+ Asignar ruta"}
+        </button>
 
-          {mapa ? (
-            <a
-              href={mapa}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-xl bg-cyan-50 px-3 py-2 text-center text-xs font-black text-cyan-700"
-            >
-              📍 Abrir mapa
-            </a>
-          ) : (
-            <div />
-          )}
-        </div>
-      )}
+        <button
+          type="button"
+          onClick={
+            onEditarEstado
+          }
+          className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center text-xs font-black text-slate-700"
+        >
+          Cambiar estado
+        </button>
+
+        {whatsapp && (
+          <a
+            href={whatsapp}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-xl bg-emerald-50 px-3 py-2 text-center text-xs font-black text-emerald-700"
+          >
+            WhatsApp
+          </a>
+        )}
+
+        {mapa && (
+          <a
+            href={mapa}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-xl bg-cyan-50 px-3 py-2 text-center text-xs font-black text-cyan-700"
+          >
+            📍 Abrir mapa
+          </a>
+        )}
+      </div>
     </div>
   );
 }
@@ -2767,9 +3157,15 @@ function TarjetaMovil({
 function Detalle({
   item,
   cerrar,
+  onEditarRuta,
+  onEditarEstado,
+  onEditarCita,
 }: {
   item: Recoleccion;
   cerrar: () => void;
+  onEditarRuta: () => void;
+  onEditarEstado: () => void;
+  onEditarCita: () => void;
 }) {
   const [
     notas,
@@ -3122,21 +3518,94 @@ function Detalle({
           </div>
 
           <div className="p-5">
-            <div className="mb-5 flex items-center gap-2">
-              <EstadoBadge
-                estado={
-                  item.estado
-                }
-              />
+            <div className="mb-5 rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-700">
+                Control operativo
+              </p>
 
-              {item.ordenRuta && (
-                <span className="rounded-full bg-[#072c74] px-3 py-1 text-xs font-black text-white">
-                  Ruta{" "}
-                  {
-                    item.ordenRuta
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <button
+                  type="button"
+                  onClick={
+                    onEditarRuta
                   }
-                </span>
-              )}
+                  className="flex items-center justify-between rounded-xl border border-blue-200 bg-white px-4 py-3 text-left transition hover:bg-blue-50"
+                >
+                  <span>
+                    <span className="block text-[10px] font-black uppercase text-slate-400">
+                      Ruta
+                    </span>
+
+                    <span className="mt-1 block text-sm font-black text-[#072c74]">
+                      {item.ordenRuta
+                        ? `Ruta ${item.ordenRuta}`
+                        : "Sin ruta asignada"}
+                    </span>
+                  </span>
+
+                  <span className="text-xs font-black text-blue-700">
+                    {item.ordenRuta
+                      ? "Cambiar"
+                      : "Asignar"}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={
+                    onEditarEstado
+                  }
+                  className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:bg-slate-50"
+                >
+                  <span>
+                    <span className="block text-[10px] font-black uppercase text-slate-400">
+                      Estado
+                    </span>
+
+                    <span className="mt-1 block">
+                      <EstadoBadge
+                        estado={
+                          item.estado
+                        }
+                      />
+                    </span>
+                  </span>
+
+                  <span className="text-xs font-black text-slate-700">
+                    Cambiar
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={
+                    onEditarCita
+                  }
+                  className="flex items-center justify-between rounded-xl border border-violet-200 bg-white px-4 py-3 text-left transition hover:bg-violet-50"
+                >
+                  <span>
+                    <span className="block text-[10px] font-black uppercase text-slate-400">
+                      Cita
+                    </span>
+
+                    <span className="mt-1 block text-sm font-black text-violet-700">
+                      {formatoFecha(
+                        item.fechaRecoleccion
+                      )}
+                    </span>
+
+                    <span className="mt-0.5 block text-xs font-black text-slate-500">
+                      {formatoHora(
+                        item.horaCita
+                      )}
+                    </span>
+                  </span>
+
+                  <span className="text-xs font-black text-violet-700">
+                    Editar
+                  </span>
+                </button>
+              </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -4145,6 +4614,589 @@ function formatoBytes(
 }
 
 
+function EditorRecoleccion({
+  item,
+  tipo,
+  onCerrar,
+  onGuardado,
+}: {
+  item: Recoleccion;
+  tipo:
+    | "ruta"
+    | "estado"
+    | "cita";
+  onCerrar: () => void;
+  onGuardado: (
+    cambios: {
+      ordenRuta?: string;
+      estado?: Estado;
+      fechaRecoleccion?: string;
+      horaCita?: string;
+    }
+  ) => Promise<void>;
+}) {
+  const [
+    ruta,
+    setRuta,
+  ] = useState(
+    item.ordenRuta
+  );
+
+  const [
+    estado,
+    setEstado,
+  ] = useState<Estado>(
+    item.estado
+  );
+
+  const [
+    fechaRecoleccion,
+    setFechaRecoleccion,
+  ] = useState(
+    fechaParaInput(
+      item.fechaRecoleccion
+    )
+  );
+
+  const [
+    horaCita,
+    setHoraCita,
+  ] = useState(
+    item.horaCita
+  );
+
+  const [
+    guardando,
+    setGuardando,
+  ] = useState(false);
+
+  const [
+    error,
+    setError,
+  ] = useState("");
+
+  async function guardarRuta(
+    valor?: string
+  ) {
+    try {
+      setGuardando(true);
+      setError("");
+
+      const nuevaRuta =
+        valor !== undefined
+          ? valor
+          : ruta.trim();
+
+      const response =
+        await fetch(
+          "/api/recolecciones",
+          {
+            method:
+              "PATCH",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                folio:
+                  item.folio,
+                ordenRuta:
+                  nuevaRuta,
+              }),
+          }
+        );
+
+      const data =
+        (await response.json()) as {
+          success?: boolean;
+          error?: string;
+        };
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        throw new Error(
+          data.error ||
+            "No se pudo actualizar la ruta."
+        );
+      }
+
+      await onGuardado({
+        ordenRuta:
+          nuevaRuta,
+      });
+    } catch (
+      e: unknown
+    ) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "No se pudo actualizar la ruta."
+      );
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function guardarEstado(
+    nuevoEstado: Estado
+  ) {
+    try {
+      setGuardando(true);
+      setError("");
+      setEstado(
+        nuevoEstado
+      );
+
+      const response =
+        await fetch(
+          "/api/recolecciones",
+          {
+            method:
+              "PATCH",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                folio:
+                  item.folio,
+                estado:
+                  nuevoEstado,
+              }),
+          }
+        );
+
+      const data =
+        (await response.json()) as {
+          success?: boolean;
+          error?: string;
+        };
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        throw new Error(
+          data.error ||
+            "No se pudo actualizar el estado."
+        );
+      }
+
+      await onGuardado({
+        estado:
+          nuevoEstado,
+      });
+    } catch (
+      e: unknown
+    ) {
+      setEstado(
+        item.estado
+      );
+
+      setError(
+        e instanceof Error
+          ? e.message
+          : "No se pudo actualizar el estado."
+      );
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function guardarCita() {
+    try {
+      setGuardando(true);
+      setError("");
+
+      const response =
+        await fetch(
+          "/api/recolecciones",
+          {
+            method:
+              "PATCH",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                folio:
+                  item.folio,
+                fechaRecoleccion:
+                  fechaRecoleccion.trim(),
+                horaCita:
+                  horaCita.trim(),
+              }),
+          }
+        );
+
+      const data =
+        (await response.json()) as {
+          success?: boolean;
+          error?: string;
+        };
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        throw new Error(
+          data.error ||
+            "No se pudo actualizar la cita."
+        );
+      }
+
+      await onGuardado({
+        fechaRecoleccion:
+          fechaRecoleccion.trim(),
+        horaCita:
+          horaCita.trim(),
+      });
+    } catch (
+      e: unknown
+    ) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "No se pudo actualizar la cita."
+      );
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[220] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
+      <button
+        type="button"
+        aria-label="Cerrar"
+        onClick={onCerrar}
+        disabled={guardando}
+        className="absolute inset-0"
+      />
+
+      <div className="relative z-10 w-full rounded-t-3xl bg-white shadow-2xl sm:max-w-lg sm:rounded-3xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-700">
+              {item.folio}
+            </p>
+
+            <h3 className="mt-1 text-xl font-black text-slate-950">
+              {tipo ===
+              "ruta"
+                ? item.ordenRuta
+                  ? "Cambiar ruta"
+                  : "Asignar ruta"
+                : tipo ===
+                    "estado"
+                  ? "Cambiar estado"
+                  : "Editar fecha y hora"}
+            </h3>
+
+            <p className="mt-1 text-xs font-semibold text-slate-500">
+              {item.cliente}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onCerrar}
+            disabled={guardando}
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-xl font-black text-slate-600 disabled:opacity-40"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="p-5">
+          {tipo ===
+          "ruta" ? (
+            <>
+              <label className="mb-2 block text-xs font-black uppercase tracking-wide text-slate-500">
+                Orden de ruta
+              </label>
+
+              <input
+                type="text"
+                inputMode="numeric"
+                autoFocus
+                value={ruta}
+                onChange={(
+                  event
+                ) =>
+                  setRuta(
+                    event.target
+                      .value
+                  )
+                }
+                onKeyDown={(
+                  event
+                ) => {
+                  if (
+                    event.key ===
+                    "Enter" &&
+                    !guardando
+                  ) {
+                    void guardarRuta();
+                  }
+                }}
+                placeholder="Ej. 173"
+                className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-lg font-black text-slate-900 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
+              />
+
+              <p className="mt-2 text-xs font-semibold text-slate-500">
+                Este número se guardará en la columna “Orden ruta” del Excel.
+              </p>
+
+              {error && (
+                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">
+                  {error}
+                </div>
+              )}
+
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  disabled={
+                    guardando ||
+                    !ruta.trim()
+                  }
+                  onClick={() =>
+                    void guardarRuta()
+                  }
+                  className="rounded-2xl bg-[#072c74] px-4 py-3 text-sm font-black text-white disabled:opacity-50"
+                >
+                  {guardando
+                    ? "Guardando..."
+                    : item.ordenRuta
+                      ? "Guardar cambio"
+                      : "Asignar ruta"}
+                </button>
+
+                {item.ordenRuta && (
+                  <button
+                    type="button"
+                    disabled={
+                      guardando
+                    }
+                    onClick={() => {
+                      const confirmar =
+                        window.confirm(
+                          `¿Quitar la ruta ${item.ordenRuta} de ${item.cliente}?`
+                        );
+
+                      if (
+                        confirmar
+                      ) {
+                        void guardarRuta(
+                          ""
+                        );
+                      }
+                    }}
+                    className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700 disabled:opacity-50"
+                  >
+                    Quitar ruta
+                  </button>
+                )}
+              </div>
+            </>
+          ) : tipo ===
+            "estado" ? (
+            <>
+              <p className="mb-3 text-xs font-semibold text-slate-500">
+                Selecciona el nuevo estado. El cambio se guardará directamente en el Excel de OneDrive.
+              </p>
+
+              <div className="space-y-2">
+                {ESTADOS_RECOLECCION.map(
+                  (
+                    opcion
+                  ) => (
+                    <button
+                      key={
+                        opcion
+                      }
+                      type="button"
+                      disabled={
+                        guardando
+                      }
+                      onClick={() => {
+                        if (
+                          opcion ===
+                          item.estado
+                        ) {
+                          onCerrar();
+                          return;
+                        }
+
+                        void guardarEstado(
+                          opcion
+                        );
+                      }}
+                      className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition disabled:opacity-50 ${
+                        estado ===
+                        opcion
+                          ? "border-blue-300 bg-blue-50"
+                          : "border-slate-200 bg-white hover:bg-slate-50"
+                      }`}
+                    >
+                      <EstadoBadge
+                        estado={
+                          opcion
+                        }
+                      />
+
+                      <span className="text-xs font-black text-slate-500">
+                        {item.estado ===
+                        opcion
+                          ? "Actual"
+                          : guardando &&
+                              estado ===
+                                opcion
+                            ? "Guardando..."
+                            : "Elegir"}
+                      </span>
+                    </button>
+                  )
+                )}
+              </div>
+
+              {error && (
+                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">
+                  {error}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="mb-4 text-xs font-semibold text-slate-500">
+                Puedes modificar la fecha de recolección, la hora de cita o ambas. La hora es opcional.
+              </p>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">
+                    Fecha de recolección
+                  </label>
+
+                  <input
+                    type="date"
+                    value={
+                      fechaRecoleccion
+                    }
+                    onChange={(event) =>
+                      setFechaRecoleccion(
+                        event.target.value
+                      )
+                    }
+                    className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">
+                    Hora de cita
+                  </label>
+
+                  <input
+                    type="time"
+                    value={
+                      horaCita
+                    }
+                    onChange={(event) =>
+                      setHoraCita(
+                        event.target.value
+                      )
+                    }
+                    className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-100"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50 p-4">
+                <p className="text-[10px] font-black uppercase tracking-wide text-violet-700">
+                  Cita programada
+                </p>
+
+                <p className="mt-1 text-base font-black text-slate-900">
+                  {formatoFecha(
+                    fechaRecoleccion
+                  )}
+                </p>
+
+                <p className="mt-1 text-sm font-black text-violet-700">
+                  🕐{" "}
+                  {formatoHora(
+                    horaCita
+                  )}
+                </p>
+              </div>
+
+              {error && (
+                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">
+                  {error}
+                </div>
+              )}
+
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  disabled={
+                    guardando
+                  }
+                  onClick={() =>
+                    void guardarCita()
+                  }
+                  className="rounded-2xl bg-violet-700 px-4 py-3 text-sm font-black text-white disabled:opacity-50"
+                >
+                  {guardando
+                    ? "Guardando..."
+                    : "Guardar fecha y hora"}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={
+                    guardando ||
+                    !horaCita
+                  }
+                  onClick={() =>
+                    setHoraCita("")
+                  }
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 disabled:opacity-50"
+                >
+                  Quitar hora
+                </button>
+              </div>
+            </>
+          )}
+
+          <button
+            type="button"
+            onClick={onCerrar}
+            disabled={guardando}
+            className="mt-5 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700 disabled:opacity-40"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function Dato({
   titulo,
   valor,
@@ -4297,7 +5349,7 @@ function Buscar({
       className={
         movil
           ? "relative w-full"
-          : "relative w-96"
+          : "relative w-full min-w-[320px] max-w-xl"
       }
     >
       <div className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-slate-400">
