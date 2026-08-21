@@ -1,856 +1,274 @@
-[{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1434",
-	"severity": 8,
-	"message": "Unexpected keyword or identifier.",
-	"source": "ts",
-	"startLineNumber": 1,
-	"startColumn": 1,
-	"endLineNumber": 1,
-	"endColumn": 7,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'create'.",
-	"source": "ts",
-	"startLineNumber": 1,
-	"startColumn": 1,
-	"endLineNumber": 1,
-	"endColumn": 7,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1434",
-	"severity": 8,
-	"message": "Unexpected keyword or identifier.",
-	"source": "ts",
-	"startLineNumber": 1,
-	"startColumn": 8,
-	"endLineNumber": 1,
-	"endColumn": 13,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'table'.",
-	"source": "ts",
-	"startLineNumber": 1,
-	"startColumn": 8,
-	"endLineNumber": 1,
-	"endColumn": 13,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "'(' expected.",
-	"source": "ts",
-	"startLineNumber": 1,
-	"startColumn": 17,
-	"endLineNumber": 1,
-	"endColumn": 20,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'not'.",
-	"source": "ts",
-	"startLineNumber": 1,
-	"startColumn": 17,
-	"endLineNumber": 1,
-	"endColumn": 20,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "')' expected.",
-	"source": "ts",
-	"startLineNumber": 1,
-	"startColumn": 21,
-	"endLineNumber": 1,
-	"endColumn": 27,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'exists'.",
-	"source": "ts",
-	"startLineNumber": 1,
-	"startColumn": 21,
-	"endLineNumber": 1,
-	"endColumn": 27,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'public'.",
-	"source": "ts",
-	"startLineNumber": 1,
-	"startColumn": 28,
-	"endLineNumber": 1,
-	"endColumn": 34,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'id'.",
-	"source": "ts",
-	"startLineNumber": 2,
-	"startColumn": 3,
-	"endLineNumber": 2,
-	"endColumn": 5,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "',' expected.",
-	"source": "ts",
-	"startLineNumber": 2,
-	"startColumn": 6,
-	"endLineNumber": 2,
-	"endColumn": 12,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2552",
-	"severity": 8,
-	"message": "Cannot find name 'bigint'. Did you mean 'BigInt'?",
-	"source": "ts",
-	"startLineNumber": 2,
-	"startColumn": 6,
-	"endLineNumber": 2,
-	"endColumn": 12,
-	"relatedInformation": [
-		{
-			"startLineNumber": 141,
-			"startColumn": 13,
-			"endLineNumber": 141,
-			"endColumn": 19,
-			"message": "'BigInt' is declared here.",
-			"resource": "/c:/Users/USER/AppData/Local/Programs/Microsoft VS Code/110a328ea5/resources/app/extensions/node_modules/typescript/lib/lib.es2020.bigint.d.ts"
-		}
-	],
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "',' expected.",
-	"source": "ts",
-	"startLineNumber": 2,
-	"startColumn": 13,
-	"endLineNumber": 2,
-	"endColumn": 22,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'generated'.",
-	"source": "ts",
-	"startLineNumber": 2,
-	"startColumn": 13,
-	"endLineNumber": 2,
-	"endColumn": 22,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "',' expected.",
-	"source": "ts",
-	"startLineNumber": 2,
-	"startColumn": 23,
-	"endLineNumber": 2,
-	"endColumn": 25,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'by'.",
-	"source": "ts",
-	"startLineNumber": 2,
-	"startColumn": 23,
-	"endLineNumber": 2,
-	"endColumn": 25,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "',' expected.",
-	"source": "ts",
-	"startLineNumber": 2,
-	"startColumn": 26,
-	"endLineNumber": 2,
-	"endColumn": 33,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'as'.",
-	"source": "ts",
-	"startLineNumber": 2,
-	"startColumn": 34,
-	"endLineNumber": 2,
-	"endColumn": 36,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "',' expected.",
-	"source": "ts",
-	"startLineNumber": 2,
-	"startColumn": 37,
-	"endLineNumber": 2,
-	"endColumn": 45,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'identity'.",
-	"source": "ts",
-	"startLineNumber": 2,
-	"startColumn": 37,
-	"endLineNumber": 2,
-	"endColumn": 45,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "',' expected.",
-	"source": "ts",
-	"startLineNumber": 2,
-	"startColumn": 46,
-	"endLineNumber": 2,
-	"endColumn": 53,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'primary'.",
-	"source": "ts",
-	"startLineNumber": 2,
-	"startColumn": 46,
-	"endLineNumber": 2,
-	"endColumn": 53,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "',' expected.",
-	"source": "ts",
-	"startLineNumber": 2,
-	"startColumn": 54,
-	"endLineNumber": 2,
-	"endColumn": 57,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'key'.",
-	"source": "ts",
-	"startLineNumber": 2,
-	"startColumn": 54,
-	"endLineNumber": 2,
-	"endColumn": 57,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'folio'.",
-	"source": "ts",
-	"startLineNumber": 3,
-	"startColumn": 3,
-	"endLineNumber": 3,
-	"endColumn": 8,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "',' expected.",
-	"source": "ts",
-	"startLineNumber": 3,
-	"startColumn": 9,
-	"endLineNumber": 3,
-	"endColumn": 13,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'text'.",
-	"source": "ts",
-	"startLineNumber": 3,
-	"startColumn": 9,
-	"endLineNumber": 3,
-	"endColumn": 13,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "',' expected.",
-	"source": "ts",
-	"startLineNumber": 3,
-	"startColumn": 14,
-	"endLineNumber": 3,
-	"endColumn": 17,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'not'.",
-	"source": "ts",
-	"startLineNumber": 3,
-	"startColumn": 14,
-	"endLineNumber": 3,
-	"endColumn": 17,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "',' expected.",
-	"source": "ts",
-	"startLineNumber": 3,
-	"startColumn": 18,
-	"endLineNumber": 3,
-	"endColumn": 22,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "',' expected.",
-	"source": "ts",
-	"startLineNumber": 3,
-	"startColumn": 23,
-	"endLineNumber": 3,
-	"endColumn": 29,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'unique'.",
-	"source": "ts",
-	"startLineNumber": 3,
-	"startColumn": 23,
-	"endLineNumber": 3,
-	"endColumn": 29,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'created_at'.",
-	"source": "ts",
-	"startLineNumber": 4,
-	"startColumn": 3,
-	"endLineNumber": 4,
-	"endColumn": 13,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "',' expected.",
-	"source": "ts",
-	"startLineNumber": 4,
-	"startColumn": 14,
-	"endLineNumber": 4,
-	"endColumn": 25,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'timestamptz'.",
-	"source": "ts",
-	"startLineNumber": 4,
-	"startColumn": 14,
-	"endLineNumber": 4,
-	"endColumn": 25,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "',' expected.",
-	"source": "ts",
-	"startLineNumber": 4,
-	"startColumn": 26,
-	"endLineNumber": 4,
-	"endColumn": 29,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'not'.",
-	"source": "ts",
-	"startLineNumber": 4,
-	"startColumn": 26,
-	"endLineNumber": 4,
-	"endColumn": 29,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "',' expected.",
-	"source": "ts",
-	"startLineNumber": 4,
-	"startColumn": 30,
-	"endLineNumber": 4,
-	"endColumn": 34,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "',' expected.",
-	"source": "ts",
-	"startLineNumber": 4,
-	"startColumn": 35,
-	"endLineNumber": 4,
-	"endColumn": 42,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'now'.",
-	"source": "ts",
-	"startLineNumber": 4,
-	"startColumn": 43,
-	"endLineNumber": 4,
-	"endColumn": 46,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1434",
-	"severity": 8,
-	"message": "Unexpected keyword or identifier.",
-	"source": "ts",
-	"startLineNumber": 7,
-	"startColumn": 1,
-	"endLineNumber": 7,
-	"endColumn": 7,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'create'.",
-	"source": "ts",
-	"startLineNumber": 7,
-	"startColumn": 1,
-	"endLineNumber": 7,
-	"endColumn": 7,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1434",
-	"severity": 8,
-	"message": "Unexpected keyword or identifier.",
-	"source": "ts",
-	"startLineNumber": 7,
-	"startColumn": 8,
-	"endLineNumber": 7,
-	"endColumn": 13,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'index'.",
-	"source": "ts",
-	"startLineNumber": 7,
-	"startColumn": 8,
-	"endLineNumber": 7,
-	"endColumn": 13,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "'(' expected.",
-	"source": "ts",
-	"startLineNumber": 7,
-	"startColumn": 17,
-	"endLineNumber": 7,
-	"endColumn": 20,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'not'.",
-	"source": "ts",
-	"startLineNumber": 7,
-	"startColumn": 17,
-	"endLineNumber": 7,
-	"endColumn": 20,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "')' expected.",
-	"source": "ts",
-	"startLineNumber": 7,
-	"startColumn": 21,
-	"endLineNumber": 7,
-	"endColumn": 27,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'exists'.",
-	"source": "ts",
-	"startLineNumber": 7,
-	"startColumn": 21,
-	"endLineNumber": 7,
-	"endColumn": 27,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'recolecciones_eliminadas_folio_idx'.",
-	"source": "ts",
-	"startLineNumber": 7,
-	"startColumn": 28,
-	"endLineNumber": 7,
-	"endColumn": 62,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1434",
-	"severity": 8,
-	"message": "Unexpected keyword or identifier.",
-	"source": "ts",
-	"startLineNumber": 8,
-	"startColumn": 3,
-	"endLineNumber": 8,
-	"endColumn": 5,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'on'.",
-	"source": "ts",
-	"startLineNumber": 8,
-	"startColumn": 3,
-	"endLineNumber": 8,
-	"endColumn": 5,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'public'.",
-	"source": "ts",
-	"startLineNumber": 8,
-	"startColumn": 6,
-	"endLineNumber": 8,
-	"endColumn": 12,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'folio'.",
-	"source": "ts",
-	"startLineNumber": 8,
-	"startColumn": 39,
-	"endLineNumber": 8,
-	"endColumn": 44,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1434",
-	"severity": 8,
-	"message": "Unexpected keyword or identifier.",
-	"source": "ts",
-	"startLineNumber": 10,
-	"startColumn": 1,
-	"endLineNumber": 10,
-	"endColumn": 6,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'alter'.",
-	"source": "ts",
-	"startLineNumber": 10,
-	"startColumn": 1,
-	"endLineNumber": 10,
-	"endColumn": 6,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1434",
-	"severity": 8,
-	"message": "Unexpected keyword or identifier.",
-	"source": "ts",
-	"startLineNumber": 10,
-	"startColumn": 7,
-	"endLineNumber": 10,
-	"endColumn": 12,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'table'.",
-	"source": "ts",
-	"startLineNumber": 10,
-	"startColumn": 7,
-	"endLineNumber": 10,
-	"endColumn": 12,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'public'.",
-	"source": "ts",
-	"startLineNumber": 10,
-	"startColumn": 13,
-	"endLineNumber": 10,
-	"endColumn": 19,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1005",
-	"severity": 8,
-	"message": "';' expected.",
-	"source": "ts",
-	"startLineNumber": 10,
-	"startColumn": 45,
-	"endLineNumber": 10,
-	"endColumn": 51,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'enable'.",
-	"source": "ts",
-	"startLineNumber": 10,
-	"startColumn": 45,
-	"endLineNumber": 10,
-	"endColumn": 51,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1434",
-	"severity": 8,
-	"message": "Unexpected keyword or identifier.",
-	"source": "ts",
-	"startLineNumber": 10,
-	"startColumn": 52,
-	"endLineNumber": 10,
-	"endColumn": 55,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'row'.",
-	"source": "ts",
-	"startLineNumber": 10,
-	"startColumn": 52,
-	"endLineNumber": 10,
-	"endColumn": 55,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "1434",
-	"severity": 8,
-	"message": "Unexpected keyword or identifier.",
-	"source": "ts",
-	"startLineNumber": 10,
-	"startColumn": 56,
-	"endLineNumber": 10,
-	"endColumn": 61,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'level'.",
-	"source": "ts",
-	"startLineNumber": 10,
-	"startColumn": 56,
-	"endLineNumber": 10,
-	"endColumn": 61,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-},{
-	"resource": "/c:/Users/USER/tracking-whatsapp-system/app/(dashboard)/recolecciones/page.tsx",
-	"owner": "typescript",
-	"code": "2304",
-	"severity": 8,
-	"message": "Cannot find name 'security'.",
-	"source": "ts",
-	"startLineNumber": 10,
-	"startColumn": 62,
-	"endLineNumber": 10,
-	"endColumn": 70,
-	"modelVersionId": 38,
-	"origin": "extHost1"
-}]
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+function crearSupabase() {
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  const supabaseServiceRoleKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (
+    !supabaseUrl ||
+    !supabaseServiceRoleKey
+  ) {
+    throw new Error(
+      "Faltan variables de configuración de Supabase."
+    );
+  }
+
+  return createClient(
+    supabaseUrl,
+    supabaseServiceRoleKey,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+}
+
+function limpiarFolio(
+  valor: unknown
+) {
+  return String(
+    valor ?? ""
+  )
+    .trim()
+    .replace(
+      /[^A-Za-z0-9-_]/g,
+      ""
+    );
+}
+
+export async function GET() {
+  try {
+    const supabase =
+      crearSupabase();
+
+    const {
+      data,
+      error,
+    } =
+      await supabase
+        .from(
+          "recolecciones_eliminadas"
+        )
+        .select(
+          "folio"
+        )
+        .order(
+          "created_at",
+          {
+            ascending: false,
+          }
+        );
+
+    if (error) {
+      throw new Error(
+        error.message
+      );
+    }
+
+    const folios =
+      (data ?? [])
+        .map(
+          (item) =>
+            limpiarFolio(
+              item.folio
+            )
+        )
+        .filter(
+          Boolean
+        );
+
+    return NextResponse.json({
+      success: true,
+      folios,
+    });
+  } catch (
+    error: unknown
+  ) {
+    console.error(
+      "Error consultando recolecciones eliminadas:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Error desconocido.",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+export async function POST(
+  request: Request
+) {
+  try {
+    const body =
+      (await request.json()) as {
+        folio?: string;
+      };
+
+    const folio =
+      limpiarFolio(
+        body.folio
+      );
+
+    if (!folio) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "El folio es obligatorio.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const supabase =
+      crearSupabase();
+
+    const {
+      error,
+    } =
+      await supabase
+        .from(
+          "recolecciones_eliminadas"
+        )
+        .upsert(
+          {
+            folio,
+          },
+          {
+            onConflict: "folio",
+          }
+        );
+
+    if (error) {
+      throw new Error(
+        error.message
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      mensaje:
+        "Recolección eliminada de la vista sin modificar el Excel.",
+      folio,
+    });
+  } catch (
+    error: unknown
+  ) {
+    console.error(
+      "Error eliminando recolección de la vista:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Error desconocido.",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+export async function DELETE(
+  request: Request
+) {
+  try {
+    const body =
+      (await request.json()) as {
+        folio?: string;
+      };
+
+    const folio =
+      limpiarFolio(
+        body.folio
+      );
+
+    if (!folio) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "El folio es obligatorio.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const supabase =
+      crearSupabase();
+
+    const {
+      error,
+    } =
+      await supabase
+        .from(
+          "recolecciones_eliminadas"
+        )
+        .delete()
+        .eq(
+          "folio",
+          folio
+        );
+
+    if (error) {
+      throw new Error(
+        error.message
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      mensaje:
+        "Recolección restaurada correctamente.",
+      folio,
+    });
+  } catch (
+    error: unknown
+  ) {
+    console.error(
+      "Error restaurando recolección:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Error desconocido.",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
