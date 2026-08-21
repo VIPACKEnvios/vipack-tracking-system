@@ -29,6 +29,21 @@ type NuevaRecoleccionBody = {
   observaciones?: string;
 };
 
+type ActualizarRecoleccionBody = {
+  folio?: string;
+  ordenRuta?: string | null;
+  estado?: string | null;
+};
+
+const ESTADOS_VALIDOS = new Set([
+  "Pendiente",
+  "En ruta",
+  "Recolectada",
+  "No lista",
+  "Reprogramada",
+  "Cancelada",
+]);
+
 async function leerJsonSeguro(
   response: Response
 ) {
@@ -414,6 +429,49 @@ function fechaSolicitudActual() {
     ).padStart(2, "0");
 
   return `${mes}/${dia}/${anio} ${horas}:${minutos}`;
+}
+
+
+function normalizarEstadoPermitido(
+  valor: unknown
+) {
+  const original =
+    String(
+      valor ?? ""
+    ).trim();
+
+  if (!original) {
+    return "";
+  }
+
+  const lower =
+    original.toLocaleLowerCase(
+      "es"
+    );
+
+  const mapa:
+    Record<
+      string,
+      string
+    > = {
+      pendiente:
+        "Pendiente",
+      "en ruta":
+        "En ruta",
+      recolectada:
+        "Recolectada",
+      "no lista":
+        "No lista",
+      reprogramada:
+        "Reprogramada",
+      cancelada:
+        "Cancelada",
+    };
+
+  return (
+    mapa[lower] ||
+    original
+  );
 }
 
 export async function GET() {
@@ -815,6 +873,297 @@ export async function POST(
   ) {
     console.error(
       "Error creando recolección:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+
+        error:
+          error instanceof Error
+            ? error.message
+            : "Error desconocido.",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+export async function PATCH(
+  request: Request
+) {
+  try {
+    const body =
+      (await request.json()) as ActualizarRecoleccionBody;
+
+    const folio =
+      String(
+        body.folio || ""
+      ).trim();
+
+    if (!folio) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "El folio es obligatorio.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const tieneOrdenRuta =
+      Object.prototype.hasOwnProperty.call(
+        body,
+        "ordenRuta"
+      );
+
+    const tieneEstado =
+      Object.prototype.hasOwnProperty.call(
+        body,
+        "estado"
+      );
+
+    if (
+      !tieneOrdenRuta &&
+      !tieneEstado
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Debes enviar ordenRuta, estado o ambos.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const ordenRuta =
+      tieneOrdenRuta
+        ? String(
+            body.ordenRuta ?? ""
+          ).trim()
+        : null;
+
+    const estado =
+      tieneEstado
+        ? normalizarEstadoPermitido(
+            body.estado
+          )
+        : null;
+
+    if (
+      tieneEstado &&
+      (
+        !estado ||
+        !ESTADOS_VALIDOS.has(
+          estado
+        )
+      )
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Estado inválido. Usa: Pendiente, En ruta, Recolectada, No lista, Reprogramada o Cancelada.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      tieneOrdenRuta &&
+      ordenRuta &&
+      !/^[A-Za-z0-9._-]{1,20}$/.test(
+        ordenRuta
+      )
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "La ruta contiene caracteres no permitidos.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const {
+      accessToken,
+    } =
+      await obtenerAccessToken();
+
+    const arrayBuffer =
+      await descargarExcel(
+        accessToken
+      );
+
+    const workbook =
+      XLSX.read(
+        Buffer.from(
+          arrayBuffer
+        ),
+        {
+          type: "buffer",
+        }
+      );
+
+    const hoja =
+      workbook.Sheets[
+        HOJA_SOLICITUDES
+      ];
+
+    if (!hoja) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            `El Excel no contiene la hoja "${HOJA_SOLICITUDES}".`,
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const filas =
+      XLSX.utils
+        .sheet_to_json<
+          Record<
+            string,
+            unknown
+          >
+        >(
+          hoja,
+          {
+            defval: "",
+            raw: false,
+          }
+        );
+
+    const indice =
+      filas.findIndex(
+        (fila) =>
+          String(
+            fila.Folio || ""
+          ).trim() ===
+          folio
+      );
+
+    if (
+      indice === -1
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            `No se encontró la recolección ${folio}.`,
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    const actualizada = {
+      ...filas[indice],
+    };
+
+    if (
+      tieneOrdenRuta
+    ) {
+      actualizada[
+        "Orden ruta"
+      ] =
+        ordenRuta || "";
+    }
+
+    if (
+      tieneEstado
+    ) {
+      actualizada.Estatus =
+        estado;
+    }
+
+    filas[indice] =
+      actualizada;
+
+    const nuevaHoja =
+      XLSX.utils.json_to_sheet(
+        filas,
+        {
+          header: [
+            "Folio",
+            "Fecha de solicitud",
+            "Cliente",
+            "TelefonoWhatsApp",
+            "Lugar / Bodega de recolección",
+            "Orden ruta",
+            "Dirección de recolección",
+            "Nota de recolección",
+            "Mercancía",
+            "Cantidad / Bultos",
+            "Fecha de recolección",
+            "Estatus",
+            "Observaciones",
+            "Foto mercancía",
+          ],
+
+          skipHeader:
+            false,
+        }
+      );
+
+    /*
+     * Conservar el rango/orden de la hoja
+     * y sustituir únicamente Solicitudes.
+     */
+    workbook.Sheets[
+      HOJA_SOLICITUDES
+    ] = nuevaHoja;
+
+    const salida =
+      XLSX.write(
+        workbook,
+        {
+          type: "buffer",
+          bookType:
+            "xlsx",
+        }
+      );
+
+    await subirExcel(
+      accessToken,
+      salida
+    );
+
+    return NextResponse.json({
+      success: true,
+
+      mensaje:
+        "Recolección actualizada correctamente.",
+
+      folio,
+
+      registro:
+        actualizada,
+    });
+  } catch (
+    error: unknown
+  ) {
+    console.error(
+      "Error actualizando recolección:",
       error
     );
 
