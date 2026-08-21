@@ -91,10 +91,27 @@ type FiltroDesktop =
   | "Activas"
   | "Pendiente"
   | "En ruta"
+  | "No lista"
+  | "Reprogramada"
+  | "Sin ruta"
   | "Recolectada"
   | "Problemas"
   | "Cancelada"
   | "Todas";
+
+type FiltroMovil =
+  | "Activas"
+  | "Pendiente"
+  | "En ruta"
+  | "No lista"
+  | "Reprogramada"
+  | "Sin ruta";
+
+type ResumenEvidenciaFila = {
+  notas: number;
+  fotos: number;
+  cargado: boolean;
+};
 
 function txt(valor: unknown) {
   return String(
@@ -287,6 +304,105 @@ function formatoFecha(
   return `${dia}/${mes}/${anio}`;
 }
 
+
+function numeroRuta(
+  valor: string
+) {
+  const numero =
+    Number(
+      valor
+        .trim()
+        .replace(
+          /[^0-9.-]/g,
+          ""
+        )
+    );
+
+  return Number.isFinite(
+    numero
+  )
+    ? numero
+    : null;
+}
+
+function compararPorRutaYFecha(
+  a: Recoleccion,
+  b: Recoleccion
+) {
+  const rutaA =
+    numeroRuta(
+      a.ordenRuta
+    );
+
+  const rutaB =
+    numeroRuta(
+      b.ordenRuta
+    );
+
+  if (
+    rutaA !== null &&
+    rutaB !== null
+  ) {
+    return rutaB - rutaA;
+  }
+
+  if (
+    rutaA !== null
+  ) {
+    return -1;
+  }
+
+  if (
+    rutaB !== null
+  ) {
+    return 1;
+  }
+
+  return b.fechaSolicitud
+    .localeCompare(
+      a.fechaSolicitud
+    );
+}
+
+function urlMapa(
+  direccion: string
+) {
+  const valor =
+    direccion.trim();
+
+  if (!valor) {
+    return "";
+  }
+
+  if (
+    /^https?:\/\//i.test(
+      valor
+    )
+  ) {
+    return valor;
+  }
+
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+    valor
+  )}`;
+}
+
+function urlWhatsApp(
+  telefono: string
+) {
+  const limpio =
+    telefono.replace(
+      /\D/g,
+      ""
+    );
+
+  if (!limpio) {
+    return "";
+  }
+
+  return `https://wa.me/${limpio}`;
+}
+
 export default function RecoleccionesPage() {
   const [
     recolecciones,
@@ -343,6 +459,24 @@ export default function RecoleccionesPage() {
     modalNueva,
     setModalNueva,
   ] = useState(false);
+
+  const [
+    filtroMovil,
+    setFiltroMovil,
+  ] =
+    useState<FiltroMovil>(
+      "Activas"
+    );
+
+  const [
+    resumenEvidencias,
+    setResumenEvidencias,
+  ] = useState<
+    Record<
+      string,
+      ResumenEvidenciaFila
+    >
+  >({});
 
   const cargar =
     useCallback(
@@ -465,12 +599,38 @@ export default function RecoleccionesPage() {
             "Cancelada"
         ).length;
 
+      const noLista =
+        recolecciones.filter(
+          (r) =>
+            r.estado ===
+            "No lista"
+        ).length;
+
+      const reprogramadas =
+        recolecciones.filter(
+          (r) =>
+            r.estado ===
+            "Reprogramada"
+        ).length;
+
+      const sinRuta =
+        recolecciones.filter(
+          (r) =>
+            esActiva(
+              r.estado
+            ) &&
+            !r.ordenRuta.trim()
+        ).length;
+
       return {
         pendientes,
         enRuta,
         recolectadas,
         problemas,
         canceladas,
+        noLista,
+        reprogramadas,
+        sinRuta,
         total:
           recolecciones.length,
       };
@@ -515,47 +675,64 @@ export default function RecoleccionesPage() {
 
   const desktop =
     useMemo(() => {
-      return recolecciones.filter(
-        (item) => {
-          if (
-            !coincideBusqueda(
-              item
-            )
-          ) {
-            return false;
-          }
+      return recolecciones
+        .filter(
+          (item) => {
+            if (
+              !coincideBusqueda(
+                item
+              )
+            ) {
+              return false;
+            }
 
-          if (
-            filtroDesktop ===
-            "Todas"
-          ) {
-            return true;
-          }
+            if (
+              filtroDesktop ===
+              "Todas"
+            ) {
+              return true;
+            }
 
-          if (
-            filtroDesktop ===
-            "Activas"
-          ) {
-            return esActiva(
-              item.estado
+            if (
+              filtroDesktop ===
+              "Activas"
+            ) {
+              return esActiva(
+                item.estado
+              );
+            }
+
+            if (
+              filtroDesktop ===
+              "Problemas"
+            ) {
+              return esProblema(
+                item.estado
+              );
+            }
+
+            if (
+              filtroDesktop ===
+              "Sin ruta"
+            ) {
+              return (
+                esActiva(
+                  item.estado
+                ) &&
+                !item.ordenRuta
+                  .trim()
+              );
+            }
+
+            return (
+              item.estado ===
+              filtroDesktop
             );
           }
-
-          if (
-            filtroDesktop ===
-            "Problemas"
-          ) {
-            return esProblema(
-              item.estado
-            );
-          }
-
-          return (
-            item.estado ===
-            filtroDesktop
-          );
-        }
-      );
+        )
+        .sort(
+          compararPorRutaYFecha
+        );
     }, [
       recolecciones,
       coincideBusqueda,
@@ -564,36 +741,221 @@ export default function RecoleccionesPage() {
 
   const movil =
     useMemo(() => {
-      return recolecciones.filter(
-        (item) => {
-          if (
-            !coincideBusqueda(
-              item
-            )
-          ) {
-            return false;
-          }
+      return recolecciones
+        .filter(
+          (item) => {
+            if (
+              !coincideBusqueda(
+                item
+              )
+            ) {
+              return false;
+            }
 
-          if (
-            vistaMovil ===
-            "Recolectadas"
-          ) {
+            if (
+              vistaMovil ===
+              "Recolectadas"
+            ) {
+              return (
+                item.estado ===
+                "Recolectada"
+              );
+            }
+
+            if (
+              filtroMovil ===
+              "Activas"
+            ) {
+              return esActiva(
+                item.estado
+              );
+            }
+
+            if (
+              filtroMovil ===
+              "Sin ruta"
+            ) {
+              return (
+                esActiva(
+                  item.estado
+                ) &&
+                !item.ordenRuta
+                  .trim()
+              );
+            }
+
             return (
               item.estado ===
-              "Recolectada"
+              filtroMovil
             );
           }
-
-          return esActiva(
-            item.estado
-          );
-        }
-      );
+        )
+        .sort(
+          compararPorRutaYFecha
+        );
     }, [
       recolecciones,
       coincideBusqueda,
       vistaMovil,
+      filtroMovil,
     ]);
+
+  /*
+   * Carga los contadores reales de evidencias
+   * solamente para las filas visibles. Se limita
+   * a 40 folios para no saturar OneDrive.
+   */
+  useEffect(() => {
+    const visibles =
+      (
+        vistaMovil ===
+        "Recolectadas"
+          ? movil
+          : desktop
+      )
+        .slice(
+          0,
+          40
+        )
+        .filter(
+          (item) =>
+            Boolean(
+              item.folio
+            ) &&
+            !resumenEvidencias[
+              item.folio
+            ]?.cargado
+        );
+
+    if (
+      visibles.length === 0
+    ) {
+      return;
+    }
+
+    let cancelado =
+      false;
+
+    async function cargarResumenes() {
+      const lote =
+        4;
+
+      for (
+        let i = 0;
+        i <
+        visibles.length;
+        i += lote
+      ) {
+        const grupo =
+          visibles.slice(
+            i,
+            i + lote
+          );
+
+        const resultados =
+          await Promise.all(
+            grupo.map(
+              async (
+                item
+              ) => {
+                try {
+                  const response =
+                    await fetch(
+                      `/api/recolecciones/${encodeURIComponent(
+                        item.folio
+                      )}/evidencias`,
+                      {
+                        cache:
+                          "no-store",
+                      }
+                    );
+
+                  const data =
+                    (await response.json()) as RespuestaEvidencias;
+
+                  if (
+                    !response.ok ||
+                    !data.success
+                  ) {
+                    throw new Error();
+                  }
+
+                  return {
+                    folio:
+                      item.folio,
+                    notas:
+                      data.resumen
+                        ?.notas ??
+                      0,
+                    fotos:
+                      data.resumen
+                        ?.fotos ??
+                      0,
+                  };
+                } catch {
+                  return {
+                    folio:
+                      item.folio,
+                    notas:
+                      item.nota
+                        ? 1
+                        : 0,
+                    fotos:
+                      item.foto
+                        ? 1
+                        : 0,
+                  };
+                }
+              }
+            )
+          );
+
+        if (
+          cancelado
+        ) {
+          return;
+        }
+
+        setResumenEvidencias(
+          (actual) => {
+            const siguiente =
+              {
+                ...actual,
+              };
+
+            for (
+              const resultado
+              of resultados
+            ) {
+              siguiente[
+                resultado.folio
+              ] = {
+                notas:
+                  resultado.notas,
+                fotos:
+                  resultado.fotos,
+                cargado:
+                  true,
+              };
+            }
+
+            return siguiente;
+          }
+        );
+      }
+    }
+
+    void cargarResumenes();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [
+    desktop,
+    movil,
+    vistaMovil,
+    resumenEvidencias,
+  ]);
 
   return (
     <div className="min-h-full bg-slate-100">
@@ -649,7 +1011,7 @@ export default function RecoleccionesPage() {
             </div>
           </div>
 
-          <div className="mb-6 grid grid-cols-5 gap-3">
+          <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4 2xl:grid-cols-8">
             <Resumen
               titulo="Pendientes"
               numero={
@@ -664,6 +1026,30 @@ export default function RecoleccionesPage() {
                 resumen.enRuta
               }
               estilo="blue"
+            />
+
+            <Resumen
+              titulo="No lista"
+              numero={
+                resumen.noLista
+              }
+              estilo="orange"
+            />
+
+            <Resumen
+              titulo="Reprogramadas"
+              numero={
+                resumen.reprogramadas
+              }
+              estilo="violet"
+            />
+
+            <Resumen
+              titulo="Sin ruta"
+              numero={
+                resumen.sinRuta
+              }
+              estilo="slate"
             />
 
             <Resumen
@@ -693,12 +1079,15 @@ export default function RecoleccionesPage() {
 
           <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 p-5">
-              <div className="flex items-center justify-between gap-5">
-                <div className="flex gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex flex-wrap gap-2">
                   {[
                     "Activas",
                     "Pendiente",
                     "En ruta",
+                    "No lista",
+                    "Reprogramada",
+                    "Sin ruta",
                     "Recolectada",
                     "Problemas",
                     "Cancelada",
@@ -741,126 +1130,299 @@ export default function RecoleccionesPage() {
               <Cargando />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1050px]">
+                <table className="w-full min-w-[1380px]">
                   <thead className="bg-slate-50">
                     <tr className="text-left text-[11px] font-black uppercase tracking-wide text-slate-500">
-                      <th className="px-5 py-4">
+                      <th className="px-4 py-4">
                         Ruta
                       </th>
 
-                      <th className="px-5 py-4">
+                      <th className="px-4 py-4">
                         Folio
                       </th>
 
-                      <th className="px-5 py-4">
+                      <th className="px-4 py-4">
                         Cliente
                       </th>
 
-                      <th className="px-5 py-4">
+                      <th className="px-4 py-4">
                         Bodega
                       </th>
 
-                      <th className="px-5 py-4">
-                        Mercancía
+                      <th className="px-4 py-4">
+                        Mercancía / bultos
                       </th>
 
-                      <th className="px-5 py-4">
-                        Fecha
+                      <th className="px-4 py-4">
+                        Fechas
                       </th>
 
-                      <th className="px-5 py-4">
+                      <th className="px-4 py-4">
+                        Evidencias
+                      </th>
+
+                      <th className="px-4 py-4">
+                        Avisos
+                      </th>
+
+                      <th className="px-4 py-4">
                         Estado
                       </th>
 
-                      <th className="px-5 py-4 text-right">
-                        Acción
+                      <th className="px-4 py-4 text-right">
+                        Acciones
                       </th>
                     </tr>
                   </thead>
 
                   <tbody className="divide-y divide-slate-100">
                     {desktop.map(
-                      (item) => (
-                        <tr
-                          key={
+                      (item) => {
+                        const evidencia =
+                          resumenEvidencias[
                             item.folio
-                          }
-                          className="hover:bg-slate-50"
-                        >
-                          <td className="px-5 py-4">
-                            {item.ordenRuta ? (
-                              <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-xl bg-[#072c74] px-2 font-black text-white">
-                                {
-                                  item.ordenRuta
-                                }
-                              </span>
-                            ) : (
-                              "—"
-                            )}
-                          </td>
+                          ];
 
-                          <td className="px-5 py-4">
-                            <p className="text-xs font-black text-[#072c74]">
-                              {
-                                item.folio
-                              }
-                            </p>
+                        const notas =
+                          evidencia
+                            ?.cargado
+                            ? evidencia.notas
+                            : item.nota
+                              ? 1
+                              : 0;
 
-                            <p className="mt-1 text-[11px] text-slate-400">
-                              {
-                                item.fechaSolicitud
-                              }
-                            </p>
-                          </td>
+                        const fotos =
+                          evidencia
+                            ?.cargado
+                            ? evidencia.fotos
+                            : item.foto
+                              ? 1
+                              : 0;
 
-                          <td className="px-5 py-4 font-bold text-slate-900">
-                            {
-                              item.cliente
+                        const mapa =
+                          urlMapa(
+                            item.direccion
+                          );
+
+                        const whatsapp =
+                          urlWhatsApp(
+                            item.telefono
+                          );
+
+                        return (
+                          <tr
+                            key={
+                              item.folio
                             }
-                          </td>
+                            className="align-top hover:bg-slate-50"
+                          >
+                            <td className="px-4 py-4">
+                              {item.ordenRuta ? (
+                                <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-xl bg-[#072c74] px-2 font-black text-white">
+                                  {
+                                    item.ordenRuta
+                                  }
+                                </span>
+                              ) : (
+                                <span className="inline-flex rounded-lg border border-dashed border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-black text-amber-700">
+                                  Sin ruta
+                                </span>
+                              )}
+                            </td>
 
-                          <td className="px-5 py-4 text-sm text-slate-600">
-                            {item.bodega ||
-                              "—"}
-                          </td>
+                            <td className="px-4 py-4">
+                              <p className="text-xs font-black text-[#072c74]">
+                                {
+                                  item.folio
+                                }
+                              </p>
 
-                          <td className="max-w-[230px] px-5 py-4 text-sm text-slate-600">
-                            <p className="truncate">
-                              {item.mercancia ||
-                                item.cantidad ||
-                                "—"}
-                            </p>
-                          </td>
+                              <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                                Solicitud:{" "}
+                                {
+                                  item.fechaSolicitud ||
+                                  "—"
+                                }
+                              </p>
+                            </td>
 
-                          <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-600">
-                            {formatoFecha(
-                              item.fechaRecoleccion
-                            )}
-                          </td>
+                            <td className="max-w-[230px] px-4 py-4">
+                              <p className="font-black text-slate-900">
+                                {
+                                  item.cliente ||
+                                  "Sin cliente"
+                                }
+                              </p>
 
-                          <td className="px-5 py-4">
-                            <EstadoBadge
-                              estado={
-                                item.estado
-                              }
-                            />
-                          </td>
+                              {item.telefono && (
+                                <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                                  {
+                                    item.telefono
+                                  }
+                                </p>
+                              )}
+                            </td>
 
-                          <td className="px-5 py-4 text-right">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setSeleccionada(
-                                  item
-                                )
-                              }
-                              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-700 hover:bg-slate-100"
-                            >
-                              Ver
-                            </button>
-                          </td>
-                        </tr>
-                      )
+                            <td className="max-w-[210px] px-4 py-4 text-sm text-slate-600">
+                              <p className="font-semibold">
+                                {item.bodega ||
+                                  "—"}
+                              </p>
+
+                              {item.direccion && (
+                                <p className="mt-1 line-clamp-2 text-[10px] text-slate-400">
+                                  {
+                                    item.direccion
+                                  }
+                                </p>
+                              )}
+                            </td>
+
+                            <td className="max-w-[230px] px-4 py-4">
+                              <p className="line-clamp-2 text-sm font-semibold text-slate-700">
+                                {item.mercancia ||
+                                  "—"}
+                              </p>
+
+                              {item.cantidad && (
+                                <p className="mt-1 text-[11px] font-black text-slate-500">
+                                  Bultos:{" "}
+                                  {
+                                    item.cantidad
+                                  }
+                                </p>
+                              )}
+                            </td>
+
+                            <td className="whitespace-nowrap px-4 py-4">
+                              <p className="text-xs font-black text-slate-700">
+                                Programada:{" "}
+                                {formatoFecha(
+                                  item.fechaRecoleccion
+                                )}
+                              </p>
+
+                              <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                                Solicitada:{" "}
+                                {
+                                  item.fechaSolicitud ||
+                                  "—"
+                                }
+                              </p>
+                            </td>
+
+                            <td className="px-4 py-4">
+                              <div className="flex flex-wrap gap-1.5">
+                                <span className={`rounded-lg px-2 py-1 text-[10px] font-black ${
+                                  notas > 0
+                                    ? "bg-blue-50 text-blue-700"
+                                    : "bg-slate-100 text-slate-400"
+                                }`}>
+                                  📄 {notas}{" "}
+                                  {notas === 1
+                                    ? "nota"
+                                    : "notas"}
+                                </span>
+
+                                <span className={`rounded-lg px-2 py-1 text-[10px] font-black ${
+                                  fotos > 0
+                                    ? "bg-emerald-50 text-emerald-700"
+                                    : "bg-slate-100 text-slate-400"
+                                }`}>
+                                  📷 {fotos}{" "}
+                                  {fotos === 1
+                                    ? "foto"
+                                    : "fotos"}
+                                </span>
+                              </div>
+                            </td>
+
+                            <td className="px-4 py-4">
+                              <div className="flex flex-wrap gap-1.5">
+                                {item.observaciones && (
+                                  <span
+                                    title={
+                                      item.observaciones
+                                    }
+                                    className="inline-flex max-w-[150px] items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-[10px] font-black text-amber-700"
+                                  >
+                                    ⚠️{" "}
+                                    <span className="truncate">
+                                      Observación
+                                    </span>
+                                  </span>
+                                )}
+
+                                {mapa && (
+                                  <a
+                                    href={mapa}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="rounded-lg bg-cyan-50 px-2 py-1 text-[10px] font-black text-cyan-700"
+                                  >
+                                    📍 Mapa
+                                  </a>
+                                )}
+                              </div>
+
+                              {!item.observaciones &&
+                                !mapa && (
+                                <span className="text-xs text-slate-300">
+                                  —
+                                </span>
+                              )}
+                            </td>
+
+                            <td className="px-4 py-4">
+                              <EstadoBadge
+                                estado={
+                                  item.estado
+                                }
+                              />
+                            </td>
+
+                            <td className="px-4 py-4">
+                              <div className="flex justify-end gap-1.5">
+                                {whatsapp && (
+                                  <a
+                                    href={whatsapp}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    title="Abrir WhatsApp"
+                                    className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 hover:bg-emerald-100"
+                                  >
+                                    WhatsApp
+                                  </a>
+                                )}
+
+                                {mapa && (
+                                  <a
+                                    href={mapa}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    title="Abrir ubicación"
+                                    className="rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-black text-cyan-700 hover:bg-cyan-100"
+                                  >
+                                    📍
+                                  </a>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setSeleccionada(
+                                      item
+                                    )
+                                  }
+                                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-black text-slate-700 hover:bg-slate-100"
+                                >
+                                  Ver
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      }
                     )}
                   </tbody>
                 </table>
@@ -917,6 +1479,40 @@ export default function RecoleccionesPage() {
               }
               movil
             />
+
+            {vistaMovil ===
+              "Solicitudes" && (
+              <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                {[
+                  "Activas",
+                  "Pendiente",
+                  "En ruta",
+                  "No lista",
+                  "Reprogramada",
+                  "Sin ruta",
+                ].map(
+                  (item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() =>
+                        setFiltroMovil(
+                          item as FiltroMovil
+                        )
+                      }
+                      className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-black ${
+                        filtroMovil ===
+                        item
+                          ? "bg-[#072c74] text-white"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  )
+                )}
+              </div>
+            )}
           </div>
 
           {/* RESUMEN MÓVIL */}
@@ -982,6 +1578,11 @@ export default function RecoleccionesPage() {
                       item.folio
                     }
                     item={item}
+                    evidencia={
+                      resumenEvidencias[
+                        item.folio
+                      ]
+                    }
                     onVer={() =>
                       setSeleccionada(
                         item
@@ -1982,11 +2583,38 @@ function CampoFormulario({
 
 function TarjetaMovil({
   item,
+  evidencia,
   onVer,
 }: {
   item: Recoleccion;
+  evidencia?:
+    ResumenEvidenciaFila;
   onVer: () => void;
 }) {
+  const notas =
+    evidencia?.cargado
+      ? evidencia.notas
+      : item.nota
+        ? 1
+        : 0;
+
+  const fotos =
+    evidencia?.cargado
+      ? evidencia.fotos
+      : item.foto
+        ? 1
+        : 0;
+
+  const mapa =
+    urlMapa(
+      item.direccion
+    );
+
+  const whatsapp =
+    urlWhatsApp(
+      item.telefono
+    );
+
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <button
@@ -1995,7 +2623,11 @@ function TarjetaMovil({
         className="block w-full p-4 text-left"
       >
         <div className="flex items-start gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-[#072c74]">
+          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
+            item.ordenRuta
+              ? "bg-[#072c74] text-white"
+              : "border border-dashed border-amber-300 bg-amber-50 text-amber-700"
+          }`}>
             {item.ordenRuta ? (
               <span className="text-lg font-black">
                 {
@@ -2003,7 +2635,11 @@ function TarjetaMovil({
                 }
               </span>
             ) : (
-              <IconoPaquete />
+              <span className="text-[9px] font-black">
+                SIN
+                <br />
+                RUTA
+              </span>
             )}
           </div>
 
@@ -2049,22 +2685,81 @@ function TarjetaMovil({
                 {item.cantidad}
               </p>
             )}
+
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <span className="rounded-lg bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-700">
+                📄 {notas}
+              </span>
+
+              <span className="rounded-lg bg-emerald-50 px-2 py-1 text-[10px] font-black text-emerald-700">
+                📷 {fotos}
+              </span>
+
+              {item.observaciones && (
+                <span className="rounded-lg bg-amber-50 px-2 py-1 text-[10px] font-black text-amber-700">
+                  ⚠️ Aviso
+                </span>
+              )}
+
+              {mapa && (
+                <span className="rounded-lg bg-cyan-50 px-2 py-1 text-[10px] font-black text-cyan-700">
+                  📍 Ubicación
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
         <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
-          <span className="text-xs font-bold text-slate-500">
-            {formatoFecha(
-              item.fechaRecoleccion ||
-                item.fechaSolicitud
-            )}
-          </span>
+          <div>
+            <p className="text-xs font-black text-slate-600">
+              {formatoFecha(
+                item.fechaRecoleccion ||
+                  item.fechaSolicitud
+              )}
+            </p>
+
+            <p className="mt-0.5 text-[10px] text-slate-400">
+              Programada
+            </p>
+          </div>
 
           <span className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-700">
             Ver detalle
           </span>
         </div>
       </button>
+
+      {(mapa ||
+        whatsapp) && (
+        <div className="grid grid-cols-2 gap-2 border-t border-slate-100 p-3">
+          {whatsapp ? (
+            <a
+              href={whatsapp}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-xl bg-emerald-50 px-3 py-2 text-center text-xs font-black text-emerald-700"
+            >
+              WhatsApp
+            </a>
+          ) : (
+            <div />
+          )}
+
+          {mapa ? (
+            <a
+              href={mapa}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-xl bg-cyan-50 px-3 py-2 text-center text-xs font-black text-cyan-700"
+            >
+              📍 Abrir mapa
+            </a>
+          ) : (
+            <div />
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -3510,6 +4205,8 @@ function Resumen({
     | "blue"
     | "green"
     | "red"
+    | "orange"
+    | "violet"
     | "slate";
 }) {
   const estilos = {
@@ -3521,6 +4218,10 @@ function Resumen({
       "bg-emerald-50 text-emerald-700",
     red:
       "bg-red-50 text-red-700",
+    orange:
+      "bg-orange-50 text-orange-700",
+    violet:
+      "bg-violet-50 text-violet-700",
     slate:
       "bg-slate-100 text-slate-700",
   };
@@ -3611,7 +4312,7 @@ function Buscar({
             e.target.value
           )
         }
-        placeholder="Buscar cliente, folio o bodega..."
+        placeholder="Buscar cliente, folio, bodega, mercancía, ruta u observación..."
         className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm outline-none focus:border-blue-400 focus:bg-white"
       />
     </div>
