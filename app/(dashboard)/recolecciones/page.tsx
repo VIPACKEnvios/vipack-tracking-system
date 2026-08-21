@@ -2102,9 +2102,25 @@ function Detalle({
   >(null);
 
   const [
+    eliminandoId,
+    setEliminandoId,
+  ] = useState<
+    string | null
+  >(null);
+
+  const [
     errorEvidencias,
     setErrorEvidencias,
   ] = useState("");
+
+  const [
+    visor,
+    setVisor,
+  ] = useState<{
+    tipo:
+      "nota" | "foto";
+    index: number;
+  } | null>(null);
 
   const cargarEvidencias =
     useCallback(
@@ -2251,223 +2267,417 @@ function Detalle({
     }
   }
 
+  async function eliminarEvidencia(
+    archivo:
+      EvidenciaArchivo,
+    tipo:
+      "nota" | "foto"
+  ) {
+    const nombreTipo =
+      tipo === "nota"
+        ? "nota"
+        : "foto";
+
+    const confirmar =
+      window.confirm(
+        `¿Eliminar esta ${nombreTipo}?\n\n${archivo.nombre}\n\nEsta acción eliminará el archivo de OneDrive.`
+      );
+
+    if (!confirmar) {
+      return;
+    }
+
+    try {
+      setEliminandoId(
+        archivo.id
+      );
+      setErrorEvidencias("");
+
+      const response =
+        await fetch(
+          `/api/recolecciones/${encodeURIComponent(
+            item.folio
+          )}/evidencias`,
+          {
+            method:
+              "DELETE",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                id:
+                  archivo.id,
+                tipo,
+              }),
+          }
+        );
+
+      const data =
+        (await response.json()) as {
+          success?: boolean;
+          error?: string;
+        };
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        throw new Error(
+          data.error ||
+            "No se pudo eliminar la evidencia."
+        );
+      }
+
+      setVisor(null);
+
+      await cargarEvidencias();
+    } catch (
+      error: unknown
+    ) {
+      setErrorEvidencias(
+        error instanceof Error
+          ? error.message
+          : "No se pudo eliminar la evidencia."
+      );
+    } finally {
+      setEliminandoId(null);
+    }
+  }
+
+  const archivosVisor =
+    visor?.tipo === "nota"
+      ? notas
+      : visor?.tipo === "foto"
+        ? fotos
+        : [];
+
+  const archivoVisor =
+    visor &&
+    archivosVisor[
+      visor.index
+    ]
+      ? archivosVisor[
+          visor.index
+        ]
+      : null;
+
+  function moverVisor(
+    direccion:
+      -1 | 1
+  ) {
+    if (
+      !visor ||
+      archivosVisor.length ===
+        0
+    ) {
+      return;
+    }
+
+    const siguiente =
+      (
+        visor.index +
+        direccion +
+        archivosVisor.length
+      ) %
+      archivosVisor.length;
+
+    setVisor({
+      ...visor,
+      index:
+        siguiente,
+    });
+  }
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-end bg-slate-950/55 md:items-center md:justify-center md:p-5">
-      <button
-        type="button"
-        onClick={cerrar}
-        className="absolute inset-0"
-        aria-label="Cerrar"
-      />
+    <>
+      <div className="fixed inset-0 z-[100] flex items-end bg-slate-950/55 md:items-center md:justify-center md:p-5">
+        <button
+          type="button"
+          onClick={cerrar}
+          className="absolute inset-0"
+          aria-label="Cerrar"
+        />
 
-      <div className="relative z-10 max-h-[94vh] w-full overflow-y-auto rounded-t-3xl bg-white md:max-w-3xl md:rounded-3xl">
-        <div className="sticky top-0 z-20 flex items-start justify-between border-b border-slate-200 bg-white p-5">
-          <div>
-            <p className="text-xs font-black text-[#072c74]">
-              {item.folio}
-            </p>
+        <div className="relative z-10 max-h-[94vh] w-full overflow-y-auto rounded-t-3xl bg-white md:max-w-3xl md:rounded-3xl">
+          <div className="sticky top-0 z-20 flex items-start justify-between border-b border-slate-200 bg-white p-5">
+            <div>
+              <p className="text-xs font-black text-[#072c74]">
+                {item.folio}
+              </p>
 
-            <h2 className="mt-1 text-xl font-black text-slate-950">
-              {item.cliente}
-            </h2>
+              <h2 className="mt-1 text-xl font-black text-slate-950">
+                {item.cliente}
+              </h2>
+            </div>
+
+            <button
+              type="button"
+              onClick={cerrar}
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-xl"
+            >
+              ×
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={cerrar}
-            className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-xl"
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="p-5">
-          <div className="mb-5 flex items-center gap-2">
-            <EstadoBadge
-              estado={
-                item.estado
-              }
-            />
-
-            {item.ordenRuta && (
-              <span className="rounded-full bg-[#072c74] px-3 py-1 text-xs font-black text-white">
-                Ruta{" "}
-                {
-                  item.ordenRuta
+          <div className="p-5">
+            <div className="mb-5 flex items-center gap-2">
+              <EstadoBadge
+                estado={
+                  item.estado
                 }
-              </span>
-            )}
-          </div>
+              />
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Dato
-              titulo="Bodega"
-              valor={
-                item.bodega
-              }
-            />
-
-            <Dato
-              titulo="Fecha"
-              valor={formatoFecha(
-                item.fechaRecoleccion
+              {item.ordenRuta && (
+                <span className="rounded-full bg-[#072c74] px-3 py-1 text-xs font-black text-white">
+                  Ruta{" "}
+                  {
+                    item.ordenRuta
+                  }
+                </span>
               )}
-            />
+            </div>
 
-            <Dato
-              titulo="Mercancía"
-              valor={
-                item.mercancia
-              }
-            />
-
-            <Dato
-              titulo="Cantidad / Bultos"
-              valor={
-                item.cantidad
-              }
-            />
-
-            <Dato
-              titulo="Teléfono"
-              valor={
-                item.telefono
-              }
-            />
-
-            <Dato
-              titulo="Fecha solicitud"
-              valor={
-                item.fechaSolicitud
-              }
-            />
-          </div>
-
-          {item.direccion && (
-            <div className="mt-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <Dato
-                titulo="Dirección"
+                titulo="Bodega"
                 valor={
-                  item.direccion
+                  item.bodega
+                }
+              />
+
+              <Dato
+                titulo="Fecha"
+                valor={formatoFecha(
+                  item.fechaRecoleccion
+                )}
+              />
+
+              <Dato
+                titulo="Mercancía"
+                valor={
+                  item.mercancia
+                }
+              />
+
+              <Dato
+                titulo="Cantidad / Bultos"
+                valor={
+                  item.cantidad
+                }
+              />
+
+              <Dato
+                titulo="Teléfono"
+                valor={
+                  item.telefono
+                }
+              />
+
+              <Dato
+                titulo="Fecha solicitud"
+                valor={
+                  item.fechaSolicitud
                 }
               />
             </div>
-          )}
 
-          {item.observaciones && (
-            <div className="mt-3">
-              <Dato
-                titulo="Observaciones"
-                valor={
-                  item.observaciones
-                }
-              />
-            </div>
-          )}
-
-          <div className="mt-5 border-t border-slate-200 pt-5">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-700">
-                  Evidencias
-                </p>
-
-                <h3 className="mt-1 text-lg font-black text-slate-950">
-                  Evidencias de recolección
-                </h3>
-
-                <p className="mt-1 text-xs font-semibold text-slate-500">
-                  {notas.length}{" "}
-                  {notas.length === 1
-                    ? "nota"
-                    : "notas"}
-                  {" · "}
-                  {fotos.length}{" "}
-                  {fotos.length === 1
-                    ? "foto"
-                    : "fotos"}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  void cargarEvidencias()
-                }
-                disabled={
-                  cargandoEvidencias
-                }
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 disabled:opacity-50"
-              >
-                {cargandoEvidencias
-                  ? "Cargando..."
-                  : "Actualizar"}
-              </button>
-            </div>
-
-            {errorEvidencias && (
-              <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-                {errorEvidencias}
+            {item.direccion && (
+              <div className="mt-3">
+                <Dato
+                  titulo="Dirección"
+                  valor={
+                    item.direccion
+                  }
+                />
               </div>
             )}
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <SeccionEvidencias
-                titulo="Notas de recolección"
-                subtitulo="Puedes seleccionar varias imágenes."
-                archivos={notas}
-                tipo="nota"
-                subiendo={
-                  subiendoTipo ===
-                  "nota"
-                }
-                onSeleccionar={(
-                  archivos
-                ) =>
-                  void subirEvidencias(
-                    "nota",
-                    archivos
-                  )
-                }
-                legado={
-                  item.nota
-                }
-              />
+            {item.observaciones && (
+              <div className="mt-3">
+                <Dato
+                  titulo="Observaciones"
+                  valor={
+                    item.observaciones
+                  }
+                />
+              </div>
+            )}
 
-              <SeccionEvidencias
-                titulo="Fotos de mercancía"
-                subtitulo="Puedes agregar varias fotos al mismo folio."
-                archivos={fotos}
-                tipo="foto"
-                subiendo={
-                  subiendoTipo ===
-                  "foto"
-                }
-                onSeleccionar={(
-                  archivos
-                ) =>
-                  void subirEvidencias(
-                    "foto",
+            <div className="mt-5 border-t border-slate-200 pt-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-700">
+                    Evidencias
+                  </p>
+
+                  <h3 className="mt-1 text-lg font-black text-slate-950">
+                    Evidencias de recolección
+                  </h3>
+
+                  <p className="mt-1 text-xs font-semibold text-slate-500">
+                    {notas.length}{" "}
+                    {notas.length === 1
+                      ? "nota"
+                      : "notas"}
+                    {" · "}
+                    {fotos.length}{" "}
+                    {fotos.length === 1
+                      ? "foto"
+                      : "fotos"}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    void cargarEvidencias()
+                  }
+                  disabled={
+                    cargandoEvidencias
+                  }
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 disabled:opacity-50"
+                >
+                  {cargandoEvidencias
+                    ? "Cargando..."
+                    : "Actualizar"}
+                </button>
+              </div>
+
+              {errorEvidencias && (
+                <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                  {errorEvidencias}
+                </div>
+              )}
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <SeccionEvidencias
+                  titulo="Notas de recolección"
+                  subtitulo="Puedes seleccionar varias imágenes."
+                  archivos={notas}
+                  tipo="nota"
+                  subiendo={
+                    subiendoTipo ===
+                    "nota"
+                  }
+                  eliminandoId={
+                    eliminandoId
+                  }
+                  onSeleccionar={(
                     archivos
-                  )
-                }
-                legado={
-                  item.foto
-                }
-              />
+                  ) =>
+                    void subirEvidencias(
+                      "nota",
+                      archivos
+                    )
+                  }
+                  onVer={(
+                    index
+                  ) =>
+                    setVisor({
+                      tipo:
+                        "nota",
+                      index,
+                    })
+                  }
+                  onEliminar={(
+                    archivo
+                  ) =>
+                    void eliminarEvidencia(
+                      archivo,
+                      "nota"
+                    )
+                  }
+                  legado={
+                    item.nota
+                  }
+                />
+
+                <SeccionEvidencias
+                  titulo="Fotos de mercancía"
+                  subtitulo="Puedes agregar varias fotos al mismo folio."
+                  archivos={fotos}
+                  tipo="foto"
+                  subiendo={
+                    subiendoTipo ===
+                    "foto"
+                  }
+                  eliminandoId={
+                    eliminandoId
+                  }
+                  onSeleccionar={(
+                    archivos
+                  ) =>
+                    void subirEvidencias(
+                      "foto",
+                      archivos
+                    )
+                  }
+                  onVer={(
+                    index
+                  ) =>
+                    setVisor({
+                      tipo:
+                        "foto",
+                      index,
+                    })
+                  }
+                  onEliminar={(
+                    archivo
+                  ) =>
+                    void eliminarEvidencia(
+                      archivo,
+                      "foto"
+                    )
+                  }
+                  legado={
+                    item.foto
+                  }
+                />
+              </div>
             </div>
-          </div>
 
-          <button
-            type="button"
-            onClick={cerrar}
-            className="mt-6 w-full rounded-2xl bg-[#072c74] py-3.5 text-sm font-black text-white"
-          >
-            Cerrar
-          </button>
+            <button
+              type="button"
+              onClick={cerrar}
+              className="mt-6 w-full rounded-2xl bg-[#072c74] py-3.5 text-sm font-black text-white"
+            >
+              Cerrar
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+
+      {visor &&
+        archivoVisor && (
+          <VisorEvidencia
+            folio={
+              item.folio
+            }
+            archivo={
+              archivoVisor
+            }
+            posicion={
+              visor.index + 1
+            }
+            total={
+              archivosVisor.length
+            }
+            onCerrar={() =>
+              setVisor(null)
+            }
+            onAnterior={() =>
+              moverVisor(-1)
+            }
+            onSiguiente={() =>
+              moverVisor(1)
+            }
+          />
+        )}
+    </>
   );
 }
 
@@ -2477,7 +2687,10 @@ function SeccionEvidencias({
   archivos,
   tipo,
   subiendo,
+  eliminandoId,
   onSeleccionar,
+  onVer,
+  onEliminar,
   legado,
 }: {
   titulo: string;
@@ -2485,9 +2698,18 @@ function SeccionEvidencias({
   archivos: EvidenciaArchivo[];
   tipo: "nota" | "foto";
   subiendo: boolean;
+  eliminandoId:
+    string | null;
   onSeleccionar: (
     archivos:
       FileList | null
+  ) => void;
+  onVer: (
+    index: number
+  ) => void;
+  onEliminar: (
+    archivo:
+      EvidenciaArchivo
   ) => void;
   legado: string;
 }) {
@@ -2554,46 +2776,77 @@ function SeccionEvidencias({
             (
               archivo,
               index
-            ) => (
-              <div
-                key={
-                  archivo.id ||
-                  `${archivo.nombre}-${index}`
-                }
-                className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3"
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-sm font-black text-blue-700">
-                  {index + 1}
+            ) => {
+              const eliminando =
+                eliminandoId ===
+                archivo.id;
+
+              return (
+                <div
+                  key={
+                    archivo.id ||
+                    `${archivo.nombre}-${index}`
+                  }
+                  className="rounded-xl border border-slate-200 bg-white p-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onVer(index)
+                      }
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-sm font-black text-blue-700"
+                      aria-label={`Ver ${archivo.nombre}`}
+                    >
+                      {index + 1}
+                    </button>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-black text-slate-800">
+                        {
+                          archivo.nombre
+                        }
+                      </p>
+
+                      <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
+                        {formatoBytes(
+                          archivo.tamaño
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onVer(index)
+                      }
+                      className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700"
+                    >
+                      Ver
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={
+                        eliminando
+                      }
+                      onClick={() =>
+                        onEliminar(
+                          archivo
+                        )
+                      }
+                      className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 disabled:opacity-50"
+                    >
+                      {eliminando
+                        ? "Eliminando..."
+                        : "Eliminar"}
+                    </button>
+                  </div>
                 </div>
-
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-black text-slate-800">
-                    {
-                      archivo.nombre
-                    }
-                  </p>
-
-                  <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
-                    {formatoBytes(
-                      archivo.tamaño
-                    )}
-                  </p>
-                </div>
-
-                {archivo.webUrl && (
-                  <a
-                    href={
-                      archivo.webUrl
-                    }
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[10px] font-black text-[#072c74]"
-                  >
-                    Ver
-                  </a>
-                )}
-              </div>
-            )
+              );
+            }
           )}
         </div>
       ) : (
@@ -2605,6 +2858,109 @@ function SeccionEvidencias({
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+function VisorEvidencia({
+  folio,
+  archivo,
+  posicion,
+  total,
+  onCerrar,
+  onAnterior,
+  onSiguiente,
+}: {
+  folio: string;
+  archivo:
+    EvidenciaArchivo;
+  posicion: number;
+  total: number;
+  onCerrar: () => void;
+  onAnterior: () => void;
+  onSiguiente: () => void;
+}) {
+  const src =
+    `/api/recolecciones/${encodeURIComponent(
+      folio
+    )}/evidencias?archivoId=${encodeURIComponent(
+      archivo.id
+    )}`;
+
+  return (
+    <div className="fixed inset-0 z-[200] flex flex-col bg-slate-950">
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-slate-950 px-4 py-3 text-white">
+        <div className="min-w-0">
+          <p className="truncate text-xs font-black">
+            {
+              archivo.nombre
+            }
+          </p>
+
+          <p className="mt-0.5 text-[11px] text-slate-300">
+            {posicion} de{" "}
+            {total}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onCerrar}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-xl font-black"
+          aria-label="Cerrar visor"
+        >
+          ×
+        </button>
+      </div>
+
+      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-auto p-3 sm:p-6">
+        <img
+          key={
+            archivo.id
+          }
+          src={src}
+          alt={
+            archivo.nombre
+          }
+          className="max-h-full max-w-full rounded-lg bg-white object-contain shadow-2xl"
+        />
+
+        {total > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={
+                onAnterior
+              }
+              className="fixed left-3 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-2xl font-black text-white backdrop-blur sm:left-6"
+              aria-label="Evidencia anterior"
+            >
+              ‹
+            </button>
+
+            <button
+              type="button"
+              onClick={
+                onSiguiente
+              }
+              className="fixed right-3 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-2xl font-black text-white backdrop-blur sm:right-6"
+              aria-label="Evidencia siguiente"
+            >
+              ›
+            </button>
+          </>
+        )}
+      </div>
+
+      <div className="border-t border-white/10 bg-slate-950 p-3 text-center">
+        <button
+          type="button"
+          onClick={onCerrar}
+          className="w-full max-w-sm rounded-xl bg-white px-4 py-3 text-sm font-black text-slate-950"
+        >
+          Cerrar imagen
+        </button>
+      </div>
     </div>
   );
 }

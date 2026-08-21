@@ -375,6 +375,116 @@ function perteneceAlFolio(
     );
 }
 
+
+async function obtenerArchivoSeguro(
+  accessToken: string,
+  folio: string,
+  archivoId: string
+): Promise<{
+  archivo: ArchivoOneDrive;
+  tipo: TipoEvidencia;
+} | null> {
+  const [
+    notas,
+    fotos,
+  ] =
+    await Promise.all([
+      listarArchivosCarpeta(
+        accessToken,
+        RUTA_NOTAS
+      ),
+
+      listarArchivosCarpeta(
+        accessToken,
+        RUTA_FOTOS
+      ),
+    ]);
+
+  const nota =
+    notas.find(
+      (
+        item:
+          ArchivoOneDrive
+      ) =>
+        item.id ===
+          archivoId &&
+        perteneceAlFolio(
+          item.nombre,
+          folio
+        )
+    );
+
+  if (nota) {
+    return {
+      archivo:
+        nota,
+      tipo:
+        "nota",
+    };
+  }
+
+  const foto =
+    fotos.find(
+      (
+        item:
+          ArchivoOneDrive
+      ) =>
+        item.id ===
+          archivoId &&
+        perteneceAlFolio(
+          item.nombre,
+          folio
+        )
+    );
+
+  if (foto) {
+    return {
+      archivo:
+        foto,
+      tipo:
+        "foto",
+    };
+  }
+
+  return null;
+}
+
+async function descargarArchivoOneDrive(
+  accessToken: string,
+  archivoId: string
+) {
+  const response =
+    await fetch(
+      `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(
+        archivoId
+      )}/content`,
+      {
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+        },
+
+        cache:
+          "no-store",
+
+        redirect:
+          "follow",
+      }
+    );
+
+  if (!response.ok) {
+    const detalle =
+      await response.text();
+
+    throw new Error(
+      detalle ||
+        "No se pudo abrir la evidencia."
+    );
+  }
+
+  return response;
+}
+
 async function subirArchivo(
   accessToken: string,
   ruta: string,
@@ -480,6 +590,84 @@ export async function GET(
     const accessToken =
       await obtenerAccessToken();
 
+    const url =
+      new URL(
+        request.url
+      );
+
+    const archivoId =
+      String(
+        url.searchParams.get(
+          "archivoId"
+        ) || ""
+      ).trim();
+
+    /*
+     * VISOR INTERNO:
+     * si llega archivoId, primero
+     * verificamos que el archivo
+     * pertenezca al folio y después
+     * lo transmitimos sin exponer
+     * OneDrive al usuario.
+     */
+    if (archivoId) {
+      const seguro =
+        await obtenerArchivoSeguro(
+          accessToken,
+          folio,
+          archivoId
+        );
+
+      if (!seguro) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "La evidencia no existe o no pertenece a esta recolección.",
+          },
+          {
+            status: 404,
+          }
+        );
+      }
+
+      const archivoResponse =
+        await descargarArchivoOneDrive(
+          accessToken,
+          archivoId
+        );
+
+      const buffer =
+        await archivoResponse.arrayBuffer();
+
+      const contentType =
+        archivoResponse.headers.get(
+          "content-type"
+        ) ||
+        "application/octet-stream";
+
+      return new Response(
+        buffer,
+        {
+          status: 200,
+
+          headers: {
+            "Content-Type":
+              contentType,
+
+            "Content-Disposition":
+              `inline; filename="${seguro.archivo.nombre.replace(
+                /"/g,
+                ""
+              )}"`,
+
+            "Cache-Control":
+              "private, no-store, max-age=0",
+          },
+        }
+      );
+    }
+
     const [
       todosNotas,
       todosFotos,
@@ -499,7 +687,8 @@ export async function GET(
     const notas =
       todosNotas.filter(
         (
-          archivo: ArchivoOneDrive
+          archivo:
+            ArchivoOneDrive
         ) =>
           perteneceAlFolio(
             archivo.nombre,
@@ -510,7 +699,8 @@ export async function GET(
     const fotos =
       todosFotos.filter(
         (
-          archivo: ArchivoOneDrive
+          archivo:
+            ArchivoOneDrive
         ) =>
           perteneceAlFolio(
             archivo.nombre,
@@ -562,6 +752,7 @@ export async function GET(
     );
   }
 }
+
 
 export async function POST(
   request: Request,
@@ -743,6 +934,208 @@ export async function POST(
   ) {
     console.error(
       "Error subiendo evidencias:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+
+        error:
+          error instanceof Error
+            ? error.message
+            : "Error desconocido.",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+async function eliminarArchivoOneDrive(
+  accessToken: string,
+  id: string
+) {
+  const response =
+    await fetch(
+      `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(
+        id
+      )}`,
+      {
+        method: "DELETE",
+
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+        },
+
+        cache:
+          "no-store",
+      }
+    );
+
+  if (
+    response.status !== 204 &&
+    !response.ok
+  ) {
+    const data =
+      await leerJsonSeguro(
+        response
+      );
+
+    throw new Error(
+      data?.error?.message ||
+        "No se pudo eliminar el archivo de OneDrive."
+    );
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  context: {
+    params:
+      Promise<{
+        folio: string;
+      }>;
+  }
+) {
+  try {
+    const {
+      folio:
+        folioRaw,
+    } =
+      await context.params;
+
+    const folio =
+      limpiarFolio(
+        folioRaw
+      );
+
+    if (!folio) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Folio inválido.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const body =
+      (await request.json()) as {
+        id?: string;
+        tipo?: TipoEvidencia;
+      };
+
+    const id =
+      String(
+        body.id || ""
+      ).trim();
+
+    const tipo =
+      body.tipo;
+
+    if (!id) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Falta el identificador del archivo.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      tipo !== "nota" &&
+      tipo !== "foto"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'El tipo debe ser "nota" o "foto".',
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const accessToken =
+      await obtenerAccessToken();
+
+    const ruta =
+      tipo === "nota"
+        ? RUTA_NOTAS
+        : RUTA_FOTOS;
+
+    const archivos =
+      await listarArchivosCarpeta(
+        accessToken,
+        ruta
+      );
+
+    const archivo =
+      archivos.find(
+        (
+          item:
+            ArchivoOneDrive
+        ) =>
+          item.id === id &&
+          perteneceAlFolio(
+            item.nombre,
+            folio
+          )
+      );
+
+    if (!archivo) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "La evidencia no existe o no pertenece a esta recolección.",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    await eliminarArchivoOneDrive(
+      accessToken,
+      archivo.id
+    );
+
+    return NextResponse.json({
+      success: true,
+
+      mensaje:
+        tipo === "nota"
+          ? "Nota eliminada correctamente."
+          : "Foto eliminada correctamente.",
+
+      eliminado: {
+        id:
+          archivo.id,
+
+        nombre:
+          archivo.nombre,
+
+        tipo,
+      },
+    });
+  } catch (
+    error: unknown
+  ) {
+    console.error(
+      "Error eliminando evidencia:",
       error
     );
 
