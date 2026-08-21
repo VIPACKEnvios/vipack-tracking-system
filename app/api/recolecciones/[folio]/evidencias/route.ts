@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import * as XLSX from "xlsx";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +11,12 @@ const RUTA_NOTAS =
 
 const RUTA_FOTOS =
   "Envios/Recoleccion por cliente";
+
+const RUTA_EXCEL =
+  "Envios/control_recolecciones_bodega.xlsx";
+
+const HOJA_SOLICITUDES =
+  "Solicitudes";
 
 type TipoEvidencia =
   | "nota"
@@ -28,6 +35,11 @@ type ArchivoSubido = {
   nombre: string;
   tamaño: number;
   webUrl: string | null;
+};
+
+type CarpetaOneDrive = {
+  id: string;
+  nombre: string;
 };
 
 async function leerJsonSeguro(
@@ -283,6 +295,505 @@ function numeroConCeros(
   );
 }
 
+
+function normalizarNombre(
+  valor: string
+) {
+  return valor
+    .normalize("NFD")
+    .replace(
+      /[\u0300-\u036f]/g,
+      ""
+    )
+    .toLocaleLowerCase(
+      "es"
+    )
+    .replace(
+      /[^a-z0-9]+/g,
+      " "
+    )
+    .trim()
+    .replace(
+      /\s+/g,
+      " "
+    );
+}
+
+function quitarCodigoInicial(
+  valor: string
+) {
+  return valor
+    .replace(
+      /^\d+\s*/,
+      ""
+    )
+    .trim();
+}
+
+async function descargarExcel(
+  accessToken: string
+) {
+  const url =
+    `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
+      RUTA_EXCEL
+    )}:/content`;
+
+  const response =
+    await fetch(
+      url,
+      {
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+        },
+
+        cache:
+          "no-store",
+      }
+    );
+
+  if (!response.ok) {
+    const detalle =
+      await response.text();
+
+    throw new Error(
+      `No se pudo leer el Excel de recolecciones. ${detalle}`
+    );
+  }
+
+  return await response.arrayBuffer();
+}
+
+async function obtenerClientePorFolio(
+  accessToken: string,
+  folio: string
+) {
+  const arrayBuffer =
+    await descargarExcel(
+      accessToken
+    );
+
+  const workbook =
+    XLSX.read(
+      Buffer.from(
+        arrayBuffer
+      ),
+      {
+        type:
+          "buffer",
+      }
+    );
+
+  const hoja =
+    workbook.Sheets[
+      HOJA_SOLICITUDES
+    ];
+
+  if (!hoja) {
+    throw new Error(
+      `El Excel no contiene la hoja "${HOJA_SOLICITUDES}".`
+    );
+  }
+
+  const filas =
+    XLSX.utils
+      .sheet_to_json<
+        Record<
+          string,
+          unknown
+        >
+      >(
+        hoja,
+        {
+          defval:
+            "",
+          raw:
+            false,
+        }
+      );
+
+  const fila =
+    filas.find(
+      (item) =>
+        String(
+          item.Folio ?? ""
+        ).trim() ===
+        folio
+    );
+
+  if (!fila) {
+    throw new Error(
+      `No se encontró el folio ${folio} en el Excel de recolecciones.`
+    );
+  }
+
+  const cliente =
+    String(
+      fila.Cliente ?? ""
+    ).trim();
+
+  if (!cliente) {
+    throw new Error(
+      `La recolección ${folio} no tiene cliente asignado.`
+    );
+  }
+
+  return cliente;
+}
+
+async function listarCarpetas(
+  accessToken: string,
+  ruta: string
+): Promise<CarpetaOneDrive[]> {
+  const url =
+    `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
+      ruta
+    )}:/children?$select=id,name,folder&$top=999`;
+
+  const response =
+    await fetch(
+      url,
+      {
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+        },
+
+        cache:
+          "no-store",
+      }
+    );
+
+  if (
+    response.status === 404
+  ) {
+    return [];
+  }
+
+  const data =
+    await leerJsonSeguro(
+      response
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      data?.error?.message ||
+        `No se pudo leer la carpeta ${ruta}.`
+    );
+  }
+
+  const items =
+    Array.isArray(
+      data?.value
+    )
+      ? data.value
+      : [];
+
+  return items
+    .filter(
+      (item: any) =>
+        Boolean(
+          item?.folder
+        )
+    )
+    .map(
+      (
+        item: any
+      ): CarpetaOneDrive => ({
+        id:
+          String(
+            item.id || ""
+          ),
+
+        nombre:
+          String(
+            item.name || ""
+          ),
+      })
+    );
+}
+
+async function resolverCarpetaCliente(
+  accessToken: string,
+  cliente: string
+) {
+  const carpetas =
+    await listarCarpetas(
+      accessToken,
+      RUTA_FOTOS
+    );
+
+  const objetivo =
+    normalizarNombre(
+      cliente
+    );
+
+  /*
+   * Tus carpetas pueden traer un código
+   * delante, por ejemplo:
+   * "00018 Nombre del cliente".
+   */
+  const preparadas =
+    carpetas.map(
+      (carpeta) => {
+        const nombreNormal =
+          normalizarNombre(
+            carpeta.nombre
+          );
+
+        const sinCodigo =
+          quitarCodigoInicial(
+            nombreNormal
+          );
+
+        return {
+          ...carpeta,
+          nombreNormal,
+          sinCodigo,
+        };
+      }
+    );
+
+  const exacta =
+    preparadas.find(
+      (carpeta) =>
+        carpeta.sinCodigo ===
+          objetivo ||
+        carpeta.nombreNormal ===
+          objetivo
+    );
+
+  if (exacta) {
+    return exacta;
+  }
+
+  const candidatas =
+    preparadas.filter(
+      (carpeta) =>
+        carpeta.sinCodigo.includes(
+          objetivo
+        ) ||
+        objetivo.includes(
+          carpeta.sinCodigo
+        )
+    );
+
+  if (
+    candidatas.length === 1
+  ) {
+    return candidatas[0];
+  }
+
+  if (
+    candidatas.length > 1
+  ) {
+    const empieza =
+      candidatas.filter(
+        (carpeta) =>
+          carpeta.sinCodigo.startsWith(
+            objetivo
+          ) ||
+          objetivo.startsWith(
+            carpeta.sinCodigo
+          )
+      );
+
+    if (
+      empieza.length === 1
+    ) {
+      return empieza[0];
+    }
+
+    throw new Error(
+      `Se encontraron varias carpetas posibles para el cliente "${cliente}". Revisa los nombres dentro de "${RUTA_FOTOS}".`
+    );
+  }
+
+  throw new Error(
+    `No se encontró una carpeta para "${cliente}" dentro de "${RUTA_FOTOS}". No se creó una carpeta nueva para evitar duplicados.`
+  );
+}
+
+async function resolverRutaFotosCliente(
+  accessToken: string,
+  folio: string
+) {
+  const cliente =
+    await obtenerClientePorFolio(
+      accessToken,
+      folio
+    );
+
+  const carpeta =
+    await resolverCarpetaCliente(
+      accessToken,
+      cliente
+    );
+
+  return {
+    cliente,
+
+    carpeta:
+      carpeta.nombre,
+
+    ruta:
+      `${RUTA_FOTOS}/${carpeta.nombre}`,
+  };
+}
+
+async function obtenerIdCarpetaPorRuta(
+  accessToken: string,
+  ruta: string
+) {
+  const url =
+    `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
+      ruta
+    )}?$select=id,name,folder`;
+
+  const response =
+    await fetch(
+      url,
+      {
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+        },
+
+        cache:
+          "no-store",
+      }
+    );
+
+  const data =
+    await leerJsonSeguro(
+      response
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      data?.error?.message ||
+        `No se pudo localizar la carpeta ${ruta}.`
+    );
+  }
+
+  const id =
+    String(
+      data?.id || ""
+    );
+
+  if (!id) {
+    throw new Error(
+      `Microsoft no devolvió el id de la carpeta ${ruta}.`
+    );
+  }
+
+  return id;
+}
+
+async function buscarFotosPorFolio(
+  accessToken: string,
+  folio: string
+): Promise<ArchivoOneDrive[]> {
+  /*
+   * Microsoft Graph busca de forma
+   * recursiva dentro de "Recoleccion por cliente".
+   * Esto permite encontrar fotos antiguas y nuevas
+   * aunque estén dentro de carpetas distintas.
+   */
+  const carpetaId =
+    await obtenerIdCarpetaPorRuta(
+      accessToken,
+      RUTA_FOTOS
+    );
+
+  const url =
+    `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(
+      carpetaId
+    )}/search(q='${folio}')?$select=id,name,size,file,webUrl,lastModifiedDateTime&$top=999`;
+
+  const response =
+    await fetch(
+      url,
+      {
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+        },
+
+        cache:
+          "no-store",
+      }
+    );
+
+  const data =
+    await leerJsonSeguro(
+      response
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      data?.error?.message ||
+        "No se pudieron buscar las fotos de la recolección."
+    );
+  }
+
+  const items =
+    Array.isArray(
+      data?.value
+    )
+      ? data.value
+      : [];
+
+  return items
+    .filter(
+      (item: any) =>
+        Boolean(
+          item?.file
+        ) &&
+        perteneceAlFolio(
+          String(
+            item?.name || ""
+          ),
+          folio
+        )
+    )
+    .map(
+      (
+        item: any
+      ): ArchivoOneDrive => ({
+        id:
+          String(
+            item.id || ""
+          ),
+
+        nombre:
+          String(
+            item.name || ""
+          ),
+
+        tamaño:
+          Number(
+            item.size || 0
+          ),
+
+        webUrl:
+          item.webUrl
+            ? String(
+                item.webUrl
+              )
+            : null,
+
+        modificado:
+          item.lastModifiedDateTime
+            ? String(
+                item.lastModifiedDateTime
+              )
+            : null,
+      })
+    );
+}
+
+
 async function listarArchivosCarpeta(
   accessToken: string,
   ruta: string
@@ -394,9 +905,9 @@ async function obtenerArchivoSeguro(
         RUTA_NOTAS
       ),
 
-      listarArchivosCarpeta(
+      buscarFotosPorFolio(
         accessToken,
-        RUTA_FOTOS
+        folio
       ),
     ]);
 
@@ -430,11 +941,7 @@ async function obtenerArchivoSeguro(
           ArchivoOneDrive
       ) =>
         item.id ===
-          archivoId &&
-        perteneceAlFolio(
-          item.nombre,
-          folio
-        )
+        archivoId
     );
 
   if (foto) {
@@ -448,6 +955,7 @@ async function obtenerArchivoSeguro(
 
   return null;
 }
+
 
 async function descargarArchivoOneDrive(
   accessToken: string,
@@ -670,7 +1178,7 @@ export async function GET(
 
     const [
       todosNotas,
-      todosFotos,
+      fotos,
     ] =
       await Promise.all([
         listarArchivosCarpeta(
@@ -678,26 +1186,14 @@ export async function GET(
           RUTA_NOTAS
         ),
 
-        listarArchivosCarpeta(
+        buscarFotosPorFolio(
           accessToken,
-          RUTA_FOTOS
+          folio
         ),
       ]);
 
     const notas =
       todosNotas.filter(
-        (
-          archivo:
-            ArchivoOneDrive
-        ) =>
-          perteneceAlFolio(
-            archivo.nombre,
-            folio
-          )
-      );
-
-    const fotos =
-      todosFotos.filter(
         (
           archivo:
             ArchivoOneDrive
@@ -851,16 +1347,46 @@ export async function POST(
     const accessToken =
       await obtenerAccessToken();
 
-    const ruta =
-      tipo === "nota"
-        ? RUTA_NOTAS
-        : RUTA_FOTOS;
+    let ruta =
+      RUTA_NOTAS;
+
+    let cliente:
+      string | null =
+        null;
+
+    let carpetaCliente:
+      string | null =
+        null;
+
+    if (
+      tipo === "foto"
+    ) {
+      const destino =
+        await resolverRutaFotosCliente(
+          accessToken,
+          folio
+        );
+
+      ruta =
+        destino.ruta;
+
+      cliente =
+        destino.cliente;
+
+      carpetaCliente =
+        destino.carpeta;
+    }
 
     const existentes =
-      await listarArchivosCarpeta(
-        accessToken,
-        ruta
-      );
+      tipo === "nota"
+        ? await listarArchivosCarpeta(
+            accessToken,
+            RUTA_NOTAS
+          )
+        : await buscarFotosPorFolio(
+            accessToken,
+            folio
+          );
 
     const delFolio =
       existentes.filter(
@@ -928,6 +1454,19 @@ export async function POST(
 
       archivos:
         subidos,
+
+      destino:
+        tipo === "nota"
+          ? {
+              ruta:
+                RUTA_NOTAS,
+            }
+          : {
+              ruta,
+              cliente,
+              carpeta:
+                carpetaCliente,
+            },
     });
   } catch (
     error: unknown
@@ -1071,16 +1610,16 @@ export async function DELETE(
     const accessToken =
       await obtenerAccessToken();
 
-    const ruta =
-      tipo === "nota"
-        ? RUTA_NOTAS
-        : RUTA_FOTOS;
-
     const archivos =
-      await listarArchivosCarpeta(
-        accessToken,
-        ruta
-      );
+      tipo === "nota"
+        ? await listarArchivosCarpeta(
+            accessToken,
+            RUTA_NOTAS
+          )
+        : await buscarFotosPorFolio(
+            accessToken,
+            folio
+          );
 
     const archivo =
       archivos.find(
