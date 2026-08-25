@@ -70,6 +70,11 @@ const menuInventario: EnlaceMenu[] = [
     href: "/recolecciones",
     icono: <IconoUbicacion />,
   },
+  {
+    etiqueta: "Clientes",
+    href: "/clientes",
+    icono: <IconoUsuarios />,
+  },
 ];
 
 export default function DashboardLayout({
@@ -130,12 +135,6 @@ export default function DashboardLayout({
             />
 
             <div className="mt-6 border-t border-white/10 pt-5">
-              <BotonProximamente
-                etiqueta="Clientes"
-                icono={<IconoUsuarios />}
-                contraido={menuContraido}
-              />
-
               <BotonProximamente
                 etiqueta="Empaque"
                 icono={<IconoCaja />}
@@ -204,12 +203,6 @@ export default function DashboardLayout({
                 />
 
                 <div className="mt-6 border-t border-white/10 pt-5">
-                  <BotonProximamente
-                    etiqueta="Clientes"
-                    icono={<IconoUsuarios />}
-                    contraido={false}
-                  />
-
                   <BotonProximamente
                     etiqueta="Empaque"
                     icono={<IconoCaja />}
