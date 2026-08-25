@@ -360,7 +360,7 @@ export default function ClientesPage() {
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Link
-              href="/registro-bazar"
+              href="/registro-cliente"
               className="inline-flex items-center justify-center rounded-xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-md transition hover:bg-cyan-700"
             >
               + Registrar cliente
