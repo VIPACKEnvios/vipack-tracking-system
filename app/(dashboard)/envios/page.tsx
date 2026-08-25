@@ -629,6 +629,7 @@ export default function EnviosPage() {
                 <option value="ESTAFETA">ESTAFETA</option>
                 <option value="FEDEX">FEDEX</option>
                 <option value="PAQUETEXPRESS">PAQUETEXPRESS</option>
+                <option value="CASTORES">CASTORES</option>
               </select>
 
               <button
