@@ -1018,16 +1018,19 @@ export async function POST() {
           ?.token_inventario;
 
       /*
-       * Si el cliente ya tenía una
-       * carpeta vinculada, la respetamos.
+       * La carpeta detectada directamente en OneDrive
+       * tiene prioridad sobre el ID guardado en Supabase.
        *
-       * Si no tenía, usamos la carpeta
-       * detectada por ID/nombre.
+       * Esto corrige IDs antiguos o inválidos que pueden
+       * provocar itemNotFound / HTTP 404 al subir evidencias.
+       *
+       * Si por alguna razón no se detecta una carpeta física
+       * en OneDrive, conservamos temporalmente el ID existente
+       * para no romper clientes que aún requieran revisión.
        */
       const folderIdFinal =
-        existente
-          ?.onedrive_folder_id ||
         carpetaEncontrada?.id ||
+        existente?.onedrive_folder_id ||
         null;
 
       const carpetaFinal =

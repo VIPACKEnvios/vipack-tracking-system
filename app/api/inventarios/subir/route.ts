@@ -5,10 +5,21 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+const RUTA_CLIENTES =
+  "Envios/Recoleccion por cliente";
+
 type CrearSesionBody = {
   id_cliente?: number | string;
   nombre_archivo?: string;
   tamaño?: number;
+};
+
+type CarpetaOneDrive = {
+  id: string;
+  name: string;
+  folder?: {
+    childCount?: number;
+  };
 };
 
 function limpiarNombreArchivo(nombre: string) {
@@ -18,36 +29,357 @@ function limpiarNombreArchivo(nombre: string) {
     .trim();
 }
 
+function normalizar(valor: unknown) {
+  return String(valor || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("es");
+}
+
+function numeroCliente(valor: number) {
+  return String(valor).padStart(5, "0");
+}
+
+async function leerJsonSeguro(response: Response) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+async function validarCarpetaPorId(
+  accessToken: string,
+  folderId: string
+) {
+  const url =
+    `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(
+      folderId
+    )}?$select=id,name,folder`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    cache: "no-store",
+  });
+
+  const data =
+    await leerJsonSeguro(response);
+
+  if (
+    response.ok &&
+    data?.id &&
+    data?.folder
+  ) {
+    return {
+      existe: true,
+      carpeta: {
+        id: String(data.id),
+        name: String(data.name || ""),
+        folder: data.folder,
+      } as CarpetaOneDrive,
+      status: response.status,
+      detalle: null,
+    };
+  }
+
+  return {
+    existe: false,
+    carpeta: null,
+    status: response.status,
+    detalle: data,
+  };
+}
+
+async function buscarCarpetaFisicaCliente(
+  accessToken: string,
+  idCliente: number,
+  carpetaCliente: string | null
+) {
+  /*
+   * 1. Localizamos la carpeta raíz real:
+   * Envios/Recoleccion por cliente
+   */
+  const rootUrl =
+    `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
+      RUTA_CLIENTES
+    )}?$select=id,name,folder`;
+
+  const rootResponse =
+    await fetch(rootUrl, {
+      headers: {
+        Authorization:
+          `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    });
+
+  const rootData =
+    await leerJsonSeguro(
+      rootResponse
+    );
+
+  if (
+    !rootResponse.ok ||
+    !rootData?.id
+  ) {
+    return {
+      carpeta: null,
+      duplicadas: [] as CarpetaOneDrive[],
+      error:
+        `No se encontró la carpeta principal "${RUTA_CLIENTES}" en OneDrive.`,
+      detalle:
+        rootData ||
+        `HTTP ${rootResponse.status}`,
+    };
+  }
+
+  /*
+   * 2. Leemos todas las carpetas hijas.
+   */
+  const childrenUrl =
+    `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(
+      String(rootData.id)
+    )}/children?$select=id,name,folder&$top=999`;
+
+  const childrenResponse =
+    await fetch(childrenUrl, {
+      headers: {
+        Authorization:
+          `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    });
+
+  const childrenData =
+    await leerJsonSeguro(
+      childrenResponse
+    );
+
+  if (!childrenResponse.ok) {
+    return {
+      carpeta: null,
+      duplicadas: [] as CarpetaOneDrive[],
+      error:
+        "No se pudieron consultar las carpetas de clientes en OneDrive.",
+      detalle:
+        childrenData ||
+        `HTTP ${childrenResponse.status}`,
+    };
+  }
+
+  const carpetas:
+    CarpetaOneDrive[] =
+    Array.isArray(
+      childrenData?.value
+    )
+      ? childrenData.value.filter(
+          (item: any) =>
+            Boolean(
+              item?.folder
+            )
+        )
+      : [];
+
+  /*
+   * PRIORIDAD 1:
+   * ID de cliente al inicio de la carpeta.
+   * Ejemplo: 00091 Irasema Vazquez
+   */
+  const prefijo =
+    numeroCliente(
+      idCliente
+    );
+
+  const porId =
+    carpetas.filter(
+      (carpeta) => {
+        const nombre =
+          String(
+            carpeta.name ||
+            ""
+          ).trim();
+
+        return (
+          nombre === prefijo ||
+          nombre.startsWith(
+            `${prefijo} `
+          )
+        );
+      }
+    );
+
+  if (porId.length === 1) {
+    return {
+      carpeta: porId[0],
+      duplicadas: [],
+      error: null,
+      detalle: null,
+    };
+  }
+
+  if (porId.length > 1) {
+    return {
+      carpeta: null,
+      duplicadas: porId,
+      error:
+        "Se encontraron varias carpetas de OneDrive con el mismo ID de cliente.",
+      detalle:
+        porId.map(
+          (item) => ({
+            id: item.id,
+            name: item.name,
+          })
+        ),
+    };
+  }
+
+  /*
+   * PRIORIDAD 2:
+   * nombre exacto normalizado de carpeta_cliente.
+   */
+  const esperado =
+    normalizar(
+      carpetaCliente
+    );
+
+  if (esperado) {
+    const porNombre =
+      carpetas.filter(
+        (carpeta) =>
+          normalizar(
+            carpeta.name
+          ) === esperado
+      );
+
+    if (porNombre.length === 1) {
+      return {
+        carpeta: porNombre[0],
+        duplicadas: [],
+        error: null,
+        detalle: null,
+      };
+    }
+
+    if (
+      porNombre.length >
+      1
+    ) {
+      return {
+        carpeta: null,
+        duplicadas: porNombre,
+        error:
+          "Se encontraron varias carpetas de OneDrive con el mismo nombre.",
+        detalle:
+          porNombre.map(
+            (item) => ({
+              id: item.id,
+              name: item.name,
+            })
+          ),
+      };
+    }
+  }
+
+  return {
+    carpeta: null,
+    duplicadas: [],
+    error:
+      "No se encontró la carpeta física del cliente en OneDrive.",
+    detalle: {
+      id_cliente:
+        idCliente,
+      carpeta_cliente:
+        carpetaCliente,
+      ruta:
+        RUTA_CLIENTES,
+    },
+  };
+}
+
+async function crearUploadSession(
+  accessToken: string,
+  folderId: string,
+  nombreArchivo: string
+) {
+  const crearSesionUrl =
+    `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(
+      folderId
+    )}:/${encodeURIComponent(
+      nombreArchivo
+    )}:/createUploadSession`;
+
+  const response =
+    await fetch(
+      crearSesionUrl,
+      {
+        method: "POST",
+
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+
+          "Content-Type":
+            "application/json",
+        },
+
+        body:
+          JSON.stringify({
+            item: {
+              "@microsoft.graph.conflictBehavior":
+                "rename",
+            },
+          }),
+
+        cache:
+          "no-store",
+      }
+    );
+
+  const data =
+    await leerJsonSeguro(
+      response
+    );
+
+  return {
+    response,
+    data,
+  };
+}
+
 export async function POST(request: Request) {
   try {
     /*
-     * IMPORTANTE:
      * Esta API NO recibe el archivo completo.
-     *
-     * Vercel limita el cuerpo de una Function,
-     * por eso aquí únicamente creamos una sesión
-     * temporal de carga en Microsoft OneDrive.
-     *
-     * Después, el navegador subirá directamente
-     * los bytes del archivo al uploadUrl de Microsoft.
+     * Solamente crea la sesión temporal de carga.
+     * El navegador sube después directamente a OneDrive.
      */
-
     const body =
       (await request.json()) as CrearSesionBody;
 
     const idCliente =
-      Number(body?.id_cliente);
+      Number(
+        body?.id_cliente
+      );
 
     const nombreOriginal =
       String(
-        body?.nombre_archivo || ""
+        body?.nombre_archivo ||
+        ""
       ).trim();
 
     const tamaño =
-      Number(body?.tamaño);
+      Number(
+        body?.tamaño
+      );
 
     if (
-      !Number.isInteger(idCliente) ||
+      !Number.isInteger(
+        idCliente
+      ) ||
       idCliente <= 0
     ) {
       return NextResponse.json(
@@ -72,7 +404,9 @@ export async function POST(request: Request) {
     }
 
     if (
-      !Number.isFinite(tamaño) ||
+      !Number.isFinite(
+        tamaño
+      ) ||
       tamaño <= 0
     ) {
       return NextResponse.json(
@@ -105,16 +439,20 @@ export async function POST(request: Request) {
      * 1. Variables de entorno.
      */
     const clientId =
-      process.env.ONEDRIVE_CLIENT_ID;
+      process.env
+        .ONEDRIVE_CLIENT_ID;
 
     const clientSecret =
-      process.env.ONEDRIVE_CLIENT_SECRET;
+      process.env
+        .ONEDRIVE_CLIENT_SECRET;
 
     const supabaseUrl =
-      process.env.NEXT_PUBLIC_SUPABASE_URL;
+      process.env
+        .NEXT_PUBLIC_SUPABASE_URL;
 
     const supabaseServiceRoleKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY;
+      process.env
+        .SUPABASE_SERVICE_ROLE_KEY;
 
     if (
       !clientId ||
@@ -132,41 +470,50 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = createClient(
-      supabaseUrl,
-      supabaseServiceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
+    const supabase =
+      createClient(
+        supabaseUrl,
+        supabaseServiceRoleKey,
+        {
+          auth: {
+            autoRefreshToken:
+              false,
+            persistSession:
+              false,
+          },
+        }
+      );
 
     /*
-     * 2. Buscar al cliente activo.
-     *
-     * Nunca confiamos en un folder_id recibido
-     * desde el navegador.
+     * 2. Buscar cliente activo.
      */
     const {
       data: cliente,
       error: clienteError,
-    } = await supabase
-      .from("clientes_inventario")
-      .select(
-        `
-        id,
-        id_cliente,
-        nombre,
-        carpeta_cliente,
-        onedrive_folder_id,
-        activo
-        `
-      )
-      .eq("id_cliente", idCliente)
-      .eq("activo", true)
-      .maybeSingle();
+    } =
+      await supabase
+        .from(
+          "clientes_inventario"
+        )
+        .select(
+          `
+          id,
+          id_cliente,
+          nombre,
+          carpeta_cliente,
+          onedrive_folder_id,
+          activo
+          `
+        )
+        .eq(
+          "id_cliente",
+          idCliente
+        )
+        .eq(
+          "activo",
+          true
+        )
+        .maybeSingle();
 
     if (clienteError) {
       console.error(
@@ -197,43 +544,32 @@ export async function POST(request: Request) {
       );
     }
 
-    const folderId =
-      String(
-        cliente.onedrive_folder_id ||
-          ""
-      ).trim();
-
-    if (!folderId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "El cliente no tiene una carpeta de OneDrive vinculada.",
-        },
-        { status: 400 }
-      );
-    }
-
     /*
-     * 3. Obtener la conexión de OneDrive.
+     * 3. Obtener conexión OneDrive.
      */
     const {
       data: conexion,
       error: conexionError,
-    } = await supabase
-      .from("onedrive_connections")
-      .select(
-        `
-        id,
-        drive_id,
-        refresh_token
-        `
-      )
-      .order("id", {
-        ascending: false,
-      })
-      .limit(1)
-      .maybeSingle();
+    } =
+      await supabase
+        .from(
+          "onedrive_connections"
+        )
+        .select(
+          `
+          id,
+          refresh_token
+          `
+        )
+        .order(
+          "id",
+          {
+            ascending:
+              false,
+          }
+        )
+        .limit(1)
+        .maybeSingle();
 
     if (conexionError) {
       console.error(
@@ -254,7 +590,8 @@ export async function POST(request: Request) {
     }
 
     if (
-      !conexion?.refresh_token
+      !conexion
+        ?.refresh_token
     ) {
       return NextResponse.json(
         {
@@ -268,9 +605,6 @@ export async function POST(request: Request) {
 
     /*
      * 4. Renovar access_token.
-     *
-     * Esta conexión corresponde a una cuenta
-     * personal de Microsoft.
      */
     const tokenResponse =
       await fetch(
@@ -287,16 +621,12 @@ export async function POST(request: Request) {
             new URLSearchParams({
               client_id:
                 clientId,
-
               client_secret:
                 clientSecret,
-
               grant_type:
                 "refresh_token",
-
               refresh_token:
                 conexion.refresh_token,
-
               scope:
                 "openid profile offline_access User.Read Files.ReadWrite",
             }),
@@ -307,7 +637,9 @@ export async function POST(request: Request) {
       );
 
     const tokenData =
-      await tokenResponse.json();
+      await leerJsonSeguro(
+        tokenResponse
+      );
 
     if (!tokenResponse.ok) {
       console.error(
@@ -321,19 +653,22 @@ export async function POST(request: Request) {
           error:
             "No se pudo renovar el acceso a OneDrive.",
           detalle:
-            tokenData?.error_description ||
+            tokenData
+              ?.error_description ||
             tokenData?.error ||
-            "Error desconocido.",
+            `HTTP ${tokenResponse.status}`,
         },
         { status: 400 }
       );
     }
 
     const accessToken =
-      tokenData?.access_token;
+      tokenData
+        ?.access_token;
 
     const nuevoRefreshToken =
-      tokenData?.refresh_token;
+      tokenData
+        ?.refresh_token;
 
     if (!accessToken) {
       return NextResponse.json(
@@ -347,7 +682,7 @@ export async function POST(request: Request) {
     }
 
     /*
-     * Microsoft puede rotar el refresh token.
+     * Microsoft puede rotar refresh_token.
      */
     if (
       nuevoRefreshToken &&
@@ -355,22 +690,28 @@ export async function POST(request: Request) {
         conexion.refresh_token
     ) {
       const {
-        error: updateTokenError,
-      } = await supabase
-        .from("onedrive_connections")
-        .update({
-          refresh_token:
-            nuevoRefreshToken,
+        error:
+          updateTokenError,
+      } =
+        await supabase
+          .from(
+            "onedrive_connections"
+          )
+          .update({
+            refresh_token:
+              nuevoRefreshToken,
+            updated_at:
+              new Date()
+                .toISOString(),
+          })
+          .eq(
+            "id",
+            conexion.id
+          );
 
-          updated_at:
-            new Date().toISOString(),
-        })
-        .eq(
-          "id",
-          conexion.id
-        );
-
-      if (updateTokenError) {
+      if (
+        updateTokenError
+      ) {
         console.error(
           "No se pudo guardar refresh_token rotado:",
           updateTokenError
@@ -379,63 +720,216 @@ export async function POST(request: Request) {
     }
 
     /*
-     * 5. Crear una sesión de carga.
+     * 5. Resolver el folderId correcto.
      *
-     * La carpeta fue vinculada usando la misma
-     * cuenta personal conectada de OneDrive,
-     * por eso usamos /me/drive.
+     * Primero validamos el ID guardado.
+     * Si ya no existe, buscamos nuevamente
+     * la carpeta física del cliente en OneDrive.
      */
-    const nombreCodificado =
-      encodeURIComponent(
+    let folderId =
+      String(
+        cliente
+          .onedrive_folder_id ||
+        ""
+      ).trim();
+
+    let carpetaDetectada:
+      CarpetaOneDrive |
+      null = null;
+
+    if (folderId) {
+      const validacion =
+        await validarCarpetaPorId(
+          accessToken,
+          folderId
+        );
+
+      if (
+        validacion.existe &&
+        validacion.carpeta
+      ) {
+        carpetaDetectada =
+          validacion.carpeta;
+      } else {
+        console.warn(
+          "FolderId guardado inválido; se intentará recuperar:",
+          {
+            id_cliente:
+              cliente.id_cliente,
+            folderId,
+            status:
+              validacion.status,
+            detalle:
+              validacion.detalle,
+          }
+        );
+
+        folderId = "";
+      }
+    }
+
+    /*
+     * Si el ID no existe o es inválido,
+     * recuperamos la carpeta real.
+     */
+    if (!folderId) {
+      const busqueda =
+        await buscarCarpetaFisicaCliente(
+          accessToken,
+          Number(
+            cliente.id_cliente
+          ),
+          cliente
+            .carpeta_cliente
+        );
+
+      if (
+        !busqueda.carpeta
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              busqueda.error ||
+              "No se pudo localizar la carpeta del cliente en OneDrive.",
+            detalle:
+              busqueda.detalle,
+          },
+          { status: 404 }
+        );
+      }
+
+      carpetaDetectada =
+        busqueda.carpeta;
+
+      folderId =
+        busqueda.carpeta.id;
+
+      /*
+       * Autorreparación:
+       * guardamos el ID actual en Supabase.
+       */
+      const {
+        error:
+          actualizarFolderError,
+      } =
+        await supabase
+          .from(
+            "clientes_inventario"
+          )
+          .update({
+            onedrive_folder_id:
+              folderId,
+            carpeta_cliente:
+              busqueda.carpeta
+                .name,
+            updated_at:
+              new Date()
+                .toISOString(),
+          })
+          .eq(
+            "id",
+            cliente.id
+          );
+
+      if (
+        actualizarFolderError
+      ) {
+        console.error(
+          "La carpeta fue recuperada pero no se pudo actualizar Supabase:",
+          actualizarFolderError
+        );
+      }
+    }
+
+    /*
+     * 6. Crear sesión de carga.
+     */
+    let {
+      response:
+        sessionResponse,
+      data:
+        sessionData,
+    } =
+      await crearUploadSession(
+        accessToken,
+        folderId,
         nombreArchivo
       );
 
-    const folderCodificado =
-      encodeURIComponent(
-        folderId
-      );
-
     /*
-     * Usamos /me/drive porque toda la vinculación
-     * de carpetas del ERP fue creada contra la misma
-     * cuenta personal conectada de OneDrive.
-     *
-     * Así evitamos mezclar un folder_id obtenido
-     * desde /me/drive con un drive_id distinto o
-     * desactualizado guardado previamente.
+     * Segunda defensa:
+     * si Microsoft todavía devuelve itemNotFound,
+     * volvemos a resolver la carpeta una sola vez
+     * y reintentamos automáticamente.
      */
-    const crearSesionUrl =
-      `https://graph.microsoft.com/v1.0/me/drive/items/${folderCodificado}:/${nombreCodificado}:/createUploadSession`;
+    const graphCodeInicial =
+      sessionData
+        ?.error?.code;
 
-    const sessionResponse =
-      await fetch(
-        crearSesionUrl,
-        {
-          method: "POST",
+    if (
+      !sessionResponse.ok &&
+      (
+        sessionResponse.status ===
+          404 ||
+        graphCodeInicial ===
+          "itemNotFound"
+      )
+    ) {
+      const busqueda =
+        await buscarCarpetaFisicaCliente(
+          accessToken,
+          Number(
+            cliente.id_cliente
+          ),
+          cliente
+            .carpeta_cliente
+        );
 
-          headers: {
-            Authorization:
-              `Bearer ${accessToken}`,
+      if (
+        busqueda.carpeta &&
+        busqueda.carpeta.id !==
+          folderId
+      ) {
+        folderId =
+          busqueda.carpeta.id;
 
-            "Content-Type":
-              "application/json",
-          },
+        carpetaDetectada =
+          busqueda.carpeta;
 
-          body:
-            JSON.stringify({
-              item: {
-                "@microsoft.graph.conflictBehavior":
-                  "rename",
-              },
-            }),
+        await supabase
+          .from(
+            "clientes_inventario"
+          )
+          .update({
+            onedrive_folder_id:
+              folderId,
+            carpeta_cliente:
+              busqueda.carpeta
+                .name,
+            updated_at:
+              new Date()
+                .toISOString(),
+          })
+          .eq(
+            "id",
+            cliente.id
+          );
 
-          cache:
-            "no-store",
-        }
-      );
+        const reintento =
+          await crearUploadSession(
+            accessToken,
+            folderId,
+            nombreArchivo
+          );
 
-    const sessionData =
-      await sessionResponse.json();
+        sessionResponse =
+          reintento.response;
+
+        sessionData =
+          reintento.data;
+      }
+    }
 
     if (
       !sessionResponse.ok
@@ -448,14 +942,24 @@ export async function POST(request: Request) {
           statusText:
             sessionResponse.statusText,
           sessionData,
+          id_cliente:
+            cliente.id_cliente,
+          folderId,
+          carpeta:
+            carpetaDetectada
+              ?.name ||
+            cliente
+              .carpeta_cliente,
         }
       );
 
       const graphCode =
-        sessionData?.error?.code;
+        sessionData
+          ?.error?.code;
 
       const graphMessage =
-        sessionData?.error?.message;
+        sessionData
+          ?.error?.message;
 
       const detalle =
         [
@@ -481,8 +985,10 @@ export async function POST(request: Request) {
         },
         {
           status:
-            sessionResponse.status >= 400 &&
-            sessionResponse.status < 600
+            sessionResponse.status >=
+              400 &&
+            sessionResponse.status <
+              600
               ? sessionResponse.status
               : 400,
         }
@@ -491,8 +997,9 @@ export async function POST(request: Request) {
 
     const uploadUrl =
       String(
-        sessionData?.uploadUrl ||
-          ""
+        sessionData
+          ?.uploadUrl ||
+        ""
       ).trim();
 
     if (!uploadUrl) {
@@ -507,13 +1014,8 @@ export async function POST(request: Request) {
     }
 
     /*
-     * 6. Respuesta.
-     *
-     * uploadUrl es temporal y preautorizado.
-     * NO devolvemos:
-     * - access_token
-     * - refresh_token
-     * - client_secret
+     * 7. Respuesta.
+     * Nunca devolvemos credenciales.
      */
     return NextResponse.json({
       success: true,
@@ -521,15 +1023,18 @@ export async function POST(request: Request) {
       cliente: {
         id_cliente:
           cliente.id_cliente,
-
         nombre:
           cliente.nombre,
+        carpeta:
+          carpetaDetectada
+            ?.name ||
+          cliente
+            .carpeta_cliente,
       },
 
       archivo: {
         nombre:
           nombreArchivo,
-
         tamaño,
       },
 
