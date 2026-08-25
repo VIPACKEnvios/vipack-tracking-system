@@ -215,9 +215,9 @@ export default function RegistroClientePage() {
     <main className="relative min-h-screen overflow-hidden bg-[#f3f7fc] text-slate-900">
       <DecoracionFondo />
 
-      <div className="relative mx-auto max-w-5xl px-4 py-6 sm:px-6 md:py-10">
-        <header className="mb-6 overflow-hidden rounded-[30px] bg-gradient-to-br from-[#031b46] via-[#073b86] to-[#05a9b8] text-white shadow-[0_24px_70px_rgba(3,27,70,0.25)]">
-          <div className="grid gap-8 px-6 py-8 md:grid-cols-[1.3fr_0.7fr] md:px-10 md:py-10">
+      <div className="relative mx-auto w-full max-w-5xl px-3 py-4 sm:px-6 sm:py-6 md:py-10">
+        <header className="mb-5 overflow-hidden rounded-[24px] sm:rounded-[30px] bg-gradient-to-br from-[#031b46] via-[#073b86] to-[#05a9b8] text-white shadow-[0_24px_70px_rgba(3,27,70,0.25)]">
+          <div className="grid gap-6 px-4 py-6 sm:px-6 sm:py-8 md:grid-cols-[1.3fr_0.7fr] md:px-10 md:py-10">
             <div className="flex items-start gap-4">
               <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/10 shadow-inner backdrop-blur">
                 <IconoUsuario className="h-9 w-9" />
@@ -228,7 +228,7 @@ export default function RegistroClientePage() {
                   Registro de clientes VIPACK
                 </span>
 
-                <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl md:text-5xl">
+                <h1 className="mt-4 text-2xl font-black tracking-tight sm:text-4xl md:text-5xl">
                   Registra tus datos
                   <span className="block text-cyan-200">
                     para comenzar
@@ -272,7 +272,7 @@ export default function RegistroClientePage() {
         </header>
 
         {registroExitoso ? (
-          <section className="overflow-hidden rounded-[30px] border border-white bg-white shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
+          <section className="min-w-0 overflow-hidden rounded-[24px] border border-white bg-white shadow-[0_24px_70px_rgba(15,23,42,0.10)] sm:rounded-[30px]">
             <div className="bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-600 px-6 py-10 text-center text-white">
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white text-emerald-600 shadow-xl">
                 <IconoCheck className="h-10 w-10" />
@@ -306,16 +306,15 @@ export default function RegistroClientePage() {
 
                 <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
                   <p>
-                    1. VIPACK revisará tus datos.
+                    1. Tus datos quedarán registrados en VIPACK.
                   </p>
                   <p>
-                    2. Cuando tu registro sea aprobado,
-                    se creará tu número de cliente y tu
-                    carpeta de inventario.
+                    2. Cuando realices tu primera compra, VIPACK creará tu
+                    número de cliente y tu carpeta personal de inventario.
                   </p>
                   <p>
-                    3. Recibirás la información necesaria
-                    para utilizar el servicio.
+                    3. Desde ese momento podrás comenzar a consultar las
+                    evidencias y movimientos de tu mercancía.
                   </p>
                 </div>
               </div>
@@ -332,7 +331,7 @@ export default function RegistroClientePage() {
             </div>
           </section>
         ) : (
-          <div className="grid items-start gap-6 lg:grid-cols-[260px_1fr]">
+          <div className="grid min-w-0 items-start gap-4 sm:gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
             <aside className="space-y-4 lg:sticky lg:top-6">
               <section className="rounded-3xl border border-white bg-white/90 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur">
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">
@@ -360,11 +359,19 @@ export default function RegistroClientePage() {
                 </p>
 
                 <p className="mt-3 text-sm leading-6 text-blue-100">
-                  Enviar este formulario no crea tu
-                  carpeta automáticamente. VIPACK
-                  revisará tus datos y realizará la
-                  activación.
+                  Al enviar este formulario registraremos tus datos en VIPACK.
+                  Tu carpeta personal de inventario se creará cuando realices
+                  tu primera compra, para que podamos comenzar a registrar y
+                  organizar tu mercancía.
                 </p>
+
+                <div className="mt-4 rounded-2xl border border-cyan-300/20 bg-white/10 p-3">
+                  <p className="text-xs font-bold leading-5 text-cyan-100">
+                    📦 A partir de tu primera compra podrás comenzar a consultar
+                    las evidencias y movimientos de tu mercancía desde tu
+                    inventario en línea.
+                  </p>
+                </div>
               </section>
             </aside>
 
@@ -372,7 +379,7 @@ export default function RegistroClientePage() {
               onSubmit={
                 enviarFormulario
               }
-              className="overflow-hidden rounded-[30px] border border-white bg-white shadow-[0_24px_70px_rgba(15,23,42,0.10)]"
+              className="min-w-0 overflow-hidden rounded-[24px] border border-white bg-white shadow-[0_24px_70px_rgba(15,23,42,0.10)] sm:rounded-[30px]"
             >
               <div className="border-b border-slate-100 bg-gradient-to-r from-white to-blue-50 px-5 py-5 sm:px-8">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">
@@ -384,7 +391,7 @@ export default function RegistroClientePage() {
                 </h2>
               </div>
 
-              <div className="space-y-7 p-5 sm:p-8">
+              <div className="space-y-6 p-4 sm:space-y-7 sm:p-8">
                 <SeccionFormulario
                   numero="01"
                   titulo="Datos personales"
@@ -457,7 +464,7 @@ export default function RegistroClientePage() {
                         required
                         rows={4}
                         placeholder="Calle, número exterior/interior, colonia, código postal, ciudad, municipio y estado"
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                        className="w-full min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100 sm:text-sm"
                       />
                     </div>
 
@@ -485,7 +492,7 @@ export default function RegistroClientePage() {
                         required
                         rows={3}
                         placeholder="Ejemplo: casa color blanco, portón negro, frente a una farmacia"
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                        className="w-full min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100 sm:text-sm"
                       />
                     </div>
                   </div>
@@ -580,7 +587,7 @@ function SeccionFormulario({
         </div>
       </div>
 
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:rounded-3xl sm:p-6">
         {children}
       </div>
     </section>
@@ -648,7 +655,7 @@ function Campo({
         required={requerido}
         inputMode={inputMode}
         maxLength={maxLength}
-        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100"
+        className="w-full min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100 sm:text-sm"
       />
     </div>
   );
