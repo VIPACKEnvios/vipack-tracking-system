@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import {
   useEffect,
   useMemo,
@@ -356,21 +358,30 @@ export default function ClientesPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={
-              cargarSolicitudes
-            }
-            disabled={
-              cargando ||
-              aprobando
-            }
-            className="rounded-xl bg-[#072c74] px-5 py-3 text-sm font-black text-white shadow-md transition hover:bg-blue-900 disabled:opacity-50"
-          >
-            {cargando
-              ? "Actualizando..."
-              : "Actualizar"}
-          </button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Link
+              href="/registro-bazar"
+              className="inline-flex items-center justify-center rounded-xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-md transition hover:bg-cyan-700"
+            >
+              + Registrar cliente
+            </Link>
+
+            <button
+              type="button"
+              onClick={
+                cargarSolicitudes
+              }
+              disabled={
+                cargando ||
+                aprobando
+              }
+              className="rounded-xl bg-[#072c74] px-5 py-3 text-sm font-black text-white shadow-md transition hover:bg-blue-900 disabled:opacity-50"
+            >
+              {cargando
+                ? "Actualizando..."
+                : "Actualizar"}
+            </button>
+          </div>
         </div>
 
         {mensaje && (
