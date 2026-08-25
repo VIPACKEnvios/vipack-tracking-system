@@ -217,10 +217,10 @@ export default function RegistroClientePage() {
 
       <div className="relative mx-auto w-full max-w-5xl px-3 py-4 sm:px-6 sm:py-6 md:py-10">
         <header className="mb-5 overflow-hidden rounded-[24px] sm:rounded-[30px] bg-gradient-to-br from-[#031b46] via-[#073b86] to-[#05a9b8] text-white shadow-[0_24px_70px_rgba(3,27,70,0.25)]">
-          <div className="grid gap-6 px-4 py-6 sm:px-6 sm:py-8 md:grid-cols-[1.3fr_0.7fr] md:px-10 md:py-10">
+          <div className="grid gap-5 px-4 py-5 sm:gap-6 sm:px-6 sm:py-8 md:grid-cols-[1.3fr_0.7fr] md:px-10 md:py-10">
             <div className="flex items-start gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/10 shadow-inner backdrop-blur">
-                <IconoUsuario className="h-9 w-9" />
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/10 shadow-inner backdrop-blur sm:h-16 sm:w-16">
+                <IconoUsuario className="h-8 w-8 sm:h-9 sm:w-9" />
               </div>
 
               <div>
@@ -229,21 +229,21 @@ export default function RegistroClientePage() {
                 </span>
 
                 <h1 className="mt-4 text-2xl font-black tracking-tight sm:text-4xl md:text-5xl">
-                  Registra tus datos
+                  Bienvenido a VIPACK
                   <span className="block text-cyan-200">
-                    para comenzar
+                    Tu registro comienza aquí
                   </span>
                 </h1>
 
                 <p className="mt-4 max-w-2xl text-sm leading-6 text-blue-100 sm:text-base">
-                  Completa tus datos de contacto y domicilio.
-                  VIPACK revisará tu registro antes de habilitar
-                  tu cuenta de cliente.
+                  Regístrate en VIPACK y mantén tus compras más organizadas.
+                  Cuando realices tu primera compra, activaremos tu carpeta
+                  personal de inventario.
                 </p>
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3 md:grid-cols-1">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 md:grid-cols-1">
               <BeneficioRapido
                 icono={
                   <IconoReloj />
@@ -264,8 +264,8 @@ export default function RegistroClientePage() {
                 icono={
                   <IconoCheck />
                 }
-                titulo="Revisión VIPACK"
-                texto="Activación manual"
+                titulo="Primera compra"
+                texto="Activa tu carpeta"
               />
             </div>
           </div>
@@ -279,7 +279,7 @@ export default function RegistroClientePage() {
               </div>
 
               <h2 className="mt-5 text-3xl font-black">
-                Registro recibido
+                ¡Registro completado!
               </h2>
 
               <p className="mx-auto mt-3 max-w-xl text-emerald-50">
@@ -306,15 +306,15 @@ export default function RegistroClientePage() {
 
                 <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
                   <p>
-                    1. Tus datos quedarán registrados en VIPACK.
+                    1. Tu información ya quedó registrada en VIPACK.
                   </p>
                   <p>
-                    2. Cuando realices tu primera compra, VIPACK creará tu
-                    número de cliente y tu carpeta personal de inventario.
+                    2. Con tu primera compra crearemos tu número de cliente
+                    y tu carpeta personal de inventario.
                   </p>
                   <p>
-                    3. Desde ese momento podrás comenzar a consultar las
-                    evidencias y movimientos de tu mercancía.
+                    3. Desde ahí podrás consultar evidencias y llevar un
+                    mejor control de tu mercancía.
                   </p>
                 </div>
               </div>
@@ -335,7 +335,7 @@ export default function RegistroClientePage() {
             <aside className="space-y-4 lg:sticky lg:top-6">
               <section className="rounded-3xl border border-white bg-white/90 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur">
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">
-                  Tu avance
+                  Registro en progreso
                 </p>
 
                 <p className="mt-1 text-2xl font-black text-slate-950">
@@ -359,17 +359,15 @@ export default function RegistroClientePage() {
                 </p>
 
                 <p className="mt-3 text-sm leading-6 text-blue-100">
-                  Al enviar este formulario registraremos tus datos en VIPACK.
-                  Tu carpeta personal de inventario se creará cuando realices
-                  tu primera compra, para que podamos comenzar a registrar y
-                  organizar tu mercancía.
+                  Al registrarte, tus datos quedarán listos para comenzar.
+                  En cuanto realices tu primera compra, crearemos tu carpeta
+                  personal para organizar tu mercancía desde su llegada.
                 </p>
 
                 <div className="mt-4 rounded-2xl border border-cyan-300/20 bg-white/10 p-3">
                   <p className="text-xs font-bold leading-5 text-cyan-100">
-                    📦 A partir de tu primera compra podrás comenzar a consultar
-                    las evidencias y movimientos de tu mercancía desde tu
-                    inventario en línea.
+                    📦 Desde tu primera compra podrás consultar evidencias y
+                    mantener un mejor control de tu mercancía en línea.
                   </p>
                 </div>
               </section>
@@ -383,11 +381,11 @@ export default function RegistroClientePage() {
             >
               <div className="border-b border-slate-100 bg-gradient-to-r from-white to-blue-50 px-5 py-5 sm:px-8">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">
-                  Datos de cliente
+                  Tu registro
                 </p>
 
                 <h2 className="mt-1 text-2xl font-black text-slate-950">
-                  Completa tu información
+                  Cuéntanos dónde recibirás tus envíos
                 </h2>
               </div>
 
@@ -532,7 +530,7 @@ export default function RegistroClientePage() {
                 >
                   {enviando
                     ? "Enviando registro..."
-                    : "Enviar mis datos"}
+                    : "Crear mi registro VIPACK"}
                 </button>
               </div>
             </form>
@@ -671,16 +669,16 @@ function BeneficioRapido({
   texto: string;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15">
+    <div className="flex min-w-0 flex-col items-center gap-2 rounded-2xl border border-white/15 bg-white/10 p-2.5 text-center backdrop-blur sm:p-3 md:flex-row md:text-left">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 sm:h-10 sm:w-10">
         {icono}
       </div>
 
       <div>
-        <p className="text-sm font-black text-white">
+        <p className="text-[11px] font-black leading-tight text-white sm:text-sm">
           {titulo}
         </p>
-        <p className="text-xs text-blue-100">
+        <p className="mt-0.5 text-[10px] leading-tight text-blue-100 sm:text-xs">
           {texto}
         </p>
       </div>
