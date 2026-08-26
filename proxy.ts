@@ -7,6 +7,7 @@ export function proxy(request: NextRequest) {
   const isPublicPage =
     path === "/login" ||
     path === "/registro-bazar" ||
+    path === "/registro-cliente" ||
     path === "/consulta-bazares" ||
     path === "/informacion" ||
     path.startsWith("/informacion/") ||
@@ -15,6 +16,7 @@ export function proxy(request: NextRequest) {
   const isPublicApi =
     path === "/api/login" ||
     path.startsWith("/api/registro-bazar") ||
+    path.startsWith("/api/registro-cliente") ||
     path.startsWith("/api/consulta-bazares") ||
     path.startsWith("/api/trackingmore/") ||
     path === "/api/onedrive/login" ||
