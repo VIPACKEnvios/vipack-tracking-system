@@ -2609,22 +2609,21 @@ function FormularioNuevaRecoleccion({
             "es"
           );
 
+      // Mostrar TODO el catálogo maestro cuando no hay búsqueda.
+      // Antes se limitaba a 50 clientes, por eso faltaban registros
+      // del Excel en el selector de nueva recolección.
       if (!q) {
-        return clientes.slice(
-          0,
-          50
-        );
+        return clientes;
       }
 
-      return clientes
-        .filter((item) =>
-          item.nombre
-            .toLocaleLowerCase(
-              "es"
-            )
-            .includes(q)
-        )
-        .slice(0, 50);
+      // Buscar sobre el catálogo completo, sin recortar resultados.
+      return clientes.filter((item) =>
+        item.nombre
+          .toLocaleLowerCase(
+            "es"
+          )
+          .includes(q)
+      );
     }, [cliente, clientes]);
 
   const bodegas =
