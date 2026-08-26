@@ -1,4 +1,4 @@
-"use client";
+
 
 import {
   useCallback,
@@ -2350,6 +2350,16 @@ function FormularioNuevaRecoleccion({
     setClienteAbierto,
   ] = useState(false);
 
+  const [
+    errorClientes,
+    setErrorClientes,
+  ] = useState("");
+
+  const [
+    totalClientesApi,
+    setTotalClientesApi,
+  ] = useState(0);
+
   /*
    * Fallback seguro:
    * aunque /api/clientes todavía no exista o falle,
@@ -2399,15 +2409,15 @@ function FormularioNuevaRecoleccion({
     }, [recolecciones]);
 
   /*
-   * Intenta cargar el catálogo maestro de clientes.
-   * Es tolerante a respuestas como:
-   *   { clientes: [...] }
-   *   { registros: [...] }
-   *   { data: [...] }
-   *   [...]
+   * Carga el catálogo maestro desde /api/clientes.
    *
-   * También acepta nombres de campos comunes:
-   * nombre, name, cliente, Cliente, Nombre...
+   * /api/clientes debe leer directamente:
+   * OneDrive/Envios/control_recolecciones_bodega.xlsx
+   * hoja "Clientes".
+   *
+   * Ya NO ocultamos errores silenciosamente:
+   * si la API falla, mostramos el problema y usamos
+   * temporalmente los clientes de recolecciones como respaldo.
    */
   useEffect(() => {
     let cancelado = false;
@@ -2415,18 +2425,18 @@ function FormularioNuevaRecoleccion({
     async function cargarClientes() {
       try {
         setCargandoClientes(true);
+        setErrorClientes("");
 
         const response =
           await fetch(
-            "/api/clientes",
+            `/api/clientes?t=${Date.now()}`,
             {
               cache: "no-store",
+              headers: {
+                "Cache-Control": "no-cache",
+              },
             }
           );
-
-        if (!response.ok) {
-          return;
-        }
 
         const data: unknown =
           await response.json();
@@ -2438,6 +2448,25 @@ function FormularioNuevaRecoleccion({
                 unknown
               >
             | unknown[];
+
+        if (!response.ok) {
+          const mensaje =
+            !Array.isArray(raiz) &&
+            typeof raiz === "object" &&
+            raiz !== null
+              ? txt(
+                  (raiz as Record<
+                    string,
+                    unknown
+                  >).error
+                )
+              : "";
+
+          throw new Error(
+            mensaje ||
+              `No se pudo cargar /api/clientes (HTTP ${response.status}).`
+          );
+        }
 
         const filas =
           Array.isArray(raiz)
@@ -2495,16 +2524,28 @@ function FormularioNuevaRecoleccion({
             txt(
               item.telefono ??
                 item.Telefono ??
+                item["Teléfono"] ??
                 item.whatsapp ??
                 item.WhatsApp ??
                 item.telefonoWhatsApp ??
                 item.TelefonoWhatsApp
             );
 
+          /*
+           * Dedupe solo por nombre normalizado.
+           * No limita cantidad de registros.
+           */
           const key =
-            nombre.toLocaleLowerCase(
-              "es"
-            );
+            nombre
+              .normalize("NFD")
+              .replace(
+                /[\u0300-\u036f]/g,
+                ""
+              )
+              .trim()
+              .toLocaleLowerCase(
+                "es"
+              );
 
           const actual =
             mapa.get(key);
@@ -2518,24 +2559,50 @@ function FormularioNuevaRecoleccion({
           });
         }
 
-        if (!cancelado) {
-          setClientesApi(
-            Array.from(
-              mapa.values()
-            ).sort((a, b) =>
-              a.nombre.localeCompare(
-                b.nombre,
-                "es"
-              )
+        const lista =
+          Array.from(
+            mapa.values()
+          ).sort((a, b) =>
+            a.nombre.localeCompare(
+              b.nombre,
+              "es",
+              {
+                sensitivity:
+                  "base",
+              }
             )
           );
+
+        if (!cancelado) {
+          setClientesApi(
+            lista
+          );
+
+          setTotalClientesApi(
+            lista.length
+          );
+
+          if (
+            lista.length === 0
+          ) {
+            setErrorClientes(
+              "La API respondió sin clientes. Revisa la hoja Clientes del Excel de OneDrive."
+            );
+          }
         }
-      } catch {
-        /*
-         * No bloqueamos el formulario.
-         * Si falla el endpoint, se usa el
-         * fallback de recolecciones.
-         */
+      } catch (
+        error: unknown
+      ) {
+        if (!cancelado) {
+          setClientesApi([]);
+          setTotalClientesApi(0);
+
+          setErrorClientes(
+            error instanceof Error
+              ? error.message
+              : "No se pudo cargar el catálogo maestro de clientes."
+          );
+        }
       } finally {
         if (!cancelado) {
           setCargandoClientes(
@@ -2566,6 +2633,11 @@ function FormularioNuevaRecoleccion({
       ]) {
         const key =
           item.nombre
+            .normalize("NFD")
+            .replace(
+              /[\u0300-\u036f]/g,
+              ""
+            )
             .trim()
             .toLocaleLowerCase(
               "es"
@@ -2604,25 +2676,32 @@ function FormularioNuevaRecoleccion({
     useMemo(() => {
       const q =
         cliente
+          .normalize("NFD")
+          .replace(
+            /[\u0300-\u036f]/g,
+            ""
+          )
           .trim()
           .toLocaleLowerCase(
             "es"
           );
 
-      // Mostrar TODO el catálogo maestro cuando no hay búsqueda.
-      // Antes se limitaba a 50 clientes, por eso faltaban registros
-      // del Excel en el selector de nueva recolección.
       if (!q) {
         return clientes;
       }
 
-      // Buscar sobre el catálogo completo, sin recortar resultados.
-      return clientes.filter((item) =>
-        item.nombre
-          .toLocaleLowerCase(
-            "es"
-          )
-          .includes(q)
+      return clientes.filter(
+        (item) =>
+          item.nombre
+            .normalize("NFD")
+            .replace(
+              /[\u0300-\u036f]/g,
+              ""
+            )
+            .toLocaleLowerCase(
+              "es"
+            )
+            .includes(q)
       );
     }, [cliente, clientes]);
 
@@ -2838,6 +2917,29 @@ function FormularioNuevaRecoleccion({
               seleccionarCliente
             }
           />
+
+          {!cargandoClientes && (
+            <div className="mt-2">
+              <p
+                className={`text-[11px] font-bold ${
+                  errorClientes
+                    ? "text-amber-700"
+                    : "text-emerald-700"
+                }`}
+              >
+                {errorClientes
+                  ? `⚠️ Catálogo maestro: ${errorClientes}`
+                  : `✅ ${totalClientesApi} clientes cargados desde el Excel maestro`}
+              </p>
+
+              {errorClientes && (
+                <p className="mt-1 text-[10px] text-slate-500">
+                  Se está usando temporalmente el historial de recolecciones como respaldo.
+                </p>
+              )}
+            </div>
+          )}
+
 
           <CampoFormulario
             titulo="Teléfono"
