@@ -90,20 +90,149 @@ export default function GuiasPage() {
     return "";
   };
 
+  const normalizarTelefonoMexico = (valor: unknown) => {
+    let telefono = limpiarSoloDigitos(valor);
+
+    if (
+      telefono.length === 13 &&
+      telefono.startsWith("521")
+    ) {
+      telefono = telefono.slice(3);
+    } else if (
+      telefono.length === 12 &&
+      telefono.startsWith("52")
+    ) {
+      telefono = telefono.slice(2);
+    }
+
+    return telefono.length === 10 ? telefono : "";
+  };
+
   const extraerTelefonoDestinatario = (
-    textoPDF: string
+    textoPDF: string,
+    paqueteria: string,
+    paginasTexto: string[] = []
   ) => {
     const texto = String(textoPDF || "")
       .replace(/\u00a0/g, " ")
-      .replace(/\s+/g, " ");
+      .replace(/\s+/g, " ")
+      .trim();
 
     /*
-     * Las etiquetas reales de Estafeta traen primero el teléfono
-     * del remitente (ej. CEL: 663... TEL: 663...) y más adelante
-     * el teléfono del DESTINATARIO como "cel.222..." o
-     * "cel.722 362 4729".
+     * DHL:
+     * El teléfono correcto del destinatario aparece normalmente
+     * en la SEGUNDA HOJA, dentro del bloque:
      *
-     * Por eso tomamos la ÚLTIMA coincidencia "cel".
+     * Receiver:
+     * ...
+     * Contact:
+     * +52XXXXXXXXXX
+     *
+     * Por eso NO usamos el teléfono del Shipper/remitente.
+     */
+    if (paqueteria === "DHL") {
+      const segundaHoja = String(
+        paginasTexto[1] || paginasTexto[0] || texto
+      )
+        .replace(/\u00a0/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      /*
+       * Primero aislamos el bloque del destinatario.
+       */
+      const receiverMatch = segundaHoja.match(
+        /RECEIVER\s*:?\s*([\s\S]*?)(?=PRODUCT\s+DETAILS|PAYER\s+DETAILS|SHIPMENT\s+DETAILS|FEATURES\s*\/\s*SERVICES|$)/i
+      );
+
+      const bloqueReceiver =
+        receiverMatch?.[1] || "";
+
+      /*
+       * Buscar primero números con lada de México (+52)
+       * dentro del bloque Receiver.
+       */
+      const telefonosCon52 = Array.from(
+        bloqueReceiver.matchAll(
+          /\+?\s*52\s*(?:1\s*)?(\d[\d\s().-]{8,18}\d)/g
+        )
+      );
+
+      for (
+        let i = telefonosCon52.length - 1;
+        i >= 0;
+        i--
+      ) {
+        const telefono =
+          normalizarTelefonoMexico(
+            `52${telefonosCon52[i][1]}`
+          );
+
+        if (telefono) {
+          return telefono;
+        }
+      }
+
+      /*
+       * Si PDF.js separó el +52 del resto del número,
+       * buscamos cualquier teléfono mexicano de 10 dígitos
+       * dentro del bloque Receiver.
+       */
+      const candidatosReceiver =
+        Array.from(
+          bloqueReceiver.matchAll(
+            /(?<!\d)(\d[\d\s().-]{8,18}\d)(?!\d)/g
+          )
+        );
+
+      for (
+        let i = candidatosReceiver.length - 1;
+        i >= 0;
+        i--
+      ) {
+        const telefono =
+          normalizarTelefonoMexico(
+            candidatosReceiver[i][1]
+          );
+
+        if (telefono) {
+          return telefono;
+        }
+      }
+
+      /*
+       * Último respaldo DHL:
+       * en la segunda hoja normalmente aparece primero
+       * el teléfono del remitente y después el del receptor.
+       * Tomamos la última coincidencia +52 válida.
+       */
+      const todosCon52 = Array.from(
+        segundaHoja.matchAll(
+          /\+?\s*52\s*(?:1\s*)?(\d[\d\s().-]{8,18}\d)/g
+        )
+      );
+
+      for (
+        let i = todosCon52.length - 1;
+        i >= 0;
+        i--
+      ) {
+        const telefono =
+          normalizarTelefonoMexico(
+            `52${todosCon52[i][1]}`
+          );
+
+        if (telefono) {
+          return telefono;
+        }
+      }
+    }
+
+    /*
+     * ESTAFETA:
+     * las etiquetas reales pueden traer primero el teléfono
+     * del remitente y después el del destinatario.
+     * Tomamos la última coincidencia "CEL".
      */
     const matches = Array.from(
       texto.matchAll(
@@ -111,59 +240,45 @@ export default function GuiasPage() {
       )
     );
 
-    for (let i = matches.length - 1; i >= 0; i--) {
-      const candidato =
-        limpiarSoloDigitos(matches[i][1]);
+    for (
+      let i = matches.length - 1;
+      i >= 0;
+      i--
+    ) {
+      const telefono =
+        normalizarTelefonoMexico(
+          matches[i][1]
+        );
 
-      if (candidato.length === 10) {
-        return candidato;
-      }
-
-      if (
-        candidato.length === 12 &&
-        candidato.startsWith("52")
-      ) {
-        return candidato.slice(2);
-      }
-
-      if (
-        candidato.length === 13 &&
-        candidato.startsWith("521")
-      ) {
-        return candidato.slice(3);
+      if (telefono) {
+        return telefono;
       }
     }
 
     /*
-     * Respaldo: buscar PHONE/TELÉFONO/WHATSAPP,
-     * pero evitar el teléfono corporativo/remitente si se puede.
+     * Respaldo general para TEL / TELÉFONO / PHONE / WHATSAPP.
      */
     const alternos = Array.from(
       texto.matchAll(
-        /(?:TEL(?:EFONO)?|TELÉFONO|PHONE|WHATSAPP)\s*[:#.-]?\s*(?:\+?52\s*)?(?:1\s*)?(\d[\d\s().-]{8,18}\d)/gi
+        /(?:TEL(?:EFONO)?|TELÉFONO|PHONE|WHATSAPP)\s*[:#.-]?\s*(\+?\s*52\s*)?(?:1\s*)?(\d[\d\s().-]{8,18}\d)/gi
       )
     );
 
-    for (let i = alternos.length - 1; i >= 0; i--) {
-      let candidato =
-        limpiarSoloDigitos(alternos[i][1]);
+    for (
+      let i = alternos.length - 1;
+      i >= 0;
+      i--
+    ) {
+      const prefijo =
+        alternos[i][1] ? "52" : "";
 
-      if (
-        candidato.length === 12 &&
-        candidato.startsWith("52")
-      ) {
-        candidato = candidato.slice(2);
-      }
+      const telefono =
+        normalizarTelefonoMexico(
+          `${prefijo}${alternos[i][2]}`
+        );
 
-      if (
-        candidato.length === 13 &&
-        candidato.startsWith("521")
-      ) {
-        candidato = candidato.slice(3);
-      }
-
-      if (candidato.length === 10) {
-        return candidato;
+      if (telefono) {
+        return telefono;
       }
     }
 
@@ -408,6 +523,7 @@ export default function GuiasPage() {
               .promise;
 
           let textoPDF = "";
+          const paginasTexto: string[] = [];
 
           for (
             let i = 1;
@@ -420,13 +536,23 @@ export default function GuiasPage() {
             const content =
               await page.getTextContent();
 
-            textoPDF +=
+            const textoPagina =
               content.items
                 .map(
                   (item: any) =>
                     item?.str || ""
                 )
-                .join(" ") + " ";
+                .join(" ")
+                .replace(/\u00a0/g, " ")
+                .replace(/\s+/g, " ")
+                .trim();
+
+            paginasTexto.push(
+              textoPagina
+            );
+
+            textoPDF +=
+              textoPagina + " ";
           }
 
           textoPDF = textoPDF
@@ -446,7 +572,9 @@ export default function GuiasPage() {
 
           const telefono =
             extraerTelefonoDestinatario(
-              textoPDF
+              textoPDF,
+              paqueteria,
+              paginasTexto
             );
 
           const guias =
