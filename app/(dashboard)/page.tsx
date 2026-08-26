@@ -23,6 +23,23 @@ type EstadoConteo = {
   envios: number;
 };
 
+type MetodoDeteccion = "texto" | "cp" | "sin-detectar";
+
+type ResultadoEstado = {
+  estado: string;
+  metodo: MetodoDeteccion;
+  paqueteria: string;
+};
+
+type AuditoriaPDF = {
+  id: number;
+  cliente: string;
+  archivo: string;
+  paqueteria: string;
+  estado: string;
+  metodo: MetodoDeteccion;
+};
+
 const ESTADOS_MEXICO = [
   "Aguascalientes",
   "Baja California",
@@ -122,14 +139,12 @@ function buscarEstadoEnBloque(textoBloque: string) {
 
   for (const estado of estadosOrdenados) {
     const aliases = ALIAS_ESTADOS[estado] || [];
-
     const aliasesOrdenados = [...aliases].sort(
       (a, b) => b.length - a.length
     );
 
     for (const alias of aliasesOrdenados) {
       const limpio = normalizarTexto(alias);
-
       if (!limpio) continue;
 
       if (limpio.length <= 4) {
@@ -176,6 +191,79 @@ function detectarPaqueteriaDesdeTexto(textoPDF: string) {
     return "FEDEX";
   }
 
+  if (
+    texto.includes("PAQUETEXPRESS") ||
+    texto.includes("PAQUETE EXPRESS")
+  ) {
+    return "PAQUETEXPRESS";
+  }
+
+  return "OTRA";
+}
+
+/*
+ * Respaldo por código postal mexicano.
+ * Se usa SOLO dentro del bloque del destinatario, nunca en todo el PDF.
+ * Los rangos son deliberadamente amplios por entidad para rescatar guías
+ * donde la paquetería imprime CP pero omite/abrevia el estado.
+ */
+const RANGOS_CP: Array<{
+  min: number;
+  max: number;
+  estado: string;
+}> = [
+  { min: 1000, max: 16999, estado: "Ciudad de México" },
+  { min: 20000, max: 20999, estado: "Aguascalientes" },
+  { min: 21000, max: 22999, estado: "Baja California" },
+  { min: 23000, max: 23999, estado: "Baja California Sur" },
+  { min: 24000, max: 24999, estado: "Campeche" },
+  { min: 25000, max: 27999, estado: "Coahuila" },
+  { min: 28000, max: 28999, estado: "Colima" },
+  { min: 29000, max: 30999, estado: "Chiapas" },
+  { min: 31000, max: 33999, estado: "Chihuahua" },
+  { min: 34000, max: 35999, estado: "Durango" },
+  { min: 36000, max: 38999, estado: "Guanajuato" },
+  { min: 39000, max: 41999, estado: "Guerrero" },
+  { min: 42000, max: 43999, estado: "Hidalgo" },
+  { min: 44000, max: 49999, estado: "Jalisco" },
+  { min: 50000, max: 57999, estado: "Estado de México" },
+  { min: 58000, max: 61999, estado: "Michoacán" },
+  { min: 62000, max: 62999, estado: "Morelos" },
+  { min: 63000, max: 63999, estado: "Nayarit" },
+  { min: 64000, max: 67999, estado: "Nuevo León" },
+  { min: 68000, max: 71999, estado: "Oaxaca" },
+  { min: 72000, max: 75999, estado: "Puebla" },
+  { min: 76000, max: 76999, estado: "Querétaro" },
+  { min: 77000, max: 77999, estado: "Quintana Roo" },
+  { min: 78000, max: 79999, estado: "San Luis Potosí" },
+  { min: 80000, max: 82999, estado: "Sinaloa" },
+  { min: 83000, max: 85999, estado: "Sonora" },
+  { min: 86000, max: 86999, estado: "Tabasco" },
+  { min: 87000, max: 89999, estado: "Tamaulipas" },
+  { min: 90000, max: 90999, estado: "Tlaxcala" },
+  { min: 91000, max: 96999, estado: "Veracruz" },
+  { min: 97000, max: 97999, estado: "Yucatán" },
+  { min: 98000, max: 99999, estado: "Zacatecas" },
+];
+
+function buscarEstadoPorCP(textoBloque: string) {
+  const candidatos =
+    String(textoBloque || "").match(/(?:^|\D)(\d{5})(?!\d)/g) || [];
+
+  for (const candidato of candidatos) {
+    const match = candidato.match(/\d{5}/);
+    if (!match) continue;
+
+    const cp = Number(match[0]);
+    const rango = RANGOS_CP.find(
+      (item) => cp >= item.min && cp <= item.max
+    );
+
+    if (rango) {
+      return rango.estado;
+    }
+  }
+
   return "";
 }
 
@@ -188,74 +276,58 @@ function extraerBloqueDestinatario(
     .replace(/\s+/g, " ")
     .trim();
 
-  /*
-   * DHL:
-   * La hoja contiene primero FROM/SHIPPER (origen Tijuana)
-   * y después TO/RECEIVER (destino real).
-   *
-   * Solo analizamos TO o RECEIVER y cortamos antes de regresar
-   * a datos operativos del envío.
-   */
   if (paqueteria === "DHL") {
-    const receiver = texto.match(
-      /\bRECEIVER\s*:?\s*([\s\S]*?)(?=\bPRODUCT\s+DETAILS\b|\bPAYER\s+DETAILS\b|\bFEATURES\b|\bSHIPMENT\s+DETAILS\b|\bWAYBILL\b|$)/i
-    );
+    const patrones = [
+      /\bRECEIVER\s*:?\s*([\s\S]*?)(?=\bPRODUCT\s+DETAILS\b|\bPAYER\s+DETAILS\b|\bFEATURES\b|\bSHIPMENT\s+DETAILS\b|\bWAYBILL\b|$)/i,
+      /\bSHIP\s+TO\s*:?\s*([\s\S]*?)(?=\bSHIP\s+FROM\b|\bWAYBILL\b|\bCONTENTS\b|\bPRODUCT\b|\bREFERENCE\b|$)/i,
+      /\bTO\s*:?\s*([\s\S]*?)(?=\bCONTACT\s*:|\bDAY\s+TIME\b|\bREF\s*:|\bWAYBILL\b|\bCONTENTS\b|\bFROM\s*:|$)/i,
+    ];
 
-    if (receiver?.[1]) {
-      return receiver[1];
-    }
-
-    const to = texto.match(
-      /\bTO\s*:?\s*([\s\S]*?)(?=\bCONTACT\s*:|\bDAY\s+TIME\b|\bREF\s*:|\bWAYBILL\b|\bCONTENTS\b|\bFROM\s*:|$)/i
-    );
-
-    if (to?.[1]) {
-      return to[1];
+    for (const patron of patrones) {
+      const match = texto.match(patron);
+      if (match?.[1]) return match[1];
     }
   }
 
-  /*
-   * ESTAFETA:
-   * Aislamos DESTINATARIO / CONSIGNATARIO / RECIBE.
-   * Nunca usamos el bloque REMITENTE.
-   */
   if (paqueteria === "ESTAFETA") {
-    const destinatario = texto.match(
-      /\b(?:DESTINATARIO|CONSIGNATARIO|RECIBE)\b\s*:?\s*([\s\S]*?)(?=\b(?:REMITENTE|ORIGEN|CONTENIDO|REFERENCIA|CODIGO\s+DE\s+RASTREO|RASTREO|GUIA|GU[IÍ]A|SERVICIO)\b|$)/i
-    );
+    const patrones = [
+      /\bDESTINATARIO\b\s*:?\s*([\s\S]*?)(?=\bREMITENTE\b|\bORIGEN\b|\bCONTENIDO\b|\bREFERENCIA\b|\bCODIGO\s+DE\s+RASTREO\b|\bRASTREO\b|\bSERVICIO\b|$)/i,
+      /\bCONSIGNATARIO\b\s*:?\s*([\s\S]*?)(?=\bREMITENTE\b|\bORIGEN\b|\bCONTENIDO\b|\bREFERENCIA\b|\bRASTREO\b|\bSERVICIO\b|$)/i,
+      /\bRECIBE\b\s*:?\s*([\s\S]*?)(?=\bREMITENTE\b|\bORIGEN\b|\bCONTENIDO\b|\bREFERENCIA\b|\bRASTREO\b|\bSERVICIO\b|$)/i,
+    ];
 
-    if (destinatario?.[1]) {
-      return destinatario[1];
+    for (const patron of patrones) {
+      const match = texto.match(patron);
+      if (match?.[1]) return match[1];
     }
   }
 
-  /*
-   * FEDEX:
-   * Se intenta aislar SHIP TO / RECIPIENT / CONSIGNEE.
-   */
   if (paqueteria === "FEDEX") {
-    const destinatario = texto.match(
+    const match = texto.match(
       /\b(?:SHIP\s+TO|RECIPIENT|CONSIGNEE)\b\s*:?\s*([\s\S]*?)(?=\b(?:SHIP\s+FROM|SENDER|TRACKING|PACKAGE|SERVICE|REF)\b|$)/i
     );
 
-    if (destinatario?.[1]) {
-      return destinatario[1];
-    }
+    if (match?.[1]) return match[1];
   }
 
-  /*
-   * Respaldo genérico: solo bloques explícitos de destinatario.
-   * Si no existe un bloque claro, devolvemos vacío para NO confundir
-   * el estado del remitente con el destino.
-   */
+  if (paqueteria === "PAQUETEXPRESS") {
+    const match = texto.match(
+      /\b(?:DESTINATARIO|CONSIGNATARIO|RECIBE|ENTREGAR\s+A)\b\s*:?\s*([\s\S]*?)(?=\b(?:REMITENTE|ORIGEN|CONTENIDO|REFERENCIA|RASTREO|SERVICIO)\b|$)/i
+    );
+
+    if (match?.[1]) return match[1];
+  }
+
   const generico = texto.match(
-    /\b(?:DESTINATARIO|RECEIVER|RECIPIENT|CONSIGNEE|SHIP\s+TO)\b\s*:?\s*([\s\S]*?)(?=\b(?:REMITENTE|SHIPPER|SENDER|SHIP\s+FROM|ORIGEN|PRODUCT|TRACKING|WAYBILL|GUIA|GU[IÍ]A)\b|$)/i
+    /\b(?:DESTINATARIO|RECEIVER|RECIPIENT|CONSIGNEE|SHIP\s+TO|ENTREGAR\s+A)\b\s*:?\s*([\s\S]*?)(?=\b(?:REMITENTE|SHIPPER|SENDER|SHIP\s+FROM|ORIGEN|PRODUCT|TRACKING|WAYBILL|GUIA|GU[IÍ]A)\b|$)/i
   );
 
   return generico?.[1] || "";
 }
 
-function detectarEstadoDestinatario(textoPDF: string) {
+function detectarEstadoDestinatario(
+  textoPDF: string
+): ResultadoEstado {
   const paqueteria =
     detectarPaqueteriaDesdeTexto(textoPDF);
 
@@ -265,19 +337,45 @@ function detectarEstadoDestinatario(textoPDF: string) {
       paqueteria
     );
 
-  /*
-   * IMPORTANTE:
-   * Ya no buscamos el estado en todo el PDF.
-   * Si no se logra aislar al destinatario, el PDF se marca
-   * "sin estado detectado" en lugar de asignarlo a Baja California.
-   */
   if (!bloqueDestinatario) {
-    return "";
+    return {
+      estado: "",
+      metodo: "sin-detectar",
+      paqueteria,
+    };
   }
 
-  return buscarEstadoEnBloque(
-    bloqueDestinatario
-  );
+  const porTexto =
+    buscarEstadoEnBloque(
+      bloqueDestinatario
+    );
+
+  if (porTexto) {
+    return {
+      estado: porTexto,
+      metodo: "texto",
+      paqueteria,
+    };
+  }
+
+  const porCP =
+    buscarEstadoPorCP(
+      bloqueDestinatario
+    );
+
+  if (porCP) {
+    return {
+      estado: porCP,
+      metodo: "cp",
+      paqueteria,
+    };
+  }
+
+  return {
+    estado: "",
+    metodo: "sin-detectar",
+    paqueteria,
+  };
 }
 
 async function extraerTextoPDFDesdeUrl(
@@ -325,7 +423,7 @@ async function extraerTextoPDFDesdeUrl(
   const paginasALeer =
     Math.min(
       pdf.numPages,
-      2
+      4
     );
 
   for (
@@ -385,6 +483,16 @@ export default function DashboardPage() {
     pdfsSinEstado,
     setPdfsSinEstado,
   ] = useState(0);
+
+  const [
+    auditoriaPDFs,
+    setAuditoriaPDFs,
+  ] = useState<AuditoriaPDF[]>([]);
+
+  const [
+    mostrarAuditoria,
+    setMostrarAuditoria,
+  ] = useState(false);
 
   useEffect(() => {
     async function cargarResumen() {
@@ -498,11 +606,12 @@ export default function DashboardPage() {
             number
           >();
 
+        const auditoria: AuditoriaPDF[] = [];
         let procesados = 0;
         let sinEstado = 0;
 
         /*
-         * Procesamos en pequeños bloques para no saturar navegador/red.
+         * Procesamos en lotes pequeños para no saturar navegador/red.
          */
         const TAMANO_LOTE = 5;
 
@@ -522,7 +631,14 @@ export default function DashboardPage() {
               lote.map(
                 async (envio) => {
                   if (!envio.pdf) {
-                    return "";
+                    return {
+                      envio,
+                      resultado: {
+                        estado: "",
+                        metodo: "sin-detectar" as MetodoDeteccion,
+                        paqueteria: "OTRA",
+                      },
+                    };
                   }
 
                   try {
@@ -531,37 +647,69 @@ export default function DashboardPage() {
                         envio.pdf
                       );
 
-                    return detectarEstadoDestinatario(
-                      texto
-                    );
+                    return {
+                      envio,
+                      resultado:
+                        detectarEstadoDestinatario(
+                          texto
+                        ),
+                    };
                   } catch (error) {
                     console.warn(
                       `No se pudo analizar el PDF del envío ${envio.id}:`,
                       error
                     );
 
-                    return "";
+                    return {
+                      envio,
+                      resultado: {
+                        estado: "",
+                        metodo: "sin-detectar" as MetodoDeteccion,
+                        paqueteria: "ERROR",
+                      },
+                    };
                   }
                 }
               )
             );
 
-          for (
-            const estado of resultados
-          ) {
+          for (const item of resultados) {
             procesados++;
+
+            const estado =
+              item.resultado.estado;
 
             if (!estado) {
               sinEstado++;
-              continue;
+            } else {
+              conteo.set(
+                estado,
+                (conteo.get(
+                  estado
+                ) || 0) + 1
+              );
             }
 
-            conteo.set(
-              estado,
-              (conteo.get(
-                estado
-              ) || 0) + 1
-            );
+            auditoria.push({
+              id: item.envio.id,
+              cliente:
+                item.envio.cliente ||
+                "Sin cliente",
+              archivo:
+                item.envio.pdf
+                  ?.split("/")
+                  .pop()
+                  ?.split("?")[0] ||
+                `PDF ${item.envio.id}`,
+              paqueteria:
+                item.resultado
+                  .paqueteria,
+              estado:
+                estado ||
+                "Sin detectar",
+              metodo:
+                item.resultado.metodo,
+            });
           }
         }
 
@@ -594,6 +742,10 @@ export default function DashboardPage() {
 
         setPdfsSinEstado(
           sinEstado
+        );
+
+        setAuditoriaPDFs(
+          auditoria
         );
       } catch (error) {
         console.error(
@@ -656,6 +808,51 @@ export default function DashboardPage() {
   const maxEnvios =
     estadosConteo[0]?.envios ||
     1;
+
+  const detectadosPorTexto =
+    useMemo(
+      () =>
+        auditoriaPDFs.filter(
+          (item) =>
+            item.metodo === "texto"
+        ).length,
+      [auditoriaPDFs]
+    );
+
+  const detectadosPorCP =
+    useMemo(
+      () =>
+        auditoriaPDFs.filter(
+          (item) =>
+            item.metodo === "cp"
+        ).length,
+      [auditoriaPDFs]
+    );
+
+  const auditoriaOrdenada =
+    useMemo(
+      () =>
+        [...auditoriaPDFs].sort(
+          (a, b) => {
+            if (
+              a.metodo === "sin-detectar" &&
+              b.metodo !== "sin-detectar"
+            ) {
+              return -1;
+            }
+
+            if (
+              a.metodo !== "sin-detectar" &&
+              b.metodo === "sin-detectar"
+            ) {
+              return 1;
+            }
+
+            return b.id - a.id;
+          }
+        ),
+      [auditoriaPDFs]
+    );
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-slate-100 via-white to-blue-50 p-5 md:p-8">
@@ -756,7 +953,7 @@ export default function DashboardPage() {
                     estadosSinPresencia.length
                   )
             }
-            descripcion="Estados sin envíos detectados"
+            descripcion="Estados sin destinos confirmados"
             icono={<IconoObjetivo />}
             claseIcono="bg-violet-600 text-white"
             claseBorde="border-violet-200"
@@ -882,7 +1079,7 @@ export default function DashboardPage() {
                 </h2>
 
                 <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
-                  Estados donde todavía no aparece ningún destino en los PDFs procesados.
+                  Estados sin destinos confirmados en los PDFs procesados. La lista mejora conforme se identifican más guías.
                 </p>
               </div>
 
@@ -996,19 +1193,56 @@ export default function DashboardPage() {
                 </span>
               </div>
 
-              {!cargandoEstados &&
-                pdfsSinEstado >
-                  0 && (
-                  <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
-                    <p className="font-black text-orange-900">
-                      {pdfsSinEstado} PDF(s) sin estado detectado
-                    </p>
+              {!cargandoEstados && (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="font-black text-slate-950">
+                    Diagnóstico de lectura
+                  </p>
 
-                    <p className="mt-1 text-sm font-medium text-orange-700">
-                      No se cuentan como cobertura hasta poder identificar claramente el estado de destino.
-                    </p>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-xl bg-emerald-50 p-3">
+                      <p className="text-2xl font-black text-emerald-800">
+                        {detectadosPorTexto}
+                      </p>
+                      <p className="text-xs font-bold text-emerald-700">
+                        Por texto
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl bg-blue-50 p-3">
+                      <p className="text-2xl font-black text-blue-800">
+                        {detectadosPorCP}
+                      </p>
+                      <p className="text-xs font-bold text-blue-700">
+                        Por C.P.
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl bg-orange-50 p-3">
+                      <p className="text-2xl font-black text-orange-800">
+                        {pdfsSinEstado}
+                      </p>
+                      <p className="text-xs font-bold text-orange-700">
+                        Sin detectar
+                      </p>
+                    </div>
                   </div>
-                )}
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMostrarAuditoria(
+                        (actual) => !actual
+                      )
+                    }
+                    className="mt-4 w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-slate-800"
+                  >
+                    {mostrarAuditoria
+                      ? "Ocultar auditoría"
+                      : "Revisar PDFs y destinos"}
+                  </button>
+                </div>
+              )}
             </div>
           </article>
 
@@ -1064,7 +1298,7 @@ export default function DashboardPage() {
 
               <Actividad
                 titulo="Fuente real"
-                descripcion="La cobertura se calcula leyendo únicamente el estado del destinatario en los PDFs almacenados de cada envío."
+                descripcion="La cobertura usa únicamente el destinatario: primero lee el estado escrito y, si falta, usa el código postal del mismo bloque."
                 hora="Automático"
                 clasePunto="bg-blue-500"
                 claseFondo="bg-blue-50"
@@ -1072,6 +1306,95 @@ export default function DashboardPage() {
             </div>
           </article>
         </section>
+
+        {mostrarAuditoria && (
+          <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-lg">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-sm font-black uppercase tracking-[0.16em] text-slate-600">
+                  Auditoría
+                </p>
+
+                <h2 className="mt-2 text-2xl font-black text-slate-950">
+                  Revisión de PDFs y destinos
+                </h2>
+
+                <p className="mt-2 text-sm font-medium text-slate-600">
+                  Los PDFs sin detectar aparecen primero para poder corregir formatos faltantes.
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-slate-100 px-4 py-3">
+                <p className="text-xs font-bold uppercase text-slate-500">
+                  Total revisado
+                </p>
+                <p className="text-2xl font-black text-slate-950">
+                  {auditoriaPDFs.length}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-slate-100 text-xs font-black uppercase tracking-wide text-slate-600">
+                  <tr>
+                    <th className="px-4 py-3">ID</th>
+                    <th className="px-4 py-3">Cliente</th>
+                    <th className="px-4 py-3">Paquetería</th>
+                    <th className="px-4 py-3">Estado destino</th>
+                    <th className="px-4 py-3">Método</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {auditoriaOrdenada.map(
+                    (item) => (
+                      <tr
+                        key={item.id}
+                        className="border-t border-slate-100"
+                      >
+                        <td className="px-4 py-3 font-bold text-slate-500">
+                          {item.id}
+                        </td>
+
+                        <td className="px-4 py-3 font-bold text-slate-900">
+                          {item.cliente}
+                        </td>
+
+                        <td className="px-4 py-3 font-semibold text-slate-600">
+                          {item.paqueteria}
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <span
+                            className={
+                              item.estado ===
+                              "Sin detectar"
+                                ? "rounded-full bg-orange-100 px-3 py-1 font-black text-orange-800"
+                                : "rounded-full bg-emerald-100 px-3 py-1 font-black text-emerald-800"
+                            }
+                          >
+                            {item.estado}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-3 font-semibold text-slate-600">
+                          {item.metodo ===
+                          "texto"
+                            ? "Texto destinatario"
+                            : item.metodo ===
+                              "cp"
+                            ? "Código postal"
+                            : "Pendiente"}
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
 
         <section className="mt-8 rounded-3xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-cyan-50 p-6 shadow-lg">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
