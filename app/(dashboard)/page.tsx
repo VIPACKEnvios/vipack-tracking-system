@@ -113,13 +113,9 @@ function normalizarTexto(valor: string) {
     .trim();
 }
 
-function detectarEstadoDesdeTexto(textoPDF: string) {
-  const texto = ` ${normalizarTexto(textoPDF)} `;
+function buscarEstadoEnBloque(textoBloque: string) {
+  const texto = ` ${normalizarTexto(textoBloque)} `;
 
-  /*
-   * Primero buscamos nombres largos para evitar falsos positivos
-   * con abreviaturas cortas como "COL", "MOR", etc.
-   */
   const estadosOrdenados = [...ESTADOS_MEXICO].sort(
     (a, b) => b.length - a.length
   );
@@ -136,9 +132,6 @@ function detectarEstadoDesdeTexto(textoPDF: string) {
 
       if (!limpio) continue;
 
-      /*
-       * Abreviaturas de 2 o 3 letras se validan como palabra completa.
-       */
       if (limpio.length <= 4) {
         const patron = new RegExp(
           `(?:^|\\s)${limpio.replace(/\s+/g, "\\s+")}(?:\\s|$)`,
@@ -155,6 +148,136 @@ function detectarEstadoDesdeTexto(textoPDF: string) {
   }
 
   return "";
+}
+
+function detectarPaqueteriaDesdeTexto(textoPDF: string) {
+  const texto = normalizarTexto(textoPDF);
+
+  if (
+    texto.includes("DHL") ||
+    texto.includes("WAYBILL") ||
+    texto.includes("MYDHL")
+  ) {
+    return "DHL";
+  }
+
+  if (
+    texto.includes("ESTAFETA") ||
+    texto.includes("CODIGO DE RASTREO") ||
+    texto.includes("CONFIRMACION")
+  ) {
+    return "ESTAFETA";
+  }
+
+  if (
+    texto.includes("FEDEX") ||
+    texto.includes("FEDERAL EXPRESS")
+  ) {
+    return "FEDEX";
+  }
+
+  return "";
+}
+
+function extraerBloqueDestinatario(
+  textoPDF: string,
+  paqueteria: string
+) {
+  const texto = String(textoPDF || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  /*
+   * DHL:
+   * La hoja contiene primero FROM/SHIPPER (origen Tijuana)
+   * y después TO/RECEIVER (destino real).
+   *
+   * Solo analizamos TO o RECEIVER y cortamos antes de regresar
+   * a datos operativos del envío.
+   */
+  if (paqueteria === "DHL") {
+    const receiver = texto.match(
+      /\bRECEIVER\s*:?\s*([\s\S]*?)(?=\bPRODUCT\s+DETAILS\b|\bPAYER\s+DETAILS\b|\bFEATURES\b|\bSHIPMENT\s+DETAILS\b|\bWAYBILL\b|$)/i
+    );
+
+    if (receiver?.[1]) {
+      return receiver[1];
+    }
+
+    const to = texto.match(
+      /\bTO\s*:?\s*([\s\S]*?)(?=\bCONTACT\s*:|\bDAY\s+TIME\b|\bREF\s*:|\bWAYBILL\b|\bCONTENTS\b|\bFROM\s*:|$)/i
+    );
+
+    if (to?.[1]) {
+      return to[1];
+    }
+  }
+
+  /*
+   * ESTAFETA:
+   * Aislamos DESTINATARIO / CONSIGNATARIO / RECIBE.
+   * Nunca usamos el bloque REMITENTE.
+   */
+  if (paqueteria === "ESTAFETA") {
+    const destinatario = texto.match(
+      /\b(?:DESTINATARIO|CONSIGNATARIO|RECIBE)\b\s*:?\s*([\s\S]*?)(?=\b(?:REMITENTE|ORIGEN|CONTENIDO|REFERENCIA|CODIGO\s+DE\s+RASTREO|RASTREO|GUIA|GU[IÍ]A|SERVICIO)\b|$)/i
+    );
+
+    if (destinatario?.[1]) {
+      return destinatario[1];
+    }
+  }
+
+  /*
+   * FEDEX:
+   * Se intenta aislar SHIP TO / RECIPIENT / CONSIGNEE.
+   */
+  if (paqueteria === "FEDEX") {
+    const destinatario = texto.match(
+      /\b(?:SHIP\s+TO|RECIPIENT|CONSIGNEE)\b\s*:?\s*([\s\S]*?)(?=\b(?:SHIP\s+FROM|SENDER|TRACKING|PACKAGE|SERVICE|REF)\b|$)/i
+    );
+
+    if (destinatario?.[1]) {
+      return destinatario[1];
+    }
+  }
+
+  /*
+   * Respaldo genérico: solo bloques explícitos de destinatario.
+   * Si no existe un bloque claro, devolvemos vacío para NO confundir
+   * el estado del remitente con el destino.
+   */
+  const generico = texto.match(
+    /\b(?:DESTINATARIO|RECEIVER|RECIPIENT|CONSIGNEE|SHIP\s+TO)\b\s*:?\s*([\s\S]*?)(?=\b(?:REMITENTE|SHIPPER|SENDER|SHIP\s+FROM|ORIGEN|PRODUCT|TRACKING|WAYBILL|GUIA|GU[IÍ]A)\b|$)/i
+  );
+
+  return generico?.[1] || "";
+}
+
+function detectarEstadoDestinatario(textoPDF: string) {
+  const paqueteria =
+    detectarPaqueteriaDesdeTexto(textoPDF);
+
+  const bloqueDestinatario =
+    extraerBloqueDestinatario(
+      textoPDF,
+      paqueteria
+    );
+
+  /*
+   * IMPORTANTE:
+   * Ya no buscamos el estado en todo el PDF.
+   * Si no se logra aislar al destinatario, el PDF se marca
+   * "sin estado detectado" en lugar de asignarlo a Baja California.
+   */
+  if (!bloqueDestinatario) {
+    return "";
+  }
+
+  return buscarEstadoEnBloque(
+    bloqueDestinatario
+  );
 }
 
 async function extraerTextoPDFDesdeUrl(
@@ -408,7 +531,7 @@ export default function DashboardPage() {
                         envio.pdf
                       );
 
-                    return detectarEstadoDesdeTexto(
+                    return detectarEstadoDestinatario(
                       texto
                     );
                   } catch (error) {
@@ -654,7 +777,7 @@ export default function DashboardPage() {
                 </h2>
 
                 <p className="mt-2 text-sm font-medium text-slate-600">
-                  Los estados se detectan directamente del destino escrito en los PDFs de las guías.
+                  Los estados se detectan únicamente del bloque del destinatario en los PDFs de las guías.
                 </p>
               </div>
 
@@ -862,7 +985,7 @@ export default function DashboardPage() {
                   </p>
 
                   <p className="mt-1 text-sm font-medium text-slate-600">
-                    Guías usadas para calcular cobertura
+                    Guías analizadas por destinatario
                   </p>
                 </div>
 
@@ -941,7 +1064,7 @@ export default function DashboardPage() {
 
               <Actividad
                 titulo="Fuente real"
-                descripcion="La cobertura se calcula leyendo el estado de destino directamente de los PDFs almacenados de cada envío."
+                descripcion="La cobertura se calcula leyendo únicamente el estado del destinatario en los PDFs almacenados de cada envío."
                 hora="Automático"
                 clasePunto="bg-blue-500"
                 claseFondo="bg-blue-50"
