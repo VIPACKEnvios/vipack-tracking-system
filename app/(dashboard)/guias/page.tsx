@@ -341,9 +341,7 @@ export default function GuiasPage() {
       .replace(/\u00a0/g, " ")
       .replace(/\s+/g, " ");
 
-    const candidatos: string[] = [];
-
-    const agregarMatches = (
+    const obtenerPrimeraGuiaValida = (
       regex: RegExp,
       indice = 1
     ) => {
@@ -362,86 +360,134 @@ export default function GuiasPage() {
             telefono
           )
         ) {
-          candidatos.push(guia);
+          return guia;
         }
       }
+
+      return "";
     };
 
     /*
-     * REGLA PRINCIPAL ESTAFETA REAL:
+     * IMPORTANTE:
+     * En VIPACK cada archivo PDF corresponde a UNA sola guía.
+     * El PDF puede tener 1, 2 o más hojas, pero NO debemos crear
+     * una fila por cada número de 10/12/15 dígitos que aparezca.
      *
-     * Código de Rastreo: 3455849102
-     *
-     * Un solo PDF puede tener varias páginas y cada página
-     * puede traer una guía distinta. matchAll obtiene TODAS.
+     * Por eso:
+     * 1) buscamos primero el campo oficial de rastreo;
+     * 2) en cuanto encontramos UNA guía válida, terminamos;
+     * 3) los respaldos solo se usan si no encontramos la principal.
      */
-    agregarMatches(
-      /C[ÓO]DIGO\s+DE\s+RASTREO\s*[:#.-]?\s*([0-9][0-9\s-]{8,20}[0-9])/gi
-    );
-
-    if (paqueteria === "DHL") {
-      agregarMatches(
-        /(?:WAYBILL|AWB|TRACKING\s*(?:NO|NUMBER|#)?|GUIA|GU[IÍ]A)\s*[:#.-]?\s*([\d\s-]{8,24})/gi
-      );
-    }
 
     if (paqueteria === "ESTAFETA") {
-      agregarMatches(
-        /(?:NO\.?\s*DE\s*GUIA|NO\.?\s*DE\s*GU[IÍ]A|GUIA|GU[IÍ]A|RASTREO|TRACKING)\s*[:#.-]?\s*([\d\s-]{8,24})/gi
-      );
+      const principal =
+        obtenerPrimeraGuiaValida(
+          /C[ÓO]DIGO\s+DE\s+RASTREO\s*[:#.-]?\s*([0-9][0-9\s-]{8,20}[0-9])/gi
+        );
+
+      if (principal) {
+        return [principal];
+      }
+
+      const secundaria =
+        obtenerPrimeraGuiaValida(
+          /(?:NO\.?\s*DE\s*GUIA|NO\.?\s*DE\s*GU[IÍ]A|GUIA|GU[IÍ]A|RASTREO|TRACKING)\s*[:#.-]?\s*([\d\s-]{8,24})/gi
+        );
+
+      if (secundaria) {
+        return [secundaria];
+      }
+
+      const fallback =
+        texto.match(
+          /(?<!\d)\d{10}(?!\d)/g
+        ) || [];
+
+      const guia =
+        fallback.find((candidato) =>
+          guiaValida(
+            candidato,
+            paqueteria,
+            telefono
+          )
+        );
+
+      return guia ? [guia] : [];
+    }
+
+    if (paqueteria === "DHL") {
+      const principal =
+        obtenerPrimeraGuiaValida(
+          /(?:WAYBILL|AWB|TRACKING\s*(?:NO|NUMBER|#)?|GUIA|GU[IÍ]A)\s*[:#.-]?\s*([\d\s-]{8,24})/gi
+        );
+
+      if (principal) {
+        return [principal];
+      }
+
+      const fallback =
+        texto.match(
+          /(?<!\d)\d{10}(?!\d)/g
+        ) || [];
+
+      const guia =
+        fallback.find((candidato) =>
+          guiaValida(
+            candidato,
+            paqueteria,
+            telefono
+          )
+        );
+
+      return guia ? [guia] : [];
     }
 
     if (paqueteria === "FEDEX") {
-      agregarMatches(
-        /(?:TRACKING\s*(?:ID|NO|NUMBER|#)?|MASTER\s*TRACKING|GUIA|GU[IÍ]A)\s*[:#.-]?\s*([\d\s-]{10,24})/gi
-      );
+      const principal =
+        obtenerPrimeraGuiaValida(
+          /(?:TRACKING\s*(?:ID|NO|NUMBER|#)?|MASTER\s*TRACKING|GUIA|GU[IÍ]A)\s*[:#.-]?\s*([\d\s-]{10,24})/gi
+        );
+
+      if (principal) {
+        return [principal];
+      }
+
+      const fallback =
+        texto.match(
+          /(?<!\d)(?:\d{12}|\d{15})(?!\d)/g
+        ) || [];
+
+      const guia =
+        fallback.find((candidato) =>
+          guiaValida(
+            candidato,
+            paqueteria,
+            telefono
+          )
+        );
+
+      return guia ? [guia] : [];
     }
 
     /*
-     * Fallback por longitud, SOLO si las etiquetas no dieron nada.
+     * Paquetería no identificada:
+     * seguimos respetando UNA sola guía por PDF.
      */
-    if (candidatos.length === 0) {
-      if (
-        paqueteria === "DHL" ||
-        paqueteria === "ESTAFETA"
-      ) {
-        const encontrados =
-          texto.match(
-            /(?<!\d)\d{10}(?!\d)/g
-          ) || [];
+    const genericos =
+      texto.match(
+        /(?<!\d)\d{8,30}(?!\d)/g
+      ) || [];
 
-        candidatos.push(
-          ...encontrados.filter((guia) =>
-            guiaValida(
-              guia,
-              paqueteria,
-              telefono
-            )
-          )
-        );
-      }
+    const guia =
+      genericos.find((candidato) =>
+        guiaValida(
+          candidato,
+          paqueteria,
+          telefono
+        )
+      );
 
-      if (paqueteria === "FEDEX") {
-        const encontrados =
-          texto.match(
-            /(?<!\d)(?:\d{12}|\d{15})(?!\d)/g
-          ) || [];
-
-        candidatos.push(
-          ...encontrados.filter((guia) =>
-            guiaValida(
-              guia,
-              paqueteria,
-              telefono
-            )
-          )
-        );
-      }
-    }
-
-    return Array.from(
-      new Set(candidatos)
-    );
+    return guia ? [guia] : [];
   };
 
   const handleGenerateExcelFromZip = async () => {
@@ -623,41 +669,44 @@ export default function GuiasPage() {
             continue;
           }
 
-          for (
-            const guia of guias
-          ) {
-            const numeroPedido =
-              filas.length + 1;
+          const guia =
+            guias[0];
 
-            filas.push({
-              pedido: `PED-${String(
-                numeroPedido
-              ).padStart(3, "0")}`,
-              fecha_carga:
-                new Date().toISOString(),
-              cliente,
-              telefono_whatsapp:
-                telefono,
-              guia,
-              paqueteria:
-                paqueteria ||
-                "NO_DETECTADA",
-              nombre_pdf: nombrePDF,
-              estado_17track:
-                "Pendiente",
-              ultimo_estado_enviado:
-                "",
-              enviado: "",
-            });
+          const numeroPedido =
+            filas.length + 1;
 
-            totalGuias++;
-          }
+          filas.push({
+            pedido: `PED-${String(
+              numeroPedido
+            ).padStart(3, "0")}`,
+            fecha_carga:
+              new Date().toISOString(),
+            cliente,
+            telefono_whatsapp:
+              telefono,
+            guia,
+            paqueteria:
+              paqueteria ||
+              "NO_DETECTADA",
+            nombre_pdf: nombrePDF,
+            estado_17track:
+              "Pendiente",
+            ultimo_estado_enviado:
+              "",
+            enviado: "",
+          });
+
+          totalGuias++;
 
           logsGeneracion.push(
             `✅ ${nombrePDF}: ${
               paqueteria ||
               "paquetería no detectada"
-            } | ${guias.length} guía(s) detectada(s)${
+            } | 1 guía detectada${
+              pdf.numPages > 1
+                ? ` | ${pdf.numPages} hojas en el mismo PDF`
+                : ""
+            }${
               telefono
                 ? " | teléfono detectado"
                 : ""
