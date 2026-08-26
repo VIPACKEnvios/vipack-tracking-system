@@ -451,6 +451,258 @@ async function extraerTextoPDFDesdeUrl(
   return texto;
 }
 
+
+async function extraerTextoOCRPDFDesdeUrl(
+  pdfUrl: string
+) {
+  const pdfjs =
+    await import("pdfjs-dist");
+
+  const Tesseract =
+    await import("tesseract.js");
+
+  pdfjs.GlobalWorkerOptions.workerSrc =
+    new URL(
+      "pdfjs-dist/build/pdf.worker.min.mjs",
+      import.meta.url
+    ).toString();
+
+  const response = await fetch(
+    pdfUrl,
+    {
+      cache: "force-cache",
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `No se pudo descargar PDF para OCR (${response.status})`
+    );
+  }
+
+  const arrayBuffer =
+    await response.arrayBuffer();
+
+  const pdf =
+    await pdfjs
+      .getDocument({
+        data: arrayBuffer,
+      })
+      .promise;
+
+  let textoOCR = "";
+
+  /*
+   * Estafeta normalmente usa una sola hoja.
+   * Leemos máximo 2 para evitar que OCR sea demasiado pesado.
+   */
+  const paginasALeer =
+    Math.min(
+      pdf.numPages,
+      2
+    );
+
+  for (
+    let pagina = 1;
+    pagina <= paginasALeer;
+    pagina++
+  ) {
+    const page =
+      await pdf.getPage(
+        pagina
+      );
+
+    const viewport =
+      page.getViewport({
+        scale: 2,
+      });
+
+    const canvas =
+      document.createElement(
+        "canvas"
+      );
+
+    const context =
+      canvas.getContext(
+        "2d"
+      );
+
+    if (!context) {
+      continue;
+    }
+
+    canvas.width =
+      Math.ceil(
+        viewport.width
+      );
+
+    canvas.height =
+      Math.ceil(
+        viewport.height
+      );
+
+    await page.render({
+      canvas,
+      canvasContext:
+        context,
+      viewport,
+    }).promise;
+
+    const imagen =
+      canvas.toDataURL(
+        "image/png"
+      );
+
+    const resultado =
+      await Tesseract.recognize(
+        imagen,
+        "spa+eng"
+      );
+
+    textoOCR +=
+      ` ${resultado.data.text || ""} `;
+  }
+
+  return textoOCR
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/*
+ * Para etiquetas Estafeta escaneadas:
+ * el texto del destinatario suele estar en la mitad inferior.
+ * Si OCR no conserva la palabra DESTINATARIO, usamos el ÚLTIMO
+ * código postal mexicano legible, porque el remitente aparece arriba
+ * y el destinatario abajo.
+ */
+function detectarEstadoEstafetaOCR(
+  textoOCR: string
+): ResultadoEstado {
+  const texto =
+    String(
+      textoOCR || ""
+    );
+
+  const bloque =
+    extraerBloqueDestinatario(
+      texto,
+      "ESTAFETA"
+    );
+
+  if (bloque) {
+    const porTexto =
+      buscarEstadoEnBloque(
+        bloque
+      );
+
+    if (porTexto) {
+      return {
+        estado: porTexto,
+        metodo: "texto",
+        paqueteria:
+          "ESTAFETA OCR",
+      };
+    }
+
+    const porCP =
+      buscarEstadoPorCP(
+        bloque
+      );
+
+    if (porCP) {
+      return {
+        estado: porCP,
+        metodo: "cp",
+        paqueteria:
+          "ESTAFETA OCR",
+      };
+    }
+  }
+
+  const cps =
+    Array.from(
+      texto.matchAll(
+        /(?<!\d)(\d{5})(?!\d)/g
+      )
+    )
+      .map(
+        (match) =>
+          Number(
+            match[1]
+          )
+      )
+      .filter(
+        (cp) =>
+          cp >= 1000 &&
+          cp <= 99999
+      );
+
+  /*
+   * Usamos de abajo hacia arriba.
+   * En Estafeta el CP del destinatario aparece después del remitente.
+   */
+  for (
+    let i = cps.length - 1;
+    i >= 0;
+    i--
+  ) {
+    const cp =
+      cps[i];
+
+    const rango =
+      RANGOS_CP.find(
+        (item) =>
+          cp >= item.min &&
+          cp <= item.max
+      );
+
+    if (rango) {
+      return {
+        estado:
+          rango.estado,
+        metodo: "cp",
+        paqueteria:
+          "ESTAFETA OCR",
+      };
+    }
+  }
+
+  /*
+   * Último respaldo: revisar solamente la mitad final del OCR
+   * para detectar abreviaturas como DUR, YUC, CHIS, VER, etc.
+   */
+  const mitadFinal =
+    texto.slice(
+      Math.floor(
+        texto.length * 0.45
+      )
+    );
+
+  const porTextoFinal =
+    buscarEstadoEnBloque(
+      mitadFinal
+    );
+
+  if (porTextoFinal) {
+    return {
+      estado:
+        porTextoFinal,
+      metodo: "texto",
+      paqueteria:
+        "ESTAFETA OCR",
+    };
+  }
+
+  return {
+    estado: "",
+    metodo:
+      "sin-detectar",
+    paqueteria:
+      "ESTAFETA OCR",
+  };
+}
+
 export default function DashboardPage() {
   const [cargando, setCargando] =
     useState(true);
@@ -493,6 +745,16 @@ export default function DashboardPage() {
     mostrarAuditoria,
     setMostrarAuditoria,
   ] = useState(false);
+
+  const [
+    ejecutandoOCR,
+    setEjecutandoOCR,
+  ] = useState(false);
+
+  const [
+    progresoOCR,
+    setProgresoOCR,
+  ] = useState("");
 
   useEffect(() => {
     async function cargarResumen() {
@@ -765,6 +1027,220 @@ export default function DashboardPage() {
 
     cargarEstadosDesdePDF();
   }, []);
+
+  async function ejecutarOCRPendientes() {
+    if (ejecutandoOCR) {
+      return;
+    }
+
+    const pendientes =
+      auditoriaPDFs.filter(
+        (item) =>
+          item.estado ===
+            "Sin detectar" &&
+          item.paqueteria.includes(
+            "ESTAFETA"
+          )
+      );
+
+    if (
+      pendientes.length === 0
+    ) {
+      alert(
+        "No hay PDFs de Estafeta pendientes de reconocimiento."
+      );
+      return;
+    }
+
+    const confirmar =
+      window.confirm(
+        `Se analizarán ${pendientes.length} PDF(s) de Estafeta que parecen estar en imagen. El OCR puede tardar varios minutos. ¿Continuar?`
+      );
+
+    if (!confirmar) {
+      return;
+    }
+
+    try {
+      setEjecutandoOCR(
+        true
+      );
+
+      const nuevaAuditoria =
+        [...auditoriaPDFs];
+
+      const nuevoConteo =
+        new Map<
+          string,
+          number
+        >();
+
+      /*
+       * Conservamos primero los estados ya detectados.
+       */
+      for (
+        const item of nuevaAuditoria
+      ) {
+        if (
+          item.estado &&
+          item.estado !==
+            "Sin detectar"
+        ) {
+          nuevoConteo.set(
+            item.estado,
+            (nuevoConteo.get(
+              item.estado
+            ) || 0) + 1
+          );
+        }
+      }
+
+      let rescatados = 0;
+
+      for (
+        let indice = 0;
+        indice <
+        pendientes.length;
+        indice++
+      ) {
+        const pendiente =
+          pendientes[
+            indice
+          ];
+
+        setProgresoOCR(
+          `OCR Estafeta ${indice + 1} de ${pendientes.length}: ${pendiente.cliente}`
+        );
+
+        const envio =
+          await supabase
+            .from("envios")
+            .select(
+              "id, cliente, pdf"
+            )
+            .eq(
+              "id",
+              pendiente.id
+            )
+            .single();
+
+        if (
+          envio.error ||
+          !envio.data?.pdf
+        ) {
+          continue;
+        }
+
+        try {
+          const textoOCR =
+            await extraerTextoOCRPDFDesdeUrl(
+              envio.data.pdf
+            );
+
+          const resultado =
+            detectarEstadoEstafetaOCR(
+              textoOCR
+            );
+
+          if (
+            resultado.estado
+          ) {
+            const posicion =
+              nuevaAuditoria.findIndex(
+                (item) =>
+                  item.id ===
+                  pendiente.id
+              );
+
+            if (
+              posicion >= 0
+            ) {
+              nuevaAuditoria[
+                posicion
+              ] = {
+                ...nuevaAuditoria[
+                  posicion
+                ],
+                estado:
+                  resultado.estado,
+                metodo:
+                  resultado.metodo,
+                paqueteria:
+                  resultado.paqueteria,
+              };
+            }
+
+            nuevoConteo.set(
+              resultado.estado,
+              (nuevoConteo.get(
+                resultado.estado
+              ) || 0) + 1
+            );
+
+            rescatados++;
+          }
+        } catch (error) {
+          console.warn(
+            `OCR falló para envío ${pendiente.id}:`,
+            error
+          );
+        }
+      }
+
+      const lista =
+        Array.from(
+          nuevoConteo.entries()
+        )
+          .map(
+            ([
+              estado,
+              envios,
+            ]) => ({
+              estado,
+              envios,
+            })
+          )
+          .sort(
+            (a, b) =>
+              b.envios -
+              a.envios
+          );
+
+      setAuditoriaPDFs(
+        nuevaAuditoria
+      );
+
+      setEstadosConteo(
+        lista
+      );
+
+      setPdfsSinEstado(
+        nuevaAuditoria.filter(
+          (item) =>
+            item.estado ===
+            "Sin detectar"
+        ).length
+      );
+
+      setProgresoOCR(
+        `OCR terminado: ${rescatados} PDF(s) recuperados.`
+      );
+
+      alert(
+        `OCR terminado.\n\nPDFs recuperados: ${rescatados}\nPendientes restantes: ${
+          nuevaAuditoria.filter(
+            (item) =>
+              item.estado ===
+              "Sin detectar"
+          ).length
+        }`
+      );
+    } finally {
+      setEjecutandoOCR(
+        false
+      );
+    }
+  }
 
   const totalEnviosConEstado =
     useMemo(
@@ -1230,12 +1706,33 @@ export default function DashboardPage() {
 
                   <button
                     type="button"
+                    onClick={
+                      ejecutarOCRPendientes
+                    }
+                    disabled={
+                      ejecutandoOCR
+                    }
+                    className="mt-4 w-full rounded-xl bg-purple-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {ejecutandoOCR
+                      ? "Reconociendo PDFs en imagen..."
+                      : "Reconocer Estafeta en imagen (OCR)"}
+                  </button>
+
+                  {progresoOCR && (
+                    <p className="mt-2 text-xs font-bold leading-5 text-purple-700">
+                      {progresoOCR}
+                    </p>
+                  )}
+
+                  <button
+                    type="button"
                     onClick={() =>
                       setMostrarAuditoria(
                         (actual) => !actual
                       )
                     }
-                    className="mt-4 w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-slate-800"
+                    className="mt-3 w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-slate-800"
                   >
                     {mostrarAuditoria
                       ? "Ocultar auditoría"
