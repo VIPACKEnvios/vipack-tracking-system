@@ -21,14 +21,16 @@ export const metadata: Metadata = {
   },
 
   description:
-    "Sistema oficial de VIPACK para el registro de bazares, consulta de bazares autorizados, seguimiento de envíos y administración logística.",
+    "VIPACK Envíos: recolección de compras en Tijuana, inventario en línea, almacenamiento, seguimiento y envíos nacionales.",
 
   keywords: [
     "VIPACK",
     "VIPACK Envíos",
-    "Registro de Bazares",
-    "Consulta de Bazares",
-    "Envíos",
+    "Envíos nacionales",
+    "Recolecciones en Tijuana",
+    "Inventario en línea",
+    "Almacenamiento",
+    "Seguimiento de envíos",
     "Logística",
     "Paquetería",
     "Tijuana",
@@ -57,7 +59,7 @@ export const metadata: Metadata = {
     title: "VIPACK Envíos",
 
     description:
-      "Registro oficial de bazares, consulta de bazares autorizados y plataforma logística de VIPACK Envíos.",
+      "Recolección de compras en Tijuana, inventario en línea, almacenamiento, seguimiento y envíos nacionales con VIPACK Envíos.",
 
     images: [
       {
@@ -76,7 +78,7 @@ export const metadata: Metadata = {
     title: "VIPACK Envíos",
 
     description:
-      "Registro oficial de bazares y plataforma logística de VIPACK Envíos.",
+      "Recolección de compras en Tijuana, inventario en línea y envíos nacionales con VIPACK Envíos.",
 
     images: [
       "https://vipack-envios.com/og-vipack.jpg?v=2",
