@@ -327,6 +327,11 @@ export default function InventarioClientePage() {
   const [mesActivo, setMesActivo] =
     useState<string>("");
 
+  // Protección móvil: evita renderizar demasiadas evidencias a la vez.
+  const FOTOS_POR_BLOQUE = 24;
+  const [limiteFotos, setLimiteFotos] =
+    useState(FOTOS_POR_BLOQUE);
+
   const inicioTouchX =
     useRef<number | null>(null);
 
@@ -524,7 +529,11 @@ export default function InventarioClientePage() {
   const cambiarMes = (mes: string) => {
     setMesActivo(mes);
     setFotoActiva(null);
+    setLimiteFotos(FOTOS_POR_BLOQUE);
   };
+
+  const imagenesVisibles =
+    imagenesFiltradas.slice(0, limiteFotos);
 
   const fotoAnterior = () => {
     setFotoActiva((actual) => {
@@ -920,12 +929,13 @@ export default function InventarioClientePage() {
                 No hay fotos disponibles en este mes.
               </div>
             ) : (
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:mt-6 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
-                {imagenesFiltradas.map(
-                  (
-                    item,
-                    index
-                  ) => (
+              <>
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:mt-6 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
+                  {imagenesVisibles.map(
+                    (
+                      item,
+                      index
+                    ) => (
                     <article
                       key={
                         item.id
@@ -952,6 +962,7 @@ export default function InventarioClientePage() {
                             }
                             className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
                             loading="lazy"
+                            decoding="async"
                           />
                         </div>
 
@@ -995,8 +1006,28 @@ export default function InventarioClientePage() {
                       </div>
                     </article>
                   )
+                  )}
+                </div>
+
+                {imagenesVisibles.length < imagenesFiltradas.length && (
+                  <div className="mt-5 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLimiteFotos((actual) =>
+                          Math.min(
+                            actual + FOTOS_POR_BLOQUE,
+                            imagenesFiltradas.length
+                          )
+                        )
+                      }
+                      className="w-full rounded-2xl border border-blue-200 bg-white px-5 py-3 text-sm font-black text-[#0a3183] shadow-sm transition hover:bg-blue-50 sm:w-auto"
+                    >
+                      Mostrar 24 fotos más
+                    </button>
+                  </div>
                 )}
-              </div>
+              </>
             )}
           </div>
 
@@ -1028,7 +1059,7 @@ export default function InventarioClientePage() {
                           <video
                             controls
                             playsInline
-                            preload="metadata"
+                            preload="none"
                             src={srcImagen(item)}
                             className="aspect-video w-full bg-black object-contain"
                           >

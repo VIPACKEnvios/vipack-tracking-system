@@ -602,6 +602,16 @@ export default function RecoleccionesPage() {
     >
   >({});
 
+  // Cache estable para saber qué folios ya tienen su resumen cargado.
+  // Evita que actualizar el state vuelva a disparar la carga en cadena.
+  const resumenEvidenciasRef = useRef<
+    Record<string, ResumenEvidenciaFila>
+  >({});
+
+  // Límites de render para proteger especialmente Chrome móvil.
+  const [limiteMovil, setLimiteMovil] = useState(40);
+  const [limiteDesktop, setLimiteDesktop] = useState(120);
+
   const [
     editorOperacion,
     setEditorOperacion,
@@ -1070,162 +1080,127 @@ export default function RecoleccionesPage() {
       filtroMovil,
     ]);
 
+  const desktopMostrado = useMemo(
+    () => desktop.slice(0, limiteDesktop),
+    [desktop, limiteDesktop]
+  );
+
+  const movilMostrado = useMemo(
+    () => movil.slice(0, limiteMovil),
+    [movil, limiteMovil]
+  );
+
+  useEffect(() => {
+    setLimiteMovil(40);
+  }, [busqueda, filtroMovil, vistaMovil]);
+
+  useEffect(() => {
+    setLimiteDesktop(120);
+  }, [busqueda, filtroDesktop]);
+
   /*
-   * Carga los contadores reales de evidencias
-   * solamente para las filas visibles. Se limita
-   * a 40 folios para no saturar OneDrive.
+   * Carga solo los contadores de evidencias necesarios para lo que se muestra.
+   * No depende de resumenEvidencias para evitar ciclos de render + fetch.
    */
   useEffect(() => {
-    const visibles =
-      (
-        vistaMovil ===
-        "Recolectadas"
-          ? movil
-          : desktop
-      )
-        .slice(
-          0,
-          40
-        )
-        .filter(
-          (item) =>
-            Boolean(
-              item.folio
-            ) &&
-            !resumenEvidencias[
-              item.folio
-            ]?.cargado
-        );
+    const visibles = (
+      vistaMovil === "Recolectadas"
+        ? movilMostrado
+        : desktopMostrado
+    )
+      .slice(0, 24)
+      .filter(
+        (item) =>
+          Boolean(item.folio) &&
+          !resumenEvidenciasRef.current[item.folio]?.cargado
+      );
 
-    if (
-      visibles.length === 0
-    ) {
-      return;
-    }
+    if (visibles.length === 0) return;
 
-    let cancelado =
-      false;
+    const controller = new AbortController();
+    let cancelado = false;
 
     async function cargarResumenes() {
-      const lote =
-        4;
+      const lote = 3;
+      const acumulados: Array<{
+        folio: string;
+        notas: number;
+        fotos: number;
+      }> = [];
 
-      for (
-        let i = 0;
-        i <
-        visibles.length;
-        i += lote
-      ) {
-        const grupo =
-          visibles.slice(
-            i,
-            i + lote
-          );
+      for (let i = 0; i < visibles.length; i += lote) {
+        if (cancelado) return;
 
-        const resultados =
-          await Promise.all(
-            grupo.map(
-              async (
-                item
-              ) => {
-                try {
-                  const response =
-                    await fetch(
-                      `/api/recolecciones/${encodeURIComponent(
-                        item.folio
-                      )}/evidencias`,
-                      {
-                        cache:
-                          "no-store",
-                      }
-                    );
-
-                  const data =
-                    (await response.json()) as RespuestaEvidencias;
-
-                  if (
-                    !response.ok ||
-                    !data.success
-                  ) {
-                    throw new Error();
-                  }
-
-                  return {
-                    folio:
-                      item.folio,
-                    notas:
-                      data.resumen
-                        ?.notas ??
-                      0,
-                    fotos:
-                      data.resumen
-                        ?.fotos ??
-                      0,
-                  };
-                } catch {
-                  return {
-                    folio:
-                      item.folio,
-                    notas:
-                      item.nota
-                        ? 1
-                        : 0,
-                    fotos:
-                      item.foto
-                        ? 1
-                        : 0,
-                  };
+        const grupo = visibles.slice(i, i + lote);
+        const resultados = await Promise.all(
+          grupo.map(async (item) => {
+            try {
+              const response = await fetch(
+                `/api/recolecciones/${encodeURIComponent(item.folio)}/evidencias`,
+                {
+                  cache: "no-store",
+                  signal: controller.signal,
                 }
-              }
-            )
-          );
+              );
 
-        if (
-          cancelado
-        ) {
-          return;
-        }
+              const data = (await response.json()) as RespuestaEvidencias;
+              if (!response.ok || !data.success) throw new Error();
 
-        setResumenEvidencias(
-          (actual) => {
-            const siguiente =
-              {
-                ...actual,
+              return {
+                folio: item.folio,
+                notas: data.resumen?.notas ?? 0,
+                fotos: data.resumen?.fotos ?? 0,
               };
+            } catch (error) {
+              if (error instanceof DOMException && error.name === "AbortError") {
+                throw error;
+              }
 
-            for (
-              const resultado
-              of resultados
-            ) {
-              siguiente[
-                resultado.folio
-              ] = {
-                notas:
-                  resultado.notas,
-                fotos:
-                  resultado.fotos,
-                cargado:
-                  true,
+              return {
+                folio: item.folio,
+                notas: item.nota ? 1 : 0,
+                fotos: item.foto ? 1 : 0,
               };
             }
-
-            return siguiente;
-          }
+          })
         );
+
+        acumulados.push(...resultados);
       }
+
+      if (cancelado || acumulados.length === 0) return;
+
+      const nuevos: Record<string, ResumenEvidenciaFila> = {};
+      for (const resultado of acumulados) {
+        nuevos[resultado.folio] = {
+          notas: resultado.notas,
+          fotos: resultado.fotos,
+          cargado: true,
+        };
+      }
+
+      resumenEvidenciasRef.current = {
+        ...resumenEvidenciasRef.current,
+        ...nuevos,
+      };
+
+      setResumenEvidencias((actual) => ({
+        ...actual,
+        ...nuevos,
+      }));
     }
 
-    void cargarResumenes();
+    void cargarResumenes().catch((error: unknown) => {
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        console.error("Error cargando resumen de evidencias", error);
+      }
+    });
 
     return () => {
       cancelado = true;
+      controller.abort();
     };
-  }, [
-    desktop,
-    movil,
-    vistaMovil,
-    resumenEvidencias,
-  ]);
+  }, [desktopMostrado, movilMostrado, vistaMovil]);
 
   const eliminarDelSistema =
     useCallback(
@@ -1606,7 +1581,7 @@ export default function RecoleccionesPage() {
                   </thead>
 
                   <tbody className="divide-y divide-slate-100">
-                    {desktop.map(
+                    {desktopMostrado.map(
                       (item) => {
                         const evidencia =
                           resumenEvidencias[
@@ -1894,6 +1869,18 @@ export default function RecoleccionesPage() {
                   </tbody>
                 </table>
 
+                {desktopMostrado.length < desktop.length && (
+                  <div className="border-t border-slate-100 p-4 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setLimiteDesktop((actual) => actual + 120)}
+                      className="rounded-xl border border-slate-200 bg-white px-5 py-2 text-sm font-black text-slate-700 hover:bg-slate-50"
+                    >
+                      Mostrar 120 más
+                    </button>
+                  </div>
+                )}
+
                 {desktop.length ===
                   0 && (
                   <Vacio />
@@ -2038,7 +2025,7 @@ export default function RecoleccionesPage() {
             </div>
 
             <div className="space-y-3">
-              {movil.map(
+              {movilMostrado.map(
                 (item) => (
                   <TarjetaMovil
                     key={
@@ -2088,6 +2075,16 @@ export default function RecoleccionesPage() {
                 )
               )}
             </div>
+
+            {movilMostrado.length < movil.length && (
+              <button
+                type="button"
+                onClick={() => setLimiteMovil((actual) => actual + 40)}
+                className="mt-4 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm"
+              >
+                Mostrar 40 más
+              </button>
+            )}
 
             {movil.length ===
               0 && <Vacio />}
