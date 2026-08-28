@@ -102,86 +102,53 @@ export async function GET(
   context: RouteContext
 ) {
   try {
-    const {
-      token,
-    } =
-      await context.params;
+    const { token } = await context.params;
 
     if (!token) {
       return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Token no válido.",
-        },
-        {
-          status: 400,
-        }
+        { success: false, error: "Token no válido." },
+        { status: 400 }
       );
     }
 
-    const cliente =
-      await obtenerClientePorToken(
-        token
-      );
+    const cliente = await obtenerClientePorToken(token);
 
-    if (
-      !cliente
-        ?.id_cliente
-    ) {
+    if (!cliente?.id_cliente) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Cliente no encontrado o acceso inactivo.",
+          error: "Cliente no encontrado o acceso inactivo.",
         },
-        {
-          status: 404,
-        }
+        { status: 404 }
       );
     }
 
     const endpoint =
-      request.nextUrl.searchParams.get(
-        "endpoint"
-      );
+      request.nextUrl.searchParams.get("endpoint");
 
     if (!endpoint) {
-      return NextResponse.json(
-        {
-          success: true,
-          activado: false,
-        }
-      );
+      return NextResponse.json({
+        success: true,
+        activado: false,
+      });
     }
 
     const {
-      data:
-        suscripcion,
-      error:
-        suscripcionError,
-    } =
-      await supabaseAdmin
-        .from(
-          "push_subscriptions"
-        )
-        .select(
-          `
-            id,
-            cliente_id,
-            endpoint,
-            activo
-          `
-        )
-        .eq(
-          "endpoint",
-          endpoint
-        )
-        .maybeSingle();
+      data: suscripcion,
+      error: suscripcionError,
+    } = await supabaseAdmin
+      .from("push_subscriptions")
+      .select(`
+        id,
+        cliente_id,
+        endpoint,
+        activo
+      `)
+      .eq("cliente_id", Number(cliente.id_cliente))
+      .eq("endpoint", endpoint)
+      .maybeSingle();
 
-    if (
-      suscripcionError
-    ) {
+    if (suscripcionError) {
       console.error(
         "Error verificando suscripción:",
         suscripcionError
@@ -190,44 +157,19 @@ export async function GET(
       return NextResponse.json(
         {
           success: false,
-          activado:
-            false,
-          error:
-            "No se pudo comprobar la suscripción.",
+          activado: false,
+          error: "No se pudo comprobar la suscripción.",
         },
-        {
-          status: 500,
-        }
+        { status: 500 }
       );
     }
 
-    const activado =
-      Boolean(
-        suscripcion &&
-          suscripcion
-            .activo ===
-            true &&
-          Number(
-            suscripcion
-              .cliente_id
-          ) ===
-            Number(
-              cliente
-                .id_cliente
-            )
-      );
-
     return NextResponse.json({
       success: true,
-
-      activado,
-
-      cliente_id:
-        cliente.id_cliente,
+      activado: suscripcion?.activo === true,
+      cliente_id: cliente.id_cliente,
     });
-  } catch (
-    error
-  ) {
+  } catch (error) {
     console.error(
       "Error GET push subscribe:",
       error
@@ -240,9 +182,7 @@ export async function GET(
         error:
           "Error interno verificando las notificaciones.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
@@ -251,9 +191,13 @@ export async function GET(
  * ==========================
  * POST
  *
- * Registra este dispositivo
- * únicamente para el cliente
- * correspondiente al token.
+ * Registra este dispositivo para
+ * el cliente correspondiente al token.
+ *
+ * Un mismo dispositivo puede estar
+ * asociado a varios inventarios VIPACK.
+ * La combinación única es:
+ * cliente_id + endpoint.
  * ==========================
  */
 
@@ -262,284 +206,130 @@ export async function POST(
   context: RouteContext
 ) {
   try {
-    const {
-      token,
-    } =
-      await context.params;
+    const { token } = await context.params;
 
     if (!token) {
       return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Token no válido.",
-        },
-        {
-          status: 400,
-        }
+        { success: false, error: "Token no válido." },
+        { status: 400 }
       );
     }
 
-    const cliente =
-      await obtenerClientePorToken(
-        token
-      );
+    const cliente = await obtenerClientePorToken(token);
 
-    if (
-      !cliente
-        ?.id_cliente
-    ) {
+    if (!cliente?.id_cliente) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Cliente no encontrado o acceso inactivo.",
+          error: "Cliente no encontrado o acceso inactivo.",
         },
-        {
-          status: 404,
-        }
+        { status: 404 }
       );
     }
 
-    const body =
-      (
-        await request.json()
-      ) as PushBody;
+    const body = (await request.json()) as PushBody;
 
     const endpoint =
-      body
-        ?.subscription
-        ?.endpoint;
+      body?.subscription?.endpoint;
 
     const p256dh =
-      body
-        ?.subscription
-        ?.keys
-        ?.p256dh;
+      body?.subscription?.keys?.p256dh;
 
     const auth =
-      body
-        ?.subscription
-        ?.keys
-        ?.auth;
+      body?.subscription?.keys?.auth;
 
-    if (
-      !endpoint ||
-      !p256dh ||
-      !auth
-    ) {
+    if (!endpoint || !p256dh || !auth) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "La suscripción push está incompleta.",
+          error: "La suscripción push está incompleta.",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
-    /*
-     * Primero comprobamos si el
-     * endpoint ya existe.
-     */
-    const {
-      data:
-        existente,
-      error:
-        existenteError,
-    } =
-      await supabaseAdmin
-        .from(
-          "push_subscriptions"
-        )
-        .select(
-          `
-            id,
-            cliente_id,
-            endpoint,
-            activo
-          `
-        )
-        .eq(
-          "endpoint",
-          endpoint
-        )
-        .maybeSingle();
+    const clienteId = Number(cliente.id_cliente);
 
-    if (
-      existenteError
-    ) {
+    const {
+      data: existente,
+      error: existenteError,
+    } = await supabaseAdmin
+      .from("push_subscriptions")
+      .select(`
+        id,
+        cliente_id,
+        endpoint,
+        activo
+      `)
+      .eq("cliente_id", clienteId)
+      .eq("endpoint", endpoint)
+      .maybeSingle();
+
+    if (existenteError) {
       console.error(
-        "Error buscando endpoint push:",
+        "Error buscando suscripción push:",
         existenteError
       );
 
       return NextResponse.json(
         {
           success: false,
-          error:
-            "No se pudo comprobar el dispositivo.",
+          error: "No se pudo comprobar el dispositivo.",
         },
-        {
-          status: 500,
-        }
+        { status: 500 }
       );
     }
 
-    /*
-     * Si este dispositivo ya pertenece
-     * al mismo cliente, simplemente
-     * actualizamos sus llaves.
-     */
-    if (
-      existente &&
-      Number(
-        existente
-          .cliente_id
-      ) ===
-        Number(
-          cliente
-            .id_cliente
-        )
-    ) {
-      const {
-        error:
-          actualizarError,
-      } =
+    const datosSuscripcion = {
+      p256dh,
+      auth,
+      activo: true,
+      user_agent: request.headers.get("user-agent"),
+      updated_at: new Date().toISOString(),
+    };
+
+    if (existente) {
+      const { error: actualizarError } =
         await supabaseAdmin
-          .from(
-            "push_subscriptions"
-          )
-          .update({
-            p256dh,
-            auth,
+          .from("push_subscriptions")
+          .update(datosSuscripcion)
+          .eq("id", existente.id);
 
-            activo:
-              true,
+      if (actualizarError) {
+        console.error(
+          "Error actualizando push:",
+          actualizarError
+        );
 
-            user_agent:
-              request.headers.get(
-                "user-agent"
-              ),
-
-            updated_at:
-              new Date()
-                .toISOString(),
-          })
-          .eq(
-            "id",
-            existente.id
-          );
-
-      if (
-        actualizarError
-      ) {
         return NextResponse.json(
           {
             success: false,
-            error:
-              "No se pudo actualizar la suscripción.",
+            error: "No se pudo actualizar la suscripción.",
           },
-          {
-            status: 500,
-          }
+          { status: 500 }
         );
       }
 
       return NextResponse.json({
         success: true,
-
-        activado:
-          true,
-
+        activado: true,
         cliente: {
-          id_cliente:
-            cliente
-              .id_cliente,
-
-          nombre:
-            cliente
-              .nombre,
+          id_cliente: cliente.id_cliente,
+          nombre: cliente.nombre,
         },
       });
     }
 
-    /*
-     * MUY IMPORTANTE:
-     *
-     * Si el mismo endpoint pertenece
-     * a OTRO cliente, NO lo reasignamos
-     * silenciosamente.
-     */
-    if (
-      existente &&
-      Number(
-        existente
-          .cliente_id
-      ) !==
-        Number(
-          cliente
-            .id_cliente
-        )
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-
-          codigo:
-            "DISPOSITIVO_OTRO_CLIENTE",
-
-          error:
-            "Este dispositivo ya tiene notificaciones activadas para otro inventario VIPACK.",
-        },
-        {
-          status: 409,
-        }
-      );
-    }
-
-    /*
-     * Endpoint completamente nuevo.
-     */
-    const {
-      error:
-        insertarError,
-    } =
+    const { error: insertarError } =
       await supabaseAdmin
-        .from(
-          "push_subscriptions"
-        )
+        .from("push_subscriptions")
         .insert({
-          cliente_id:
-            Number(
-              cliente
-                .id_cliente
-            ),
-
+          cliente_id: clienteId,
           endpoint,
-
-          p256dh,
-
-          auth,
-
-          user_agent:
-            request.headers.get(
-              "user-agent"
-            ),
-
-          activo:
-            true,
-
-          updated_at:
-            new Date()
-              .toISOString(),
+          ...datosSuscripcion,
         });
 
-    if (
-      insertarError
-    ) {
+    if (insertarError) {
       console.error(
         "Error guardando push:",
         insertarError
@@ -548,34 +338,21 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-          error:
-            "No se pudo guardar la suscripción.",
+          error: "No se pudo guardar la suscripción.",
         },
-        {
-          status: 500,
-        }
+        { status: 500 }
       );
     }
 
     return NextResponse.json({
       success: true,
-
-      activado:
-        true,
-
+      activado: true,
       cliente: {
-        id_cliente:
-          cliente
-            .id_cliente,
-
-        nombre:
-          cliente
-            .nombre,
+        id_cliente: cliente.id_cliente,
+        nombre: cliente.nombre,
       },
     });
-  } catch (
-    error
-  ) {
+  } catch (error) {
     console.error(
       "Error POST push subscribe:",
       error
@@ -587,9 +364,7 @@ export async function POST(
         error:
           "Error interno al registrar las notificaciones.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
