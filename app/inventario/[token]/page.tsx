@@ -952,7 +952,7 @@ export default function InventarioClientePage() {
                         className="relative block w-full overflow-hidden bg-slate-100 text-left"
                         aria-label={`Abrir foto ${item.nombre}`}
                       >
-                        <div className="aspect-[4/3] overflow-hidden bg-slate-100">
+                        <div className="aspect-[4/3] overflow-hidden bg-white p-1">
                           <img
                             src={srcImagen(
                               item
@@ -960,7 +960,7 @@ export default function InventarioClientePage() {
                             alt={
                               item.nombre
                             }
-                            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                            className="h-full w-full object-contain object-center transition duration-300"
                             loading="lazy"
                             decoding="async"
                           />
