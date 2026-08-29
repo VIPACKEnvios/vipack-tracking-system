@@ -48,6 +48,48 @@ function urlBase64ToUint8Array(
   return outputArray;
 }
 
+
+function obtenerMensajeErrorPush(error: unknown) {
+  if (!(error instanceof Error)) {
+    return "No se pudieron activar las notificaciones.";
+  }
+
+  const nombre = error.name;
+  const detalle = error.message || "";
+
+  if (nombre === "NotAllowedError") {
+    return "Las notificaciones están bloqueadas en este navegador. Abre los permisos de vipack-envios.com y permite Notificaciones.";
+  }
+
+  if (nombre === "AbortError") {
+    return "El navegador no pudo completar el registro de notificaciones. Cierra esta página, vuelve a abrirla e inténtalo otra vez.";
+  }
+
+  if (nombre === "InvalidStateError") {
+    return "El navegador tiene una suscripción de notificaciones dañada. Recarga la página e inténtalo nuevamente.";
+  }
+
+  if (
+    nombre === "InvalidCharacterError" ||
+    nombre === "DataError"
+  ) {
+    return "La configuración de notificaciones de VIPACK no es válida. Revisa la llave VAPID pública.";
+  }
+
+  if (detalle.toLowerCase().includes("service worker")) {
+    return "No se pudo iniciar el servicio de notificaciones en este navegador. Recarga la página e inténtalo nuevamente.";
+  }
+
+  if (detalle.toLowerCase().includes("push service")) {
+    return "El servicio de notificaciones del teléfono no está disponible en este momento. Inténtalo nuevamente.";
+  }
+
+  return detalle
+    ? `No se pudieron activar las notificaciones: ${detalle}`
+    : "No se pudieron activar las notificaciones.";
+}
+
+
 export default function EnablePushNotifications({
   token,
 }: Props) {
@@ -236,9 +278,7 @@ export default function EnablePushNotifications({
 
   const activarNotificaciones =
     async () => {
-      if (
-        !soportado
-      ) {
+      if (!soportado) {
         setMensaje(
           "Este navegador no admite notificaciones push."
         );
@@ -256,9 +296,7 @@ export default function EnablePushNotifications({
         process.env
           .NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
-      if (
-        !vapidPublicKey
-      ) {
+      if (!vapidPublicKey) {
         setMensaje(
           "Falta configurar la llave pública de notificaciones."
         );
@@ -266,37 +304,42 @@ export default function EnablePushNotifications({
       }
 
       try {
-        setCargando(
-          true
-        );
-
+        setCargando(true);
         setMensaje("");
+
+        if (
+          Notification.permission ===
+          "denied"
+        ) {
+          setPermiso("denied");
+          setActivado(false);
+          setMensaje(
+            "Las notificaciones están bloqueadas en este navegador. Abre los permisos de vipack-envios.com y permite Notificaciones."
+          );
+          return;
+        }
 
         const permission =
           await Notification.requestPermission();
 
-        setPermiso(
-          permission
-        );
+        setPermiso(permission);
 
         if (
-          permission !==
-          "granted"
+          permission !== "granted"
         ) {
-          setActivado(
-            false
-          );
-
+          setActivado(false);
           setMensaje(
             "Debes permitir las notificaciones para activarlas."
           );
-
           return;
         }
 
         const registration =
           await navigator.serviceWorker.register(
-            "/sw.js"
+            "/sw.js",
+            {
+              updateViaCache: "none",
+            }
           );
 
         await navigator
@@ -308,21 +351,51 @@ export default function EnablePushNotifications({
             .pushManager
             .getSubscription();
 
-        if (
-          !subscription
-        ) {
-          subscription =
-            await registration
-              .pushManager
-              .subscribe({
-                userVisibleOnly:
-                  true,
+        if (!subscription) {
+          try {
+            subscription =
+              await registration
+                .pushManager
+                .subscribe({
+                  userVisibleOnly: true,
+                  applicationServerKey:
+                    urlBase64ToUint8Array(
+                      vapidPublicKey
+                    ),
+                });
+          } catch (subscribeError) {
+            console.error(
+              "Primer intento de suscripción push falló:",
+              subscribeError
+            );
 
-                applicationServerKey:
-                  urlBase64ToUint8Array(
-                    vapidPublicKey
-                  ),
-              });
+            const existente =
+              await registration
+                .pushManager
+                .getSubscription();
+
+            if (existente) {
+              try {
+                await existente.unsubscribe();
+              } catch (unsubscribeError) {
+                console.warn(
+                  "No se pudo limpiar la suscripción anterior:",
+                  unsubscribeError
+                );
+              }
+            }
+
+            subscription =
+              await registration
+                .pushManager
+                .subscribe({
+                  userVisibleOnly: true,
+                  applicationServerKey:
+                    urlBase64ToUint8Array(
+                      vapidPublicKey
+                    ),
+                });
+          }
         }
 
         const response =
@@ -331,24 +404,26 @@ export default function EnablePushNotifications({
               token
             )}/push/subscribe`,
             {
-              method:
-                "POST",
-
+              method: "POST",
               headers: {
                 "Content-Type":
                   "application/json",
               },
-
-              body:
-                JSON.stringify({
-                  subscription:
-                    subscription.toJSON(),
-                }),
+              body: JSON.stringify({
+                subscription:
+                  subscription.toJSON(),
+              }),
             }
           );
 
-        const result =
-          await response.json();
+        let result: any = null;
+
+        try {
+          result =
+            await response.json();
+        } catch {
+          result = null;
+        }
 
         if (
           !response.ok ||
@@ -356,47 +431,67 @@ export default function EnablePushNotifications({
         ) {
           console.error(
             "Error registrando push:",
-            result
+            {
+              status: response.status,
+              result,
+            }
           );
 
-          setActivado(
-            false
-          );
-
+          setActivado(false);
           setMensaje(
             result?.error ||
-              "No se pudieron activar las notificaciones."
+              `VIPACK no pudo registrar este dispositivo. Código ${response.status}.`
           );
-
           return;
         }
 
-        setActivado(
-          true
-        );
+        const endpoint =
+          subscription.endpoint;
 
+        const verificarResponse =
+          await fetch(
+            `/api/inventario/${encodeURIComponent(
+              token
+            )}/push/subscribe?endpoint=${encodeURIComponent(
+              endpoint
+            )}`,
+            {
+              method: "GET",
+              cache: "no-store",
+            }
+          );
+
+        const verificarResult =
+          await verificarResponse.json();
+
+        if (
+          !verificarResponse.ok ||
+          verificarResult?.activado !== true
+        ) {
+          setActivado(false);
+          setMensaje(
+            verificarResult?.error ||
+              "El dispositivo se registró, pero no pudo verificarse. Inténtalo nuevamente."
+          );
+          return;
+        }
+
+        setActivado(true);
         setMensaje(
           "Notificaciones activadas correctamente."
         );
-      } catch (
-        error
-      ) {
+      } catch (error) {
         console.error(
           "Error activando notificaciones:",
           error
         );
 
-        setActivado(
-          false
-        );
-
+        setActivado(false);
         setMensaje(
-          "No se pudieron activar las notificaciones."
+          obtenerMensajeErrorPush(error)
         );
       } finally {
-        setCargando(
-          false
-        );
+        setCargando(false);
       }
     };
 
