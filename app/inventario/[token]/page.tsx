@@ -21,9 +21,24 @@ type InventarioResponse = {
     id_cliente: number;
     nombre: string;
     carpeta: string;
+    telefono?: string | null;
+    direccion?: string | null;
+    referencia_domicilio?: string | null;
   };
   total?: number;
   inventario?: InventarioItem[];
+  error?: string;
+};
+
+type DatosClienteResponse = {
+  success: boolean;
+  cliente?: {
+    id_cliente: number;
+    nombre: string;
+    telefono: string;
+    direccion: string;
+    referencia_domicilio: string;
+  };
   error?: string;
 };
 
@@ -332,6 +347,29 @@ export default function InventarioClientePage() {
   const [limiteFotos, setLimiteFotos] =
     useState(FOTOS_POR_BLOQUE);
 
+  const [editarDatos, setEditarDatos] =
+    useState(false);
+
+  const [cargandoDatos, setCargandoDatos] =
+    useState(false);
+
+  const [guardandoDatos, setGuardandoDatos] =
+    useState(false);
+
+  const [mensajeDatos, setMensajeDatos] =
+    useState("");
+
+  const [errorDatos, setErrorDatos] =
+    useState("");
+
+  const [formDatos, setFormDatos] =
+    useState({
+      nombre: "",
+      telefono: "",
+      direccion: "",
+      referencia_domicilio: "",
+    });
+
   const inicioTouchX =
     useRef<number | null>(null);
 
@@ -606,6 +644,159 @@ export default function InventarioClientePage() {
     imagenesFiltradas.length,
   ]);
 
+  async function abrirCorreccionDatos() {
+    if (!token) return;
+
+    try {
+      setEditarDatos(true);
+      setCargandoDatos(true);
+      setMensajeDatos("");
+      setErrorDatos("");
+
+      const response = await fetch(
+        `/api/inventario/${encodeURIComponent(
+          token
+        )}/datos`,
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
+
+      const result =
+        (await response.json()) as DatosClienteResponse;
+
+      if (
+        !response.ok ||
+        !result.success ||
+        !result.cliente
+      ) {
+        throw new Error(
+          result.error ||
+            "No se pudieron cargar tus datos."
+        );
+      }
+
+      setFormDatos({
+        nombre: result.cliente.nombre || "",
+        telefono: result.cliente.telefono || "",
+        direccion: result.cliente.direccion || "",
+        referencia_domicilio:
+          result.cliente.referencia_domicilio || "",
+      });
+    } catch (error) {
+      setErrorDatos(
+        error instanceof Error
+          ? error.message
+          : "No se pudieron cargar tus datos."
+      );
+    } finally {
+      setCargandoDatos(false);
+    }
+  }
+
+  async function guardarCorreccionDatos() {
+    if (!token || guardandoDatos) return;
+
+    const nombre = formDatos.nombre.trim();
+    const telefono = formDatos.telefono.replace(
+      /\D/g,
+      ""
+    );
+    const direccion = formDatos.direccion.trim();
+    const referenciaDomicilio =
+      formDatos.referencia_domicilio.trim();
+
+    if (nombre.length < 3) {
+      setErrorDatos(
+        "Ingresa tu nombre completo."
+      );
+      return;
+    }
+
+    if (telefono.length !== 10) {
+      setErrorDatos(
+        "El teléfono debe tener 10 dígitos."
+      );
+      return;
+    }
+
+    if (!direccion) {
+      setErrorDatos(
+        "Ingresa tu dirección completa."
+      );
+      return;
+    }
+
+    if (!referenciaDomicilio) {
+      setErrorDatos(
+        "Ingresa una referencia del domicilio."
+      );
+      return;
+    }
+
+    try {
+      setGuardandoDatos(true);
+      setErrorDatos("");
+      setMensajeDatos("");
+
+      const response = await fetch(
+        `/api/inventario/${encodeURIComponent(
+          token
+        )}/datos`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            nombre,
+            telefono,
+            direccion,
+            referencia_domicilio:
+              referenciaDomicilio,
+          }),
+        }
+      );
+
+      const result =
+        (await response.json()) as DatosClienteResponse;
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.error ||
+            "No se pudieron guardar los cambios."
+        );
+      }
+
+      setMensajeDatos(
+        "Tus datos se actualizaron correctamente."
+      );
+
+      setData((actual) => {
+        if (!actual?.cliente) {
+          return actual;
+        }
+
+        return {
+          ...actual,
+          cliente: {
+            ...actual.cliente,
+            nombre,
+          },
+        };
+      });
+    } catch (error) {
+      setErrorDatos(
+        error instanceof Error
+          ? error.message
+          : "No se pudieron guardar los cambios."
+      );
+    } finally {
+      setGuardandoDatos(false);
+    }
+  }
+
   if (loading) {
     return (
       <main className="min-h-screen bg-[#f5f7fb]">
@@ -723,6 +914,14 @@ export default function InventarioClientePage() {
                       ?.nombre
                   }
                 </h2>
+
+                <button
+                  type="button"
+                  onClick={abrirCorreccionDatos}
+                  className="mt-3 inline-flex items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-black text-[#0a3183] transition hover:bg-blue-100 sm:mt-4 sm:px-4 sm:py-2.5 sm:text-sm"
+                >
+                  Corregir mis datos
+                </button>
               </div>
 
               <div className="shrink-0 text-blue-100">
@@ -1167,6 +1366,155 @@ export default function InventarioClientePage() {
           </footer>
         </section>
       </main>
+
+      {editarDatos && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Corregir datos del cliente"
+        >
+          <div className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-[26px] bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-blue-600">
+                  VIPACK Envíos
+                </p>
+                <h2 className="mt-1 text-xl font-black text-slate-900">
+                  Corregir mis datos
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setEditarDatos(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-2xl text-slate-600 transition hover:bg-slate-200"
+                aria-label="Cerrar"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-5 sm:p-6">
+              <div className="mb-5 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm font-semibold leading-6 text-slate-600">
+                Puedes corregir tu información sin crear otro cliente.
+                Tu número de cliente e inventario se conservarán.
+              </div>
+
+              {cargandoDatos ? (
+                <div className="py-12 text-center">
+                  <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-[#0a3183]" />
+                  <p className="mt-3 text-sm font-bold text-slate-500">
+                    Cargando tus datos...
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <label className="block">
+                    <span className="text-sm font-black text-slate-800">
+                      Nombre completo
+                    </span>
+                    <input
+                      type="text"
+                      value={formDatos.nombre}
+                      onChange={(event) =>
+                        setFormDatos((actual) => ({
+                          ...actual,
+                          nombre: event.target.value,
+                        }))
+                      }
+                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base font-semibold text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-black text-slate-800">
+                      Teléfono
+                    </span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      value={formDatos.telefono}
+                      onChange={(event) =>
+                        setFormDatos((actual) => ({
+                          ...actual,
+                          telefono:
+                            event.target.value.replace(
+                              /\D/g,
+                              ""
+                            ),
+                        }))
+                      }
+                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base font-semibold text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-black text-slate-800">
+                      Dirección completa
+                    </span>
+                    <textarea
+                      rows={3}
+                      value={formDatos.direccion}
+                      onChange={(event) =>
+                        setFormDatos((actual) => ({
+                          ...actual,
+                          direccion: event.target.value,
+                        }))
+                      }
+                      className="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base font-semibold text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-black text-slate-800">
+                      Referencia del domicilio
+                    </span>
+                    <textarea
+                      rows={3}
+                      value={
+                        formDatos.referencia_domicilio
+                      }
+                      onChange={(event) =>
+                        setFormDatos((actual) => ({
+                          ...actual,
+                          referencia_domicilio:
+                            event.target.value,
+                        }))
+                      }
+                      className="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base font-semibold text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
+                    />
+                  </label>
+
+                  {errorDatos && (
+                    <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                      {errorDatos}
+                    </div>
+                  )}
+
+                  {mensajeDatos && (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+                      {mensajeDatos}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={guardarCorreccionDatos}
+                    disabled={guardandoDatos}
+                    className="w-full rounded-2xl bg-[#0a3183] px-5 py-4 text-sm font-black text-white shadow-lg transition hover:bg-blue-900 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {guardandoDatos
+                      ? "Guardando cambios..."
+                      : "Guardar mis cambios"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {imagenSeleccionada &&
         fotoActiva !== null && (
