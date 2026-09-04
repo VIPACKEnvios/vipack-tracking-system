@@ -129,10 +129,12 @@ function normalizarTelefonoWhatsApp(
 }
 
 const EMOJI = {
-  saludo: "\u{1F44B}",
-  paquete: "\u{1F4E6}",
-  avion: "\u{2708}\u{FE0F}",
-  camion: "\u{1F69A}",
+  saludo: String.fromCodePoint(0x1F44B),
+  paquete: String.fromCodePoint(0x1F4E6),
+  avion:
+    String.fromCodePoint(0x2708) +
+    String.fromCodePoint(0xFE0F),
+  camion: String.fromCodePoint(0x1F69A),
 };
 
 function dinero(valor: number) {
