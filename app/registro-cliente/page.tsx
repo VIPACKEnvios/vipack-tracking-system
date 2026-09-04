@@ -92,6 +92,37 @@ export default function RegistroClientePage() {
     );
   }
 
+  function normalizarTelefonoWhatsApp(
+    valor: string
+  ) {
+    const limpio =
+      limpiarTelefono(valor);
+
+    if (!limpio) {
+      return "";
+    }
+
+    if (
+      limpio.startsWith("521") &&
+      limpio.length === 13
+    ) {
+      return limpio;
+    }
+
+    if (
+      limpio.startsWith("52") &&
+      limpio.length === 12
+    ) {
+      return `521${limpio.slice(2)}`;
+    }
+
+    if (limpio.length === 10) {
+      return `521${limpio}`;
+    }
+
+    return limpio;
+  }
+
   async function enviarFormulario(
     evento:
       FormEvent<HTMLFormElement>
@@ -109,18 +140,24 @@ export default function RegistroClientePage() {
     try {
       setEnviando(true);
 
-      const telefono =
+      const telefonoCapturado =
         limpiarTelefono(
           formulario.telefono
         );
 
       if (
-        telefono.length !== 10
+        telefonoCapturado.length !==
+        10
       ) {
         throw new Error(
           "Ingresa un número de teléfono válido de 10 dígitos."
         );
       }
+
+      const telefono =
+        normalizarTelefonoWhatsApp(
+          telefonoCapturado
+        );
 
       const response =
         await fetch(
@@ -412,21 +449,27 @@ export default function RegistroClientePage() {
                       requerido
                     />
 
-                    <Campo
-                      etiqueta="Número de teléfono / WhatsApp"
-                      nombre="telefono"
-                      valor={
-                        formulario.telefono
-                      }
-                      onChange={
-                        actualizarCampo
-                      }
-                      tipo="tel"
-                      inputMode="numeric"
-                      maxLength={10}
-                      placeholder="Ejemplo: 6641234567"
-                      requerido
-                    />
+                    <div>
+                      <Campo
+                        etiqueta="Número de teléfono / WhatsApp"
+                        nombre="telefono"
+                        valor={
+                          formulario.telefono
+                        }
+                        onChange={
+                          actualizarCampo
+                        }
+                        tipo="tel"
+                        inputMode="numeric"
+                        maxLength={10}
+                        placeholder="Ejemplo: 6641234567"
+                        requerido
+                      />
+
+                      <p className="mt-2 text-xs font-semibold text-slate-500">
+                        Escribe solo los 10 dígitos. VIPACK agregará automáticamente el prefijo 521 para WhatsApp.
+                      </p>
+                    </div>
                   </div>
                 </SeccionFormulario>
 
