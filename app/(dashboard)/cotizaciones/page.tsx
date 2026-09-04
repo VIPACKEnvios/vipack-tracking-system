@@ -128,14 +128,7 @@ function normalizarTelefonoWhatsApp(
   return limpio;
 }
 
-const EMOJI = {
-  saludo: String.fromCodePoint(0x1F44B),
-  paquete: String.fromCodePoint(0x1F4E6),
-  avion:
-    String.fromCodePoint(0x2708) +
-    String.fromCodePoint(0xFE0F),
-  camion: String.fromCodePoint(0x1F69A),
-};
+
 
 function dinero(valor: number) {
   return new Intl.NumberFormat("es-MX", {
@@ -976,9 +969,9 @@ export default function CotizacionesPage() {
     }
 
     const lineas: string[] = [
-      `Hola${cliente ? ` ${cliente}` : ""} ${EMOJI.saludo}`,
+      `Hola${cliente ? ` ${cliente}` : ""}`,
       "",
-      `Te compartimos tu cotización de VIPACK Envíos ${EMOJI.paquete}`,
+      "Te compartimos tu cotización de VIPACK Envíos",
       "",
       `Cajas: ${cajas.length}`,
       "",
@@ -1009,7 +1002,7 @@ export default function CotizacionesPage() {
 
     if (enviarAereo) {
       lineas.push(
-        `${EMOJI.avion} Aéreo: ${dinero(
+        `Aéreo: ${dinero(
           calculo.totalAereo
         )}`
       );
@@ -1017,7 +1010,7 @@ export default function CotizacionesPage() {
 
     if (enviarTerrestre) {
       lineas.push(
-        `${EMOJI.camion} Terrestre: ${dinero(
+        `Terrestre: ${dinero(
           calculo.totalTerrestre
         )}`
       );
