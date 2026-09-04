@@ -32,6 +32,17 @@ type BorradorCotizacion = {
 const CLAVE_BORRADOR_COTIZACION =
   "vipack-cotizacion-borrador-v1";
 
+
+type RegistroClienteExcel = {
+  Cliente?: unknown;
+  TelefonoWhatsApp?: unknown;
+};
+
+type ClienteBusqueda = {
+  nombre: string;
+  telefono: string;
+};
+
 const TARIFAS: Tarifa[] = [
   { tipo: "Terrestre", peso_min: 2, peso_max: 5, precio: 650 },
   { tipo: "Terrestre", peso_min: 6, peso_max: 10, precio: 950 },
@@ -66,6 +77,24 @@ const CAJA_INICIAL: Caja = {
   alto: "",
   peso: "",
 };
+
+function normalizarBusqueda(
+  valor: string
+) {
+  return valor
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("es")
+    .trim();
+}
+
+function limpiarTelefonoCliente(
+  valor: unknown
+) {
+  return String(valor ?? "")
+    .replace(/\D/g, "")
+    .trim();
+}
 
 function dinero(valor: number) {
   return new Intl.NumberFormat("es-MX", {
@@ -109,6 +138,23 @@ export default function CotizacionesPage() {
     useState("");
 
   const [
+    clientes,
+    setClientes,
+  ] = useState<ClienteBusqueda[]>(
+    []
+  );
+
+  const [
+    cargandoClientes,
+    setCargandoClientes,
+  ] = useState(true);
+
+  const [
+    mostrarResultadosClientes,
+    setMostrarResultadosClientes,
+  ] = useState(false);
+
+  const [
     borradorRestaurado,
     setBorradorRestaurado,
   ] = useState(false);
@@ -122,6 +168,112 @@ export default function CotizacionesPage() {
 
   const borradorHidratado =
     useRef(false);
+
+  useEffect(() => {
+    let cancelado = false;
+
+    async function cargarClientes() {
+      try {
+        setCargandoClientes(
+          true
+        );
+
+        const response =
+          await fetch(
+            "/api/recolecciones",
+            {
+              cache: "no-store",
+            }
+          );
+
+        const data =
+          (await response.json()) as {
+            success?: boolean;
+            registros?: RegistroClienteExcel[];
+            error?: string;
+          };
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+          throw new Error(
+            data.error ||
+              "No se pudieron cargar los clientes."
+          );
+        }
+
+        const mapa =
+          new Map<
+            string,
+            ClienteBusqueda
+          >();
+
+        for (
+          const registro of
+            data.registros || []
+        ) {
+          const nombre =
+            String(
+              registro.Cliente ??
+                ""
+            ).trim();
+
+          const telefonoCliente =
+            limpiarTelefonoCliente(
+              registro.TelefonoWhatsApp
+            );
+
+          if (!nombre) {
+            continue;
+          }
+
+          const clave =
+            `${normalizarBusqueda(
+              nombre
+            )}|${telefonoCliente}`;
+
+          if (!mapa.has(clave)) {
+            mapa.set(clave, {
+              nombre,
+              telefono:
+                telefonoCliente,
+            });
+          }
+        }
+
+        const lista = Array.from(
+          mapa.values()
+        ).sort((a, b) =>
+          a.nombre.localeCompare(
+            b.nombre,
+            "es"
+          )
+        );
+
+        if (!cancelado) {
+          setClientes(lista);
+        }
+      } catch (error) {
+        console.error(
+          "Error cargando clientes para cotizaciones:",
+          error
+        );
+      } finally {
+        if (!cancelado) {
+          setCargandoClientes(
+            false
+          );
+        }
+      }
+    }
+
+    void cargarClientes();
+
+    return () => {
+      cancelado = true;
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -236,6 +388,37 @@ export default function CotizacionesPage() {
     enviarTerrestre,
     observaciones,
   ]);
+
+  const clientesFiltrados =
+    useMemo(() => {
+      const q =
+        normalizarBusqueda(
+          cliente
+        );
+
+      if (!q) {
+        return [];
+      }
+
+      return clientes
+        .filter((item) => {
+          const nombre =
+            normalizarBusqueda(
+              item.nombre
+            );
+
+          return (
+            nombre.includes(q) ||
+            item.telefono.includes(
+              cliente.replace(
+                /\D/g,
+                ""
+              )
+            )
+          );
+        })
+        .slice(0, 8);
+    }, [cliente, clientes]);
 
   const calculo = useMemo(() => {
     const detalle = cajas.map((caja, indice) => {
@@ -586,24 +769,93 @@ export default function CotizacionesPage() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-2">
-                <label className="block">
+                <div className="relative">
                   <span className="mb-1.5 block text-xs font-bold text-slate-700 sm:mb-2 sm:text-sm">
                     Buscar cliente
                   </span>
+
                   <input
                     value={cliente}
-                    onChange={(e) =>
-                      setCliente(e.target.value)
+                    onFocus={() =>
+                      setMostrarResultadosClientes(
+                        true
+                      )
                     }
-                    placeholder="Nombre o número de cliente"
+                    onChange={(e) => {
+                      setCliente(
+                        e.target.value
+                      );
+                      setMostrarResultadosClientes(
+                        true
+                      );
+                    }}
+                    onBlur={() => {
+                      window.setTimeout(
+                        () =>
+                          setMostrarResultadosClientes(
+                            false
+                          ),
+                        150
+                      );
+                    }}
+                    placeholder="Escribe nombre o teléfono"
+                    autoComplete="off"
                     className="h-9.5 w-full sm:h-10 rounded-xl border border-slate-300 bg-white px-4 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                   />
+
+                  {mostrarResultadosClientes &&
+                    cliente.trim() &&
+                    clientesFiltrados.length >
+                      0 && (
+                      <div className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+                        {clientesFiltrados.map(
+                          (item) => (
+                            <button
+                              key={`${item.nombre}-${item.telefono}`}
+                              type="button"
+                              onMouseDown={(
+                                evento
+                              ) =>
+                                evento.preventDefault()
+                              }
+                              onClick={() => {
+                                setCliente(
+                                  item.nombre
+                                );
+                                setTelefono(
+                                  item.telefono
+                                );
+                                setMostrarResultadosClientes(
+                                  false
+                                );
+                              }}
+                              className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-blue-50"
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-black text-slate-900">
+                                  {item.nombre}
+                                </span>
+                                <span className="block text-xs text-slate-500">
+                                  {item.telefono ||
+                                    "Sin teléfono registrado"}
+                                </span>
+                              </span>
+
+                              <span className="shrink-0 text-xs font-bold text-blue-700">
+                                Seleccionar
+                              </span>
+                            </button>
+                          )
+                        )}
+                      </div>
+                    )}
+
                   <span className="mt-1.5 block text-[11px] leading-4 text-slate-400 sm:text-xs">
-                    En el siguiente paso conectaremos este
-                    buscador con
-                    control_recolecciones_bodega.xlsx.
+                    {cargandoClientes
+                      ? "Cargando clientes..."
+                      : `${clientes.length} clientes disponibles del control de recolecciones.`}
                   </span>
-                </label>
+                </div>
 
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-bold text-slate-700 sm:mb-2 sm:text-sm">
