@@ -129,10 +129,10 @@ function normalizarTelefonoWhatsApp(
 }
 
 const EMOJI = {
-  saludo: "\\u{1F44B}",
-  paquete: "\\u{1F4E6}",
-  avion: "\\u{2708}\\u{FE0F}",
-  camion: "\\u{1F69A}",
+  saludo: "\u{1F44B}",
+  paquete: "\u{1F4E6}",
+  avion: "\u{2708}\u{FE0F}",
+  camion: "\u{1F69A}",
 };
 
 function dinero(valor: number) {
