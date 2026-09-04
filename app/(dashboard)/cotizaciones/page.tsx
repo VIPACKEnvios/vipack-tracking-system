@@ -342,19 +342,19 @@ export default function CotizacionesPage() {
   }
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-slate-100 p-4 md:p-8">
-      <div className="mx-auto max-w-7xl">
-        <header className="mb-7 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+    <main className="min-h-[calc(100vh-4rem)] bg-slate-100 p-2.5 sm:p-3 md:p-5">
+      <div className="mx-auto max-w-[1500px]">
+        <header className="mb-3 sm:mb-4 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div>
             <p className="text-sm font-black uppercase tracking-[0.18em] text-cyan-700">
               Ventas y cobranza
             </p>
 
-            <h1 className="mt-2 text-3xl font-black text-slate-950 md:text-4xl">
+            <h1 className="mt-2 text-2xl font-black text-slate-950 sm:text-3xl">
               Cotizaciones
             </h1>
 
-            <p className="mt-2 max-w-3xl text-slate-600">
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-600 sm:text-sm">
               Calcula una o varias cajas de una misma
               clienta y obtén el total final del envío.
             </p>
@@ -363,27 +363,27 @@ export default function CotizacionesPage() {
           <button
             type="button"
             onClick={limpiarCotizacion}
-            className="rounded-xl border border-slate-300 bg-white px-5 py-3 font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 sm:w-auto font-bold text-slate-700 shadow-sm hover:bg-slate-50"
           >
             Nueva cotización
           </button>
         </header>
 
-        <div className="grid gap-6 xl:grid-cols-[1fr_390px]">
-          <div className="space-y-6">
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="mb-5">
+        <div className="grid gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="space-y-4 sm:space-y-5">
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+              <div className="mb-3 sm:mb-4">
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">
                   Cliente
                 </p>
-                <h2 className="mt-1 text-xl font-black text-slate-950">
+                <h2 className="mt-1 text-base font-black text-slate-950 sm:text-lg">
                   Datos de la clienta
                 </h2>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-2">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-bold text-slate-700">
+                  <span className="mb-1.5 block text-xs font-bold text-slate-700 sm:mb-2 sm:text-sm">
                     Buscar cliente
                   </span>
                   <input
@@ -392,9 +392,9 @@ export default function CotizacionesPage() {
                       setCliente(e.target.value)
                     }
                     placeholder="Nombre o número de cliente"
-                    className="h-12 w-full rounded-xl border border-slate-300 bg-white px-4 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                    className="h-9.5 w-full sm:h-10 rounded-xl border border-slate-300 bg-white px-4 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                   />
-                  <span className="mt-2 block text-xs text-slate-400">
+                  <span className="mt-1.5 block text-[11px] leading-4 text-slate-400 sm:text-xs">
                     En el siguiente paso conectaremos este
                     buscador con
                     control_recolecciones_bodega.xlsx.
@@ -402,7 +402,7 @@ export default function CotizacionesPage() {
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-bold text-slate-700">
+                  <span className="mb-1.5 block text-xs font-bold text-slate-700 sm:mb-2 sm:text-sm">
                     WhatsApp
                   </span>
                   <input
@@ -412,48 +412,48 @@ export default function CotizacionesPage() {
                     }
                     placeholder="Ej. 6641234567"
                     inputMode="tel"
-                    className="h-12 w-full rounded-xl border border-slate-300 bg-white px-4 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                    className="h-9.5 w-full sm:h-10 rounded-xl border border-slate-300 bg-white px-4 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                   />
                 </label>
               </div>
             </section>
 
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+              <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">
                     Mercancía
                   </p>
-                  <h2 className="mt-1 text-xl font-black text-slate-950">
+                  <h2 className="mt-1 text-base font-black text-slate-950 sm:text-lg">
                     Cajas del envío
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    Cada caja se cotiza por separado y
-                    después se suman para obtener el total.
+                    Cada caja se cotiza por separado y después se suman.
+                    El peso cobrable usa el mayor entre peso real y volumétrico (÷ 5000).
                   </p>
                 </div>
 
                 <button
                   type="button"
                   onClick={agregarCaja}
-                  className="rounded-xl bg-[#072c74] px-5 py-3 font-black text-white shadow-md transition hover:bg-blue-900"
+                  className="w-full rounded-xl bg-[#072c74] px-4 py-2.5 font-black text-white shadow-md transition hover:bg-blue-900 sm:w-auto sm:px-5 sm:py-3"
                 >
                   + Agregar caja
                 </button>
               </div>
 
-              <div className="mt-6 space-y-4">
+              <div className="mt-3 space-y-2 sm:mt-4 sm:space-y-2.5">
                 {calculo.detalle.map((caja) => (
                   <article
                     key={caja.id}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
+                    className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5 sm:p-4"
                   >
-                    <div className="mb-4 flex items-center justify-between gap-3">
+                    <div className="mb-2.5 flex items-center justify-between gap-2.5 sm:mb-3 sm:gap-3">
                       <div>
                         <p className="font-black text-slate-900">
                           Caja {caja.numero}
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-[11px] text-slate-500 sm:text-xs">
                           Medidas en cm · peso en kg
                         </p>
                       </div>
@@ -471,7 +471,7 @@ export default function CotizacionesPage() {
                       )}
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-4 lg:gap-2.5">
                       {[
                         ["largo", "Largo"],
                         ["ancho", "Ancho"],
@@ -507,43 +507,43 @@ export default function CotizacionesPage() {
                             type="number"
                             min="0"
                             step="0.1"
-                            className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                            className="h-9.5 w-full sm:h-10 rounded-xl border border-slate-300 bg-white px-3 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                           />
                         </label>
                       ))}
                     </div>
 
-                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="mt-2.5 grid grid-cols-3 gap-2 sm:mt-3 sm:gap-2.5">
+                      <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3">
                         <p className="text-xs font-bold uppercase text-slate-600">
                           Peso real
                         </p>
-                        <p className="mt-1 text-lg font-black text-slate-950">
+                        <p className="mt-1 text-base font-black text-slate-950 sm:text-lg">
                           {caja.pesoReal.toFixed(1)} kg
                         </p>
                       </div>
 
-                      <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+                      <div className="rounded-xl border border-violet-200 bg-violet-50 p-2.5 sm:p-3">
                         <p className="text-xs font-bold uppercase text-violet-700">
                           Peso volumétrico
                         </p>
-                        <p className="mt-1 text-lg font-black text-violet-950">
+                        <p className="mt-1 text-base font-black sm:text-lg text-violet-950">
                           {caja.pesoVolumetrico.toFixed(1)} kg
                         </p>
                       </div>
 
-                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-2.5 sm:p-3">
                         <p className="text-xs font-bold uppercase text-emerald-700">
                           Peso cobrable
                         </p>
-                        <p className="mt-1 text-lg font-black text-emerald-950">
+                        <p className="mt-1 text-base font-black sm:text-lg text-emerald-950">
                           {caja.pesoCobrable.toFixed(1)} kg
                         </p>
                       </div>
                     </div>
 
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-xl border border-sky-200 bg-sky-50 p-4">
+                    <div className="mt-2.5 grid grid-cols-2 gap-2 sm:mt-3 sm:gap-2.5">
+                      <div className="rounded-xl border border-sky-200 bg-sky-50 p-2.5 sm:p-3">
                         <p className="text-xs font-bold uppercase text-sky-700">
                           Aéreo
                         </p>
@@ -559,7 +559,7 @@ export default function CotizacionesPage() {
                         </p>
                       </div>
 
-                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 sm:p-3">
                         <p className="text-xs font-bold uppercase text-amber-700">
                           Terrestre
                         </p>
@@ -581,43 +581,43 @@ export default function CotizacionesPage() {
             </section>
           </div>
 
-          <aside className="space-y-6">
-            <section className="sticky top-24 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <aside className="space-y-4 sm:space-y-5">
+            <section className="sticky top-24 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
               <p className="text-xs font-black uppercase tracking-[0.16em] text-cyan-700">
                 Resumen
               </p>
 
-              <h2 className="mt-1 text-2xl font-black text-slate-950">
+              <h2 className="mt-1 text-lg font-black text-slate-950 sm:text-xl">
                 Total de la cotización
               </h2>
 
-              <div className="mt-5 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-slate-100 p-4">
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-2.5">
+                <div className="rounded-xl bg-slate-100 p-2.5 sm:p-3">
                   <p className="text-xs font-bold text-slate-500">
                     Cajas
                   </p>
-                  <p className="mt-1 text-2xl font-black text-slate-950">
+                  <p className="mt-1 text-lg font-black text-slate-950 sm:text-xl">
                     {cajas.length}
                   </p>
                 </div>
 
-                <div className="rounded-2xl bg-slate-100 p-4">
+                <div className="rounded-xl bg-slate-100 p-2.5 sm:p-3">
                   <p className="text-xs font-bold text-slate-500">
                     Peso total
                   </p>
-                  <p className="mt-1 text-2xl font-black text-slate-950">
+                  <p className="mt-1 text-lg font-black text-slate-950 sm:text-xl">
                     {calculo.pesoCobrableTotal.toFixed(1)} kg
                   </p>
                 </div>
               </div>
 
-              <div className="mt-5 space-y-3">
-                <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-sky-200 bg-sky-50 p-4">
+              <div className="mt-3 space-y-2 sm:mt-4 sm:space-y-2.5">
+                <label className="flex cursor-pointer items-center justify-between rounded-xl border border-sky-200 bg-sky-50 p-2.5 sm:p-3">
                   <div>
                     <p className="font-black text-sky-950">
                       ✈️ Aéreo
                     </p>
-                    <p className="mt-1 text-2xl font-black text-sky-950">
+                    <p className="mt-0.5 text-xl font-black text-sky-950 sm:mt-1 sm:text-2xl">
                       {dinero(
                         calculo.totalAereo
                       )}
@@ -636,12 +636,12 @@ export default function CotizacionesPage() {
                   />
                 </label>
 
-                <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <label className="flex cursor-pointer items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-2.5 sm:p-3">
                   <div>
                     <p className="font-black text-amber-950">
                       🚚 Terrestre
                     </p>
-                    <p className="mt-1 text-2xl font-black text-amber-950">
+                    <p className="mt-0.5 text-xl font-black text-amber-950 sm:mt-1 sm:text-2xl">
                       {dinero(
                         calculo.totalTerrestre
                       )}
@@ -669,8 +669,8 @@ export default function CotizacionesPage() {
                 </div>
               )}
 
-              <label className="mt-5 block">
-                <span className="mb-2 block text-sm font-bold text-slate-700">
+              <label className="mt-3 block sm:mt-4">
+                <span className="mb-1.5 block text-xs font-bold text-slate-700 sm:mb-2 sm:text-sm">
                   Observaciones
                 </span>
                 <textarea
@@ -680,7 +680,7 @@ export default function CotizacionesPage() {
                       e.target.value
                     )
                   }
-                  rows={3}
+                  rows={2}
                   placeholder="Opcional"
                   className="w-full rounded-xl border border-slate-300 p-3 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                 />
@@ -689,12 +689,12 @@ export default function CotizacionesPage() {
               <button
                 type="button"
                 onClick={abrirWhatsApp}
-                className="mt-5 w-full rounded-xl bg-emerald-600 px-5 py-3.5 font-black text-white shadow-lg transition hover:bg-emerald-700"
+                className="mt-3 w-full rounded-xl sm:mt-4 bg-emerald-600 px-5 py-3 font-black text-white shadow-lg transition hover:bg-emerald-700"
               >
                 Enviar cotización por WhatsApp
               </button>
 
-              <p className="mt-3 text-center text-xs text-slate-400">
+              <p className="mt-2 text-center text-[11px] leading-4 text-slate-400 sm:mt-3 sm:text-xs">
                 En el siguiente paso guardaremos la
                 cotización automáticamente en
                 control_cotizaciones.xlsx.
