@@ -138,8 +138,15 @@ export default function CotizacionesPage() {
     useState("");
 
   const [
-    clientes,
-    setClientes,
+    clientesApi,
+    setClientesApi,
+  ] = useState<ClienteBusqueda[]>(
+    []
+  );
+
+  const [
+    clientesRecolecciones,
+    setClientesRecolecciones,
   ] = useState<ClienteBusqueda[]>(
     []
   );
@@ -148,6 +155,11 @@ export default function CotizacionesPage() {
     cargandoClientes,
     setCargandoClientes,
   ] = useState(true);
+
+  const [
+    errorClientes,
+    setErrorClientes,
+  ] = useState("");
 
   const [
     mostrarResultadosClientes,
@@ -177,88 +189,222 @@ export default function CotizacionesPage() {
         setCargandoClientes(
           true
         );
+        setErrorClientes("");
 
-        const response =
-          await fetch(
-            "/api/recolecciones",
+        const [
+          respuestaClientes,
+          respuestaRecolecciones,
+        ] = await Promise.all([
+          fetch(
+            `/api/clientes?t=${Date.now()}`,
             {
               cache: "no-store",
+              headers: {
+                "Cache-Control":
+                  "no-cache",
+              },
             }
-          );
+          ),
+          fetch(
+            `/api/recolecciones?t=${Date.now()}`,
+            {
+              cache: "no-store",
+              headers: {
+                "Cache-Control":
+                  "no-cache",
+              },
+            }
+          ),
+        ]);
 
-        const data =
-          (await response.json()) as {
-            success?: boolean;
-            registros?: RegistroClienteExcel[];
-            error?: string;
-          };
+        let listaMaestra: ClienteBusqueda[] =
+          [];
 
-        if (
-          !response.ok ||
-          !data.success
-        ) {
-          throw new Error(
-            data.error ||
-              "No se pudieron cargar los clientes."
-          );
-        }
+        if (respuestaClientes.ok) {
+          const dataClientes: unknown =
+            await respuestaClientes.json();
 
-        const mapa =
-          new Map<
-            string,
-            ClienteBusqueda
-          >();
+          const raiz =
+            dataClientes as
+              | Record<
+                  string,
+                  unknown
+                >
+              | unknown[];
 
-        for (
-          const registro of
-            data.registros || []
-        ) {
-          const nombre =
-            String(
-              registro.Cliente ??
-                ""
-            ).trim();
+          const filas =
+            Array.isArray(raiz)
+              ? raiz
+              : Array.isArray(
+                    raiz?.clientes
+                  )
+                ? raiz.clientes
+                : Array.isArray(
+                      raiz?.registros
+                    )
+                  ? raiz.registros
+                  : Array.isArray(
+                        raiz?.data
+                      )
+                    ? raiz.data
+                    : [];
 
-          const telefonoCliente =
-            limpiarTelefonoCliente(
-              registro.TelefonoWhatsApp
-            );
+          const mapa =
+            new Map<
+              string,
+              ClienteBusqueda
+            >();
 
-          if (!nombre) {
-            continue;
-          }
+          for (const fila of filas) {
+            if (
+              !fila ||
+              typeof fila !== "object"
+            ) {
+              continue;
+            }
 
-          const clave =
-            `${normalizarBusqueda(
-              nombre
-            )}|${telefonoCliente}`;
+            const item =
+              fila as Record<
+                string,
+                unknown
+              >;
 
-          if (!mapa.has(clave)) {
-            mapa.set(clave, {
+            const nombre =
+              String(
+                item.nombre ??
+                  item.Nombre ??
+                  item.name ??
+                  item.cliente ??
+                  item.Cliente ??
+                  item.razonSocial ??
+                  item.razon_social ??
+                  ""
+              ).trim();
+
+            if (!nombre) {
+              continue;
+            }
+
+            const telefonoCliente =
+              limpiarTelefonoCliente(
+                item.telefono ??
+                  item.Telefono ??
+                  item["Teléfono"] ??
+                  item.whatsapp ??
+                  item.WhatsApp ??
+                  item.telefonoWhatsApp ??
+                  item.TelefonoWhatsApp
+              );
+
+            const key =
+              normalizarBusqueda(
+                nombre
+              );
+
+            const actual =
+              mapa.get(key);
+
+            mapa.set(key, {
               nombre,
               telefono:
-                telefonoCliente,
+                telefonoCliente ||
+                actual?.telefono ||
+                "",
             });
           }
+
+          listaMaestra =
+            Array.from(
+              mapa.values()
+            );
         }
 
-        const lista = Array.from(
-          mapa.values()
-        ).sort((a, b) =>
-          a.nombre.localeCompare(
-            b.nombre,
-            "es"
-          )
-        );
+        let listaRecolecciones: ClienteBusqueda[] =
+          [];
+
+        if (respuestaRecolecciones.ok) {
+          const dataRecolecciones =
+            (await respuestaRecolecciones.json()) as {
+              success?: boolean;
+              registros?: RegistroClienteExcel[];
+            };
+
+          const mapa =
+            new Map<
+              string,
+              ClienteBusqueda
+            >();
+
+          for (
+            const registro of
+              dataRecolecciones.registros ||
+              []
+          ) {
+            const nombre =
+              String(
+                registro.Cliente ??
+                  ""
+              ).trim();
+
+            if (!nombre) {
+              continue;
+            }
+
+            const telefonoCliente =
+              limpiarTelefonoCliente(
+                registro.TelefonoWhatsApp
+              );
+
+            const key =
+              normalizarBusqueda(
+                nombre
+              );
+
+            const actual =
+              mapa.get(key);
+
+            mapa.set(key, {
+              nombre,
+              telefono:
+                telefonoCliente ||
+                actual?.telefono ||
+                "",
+            });
+          }
+
+          listaRecolecciones =
+            Array.from(
+              mapa.values()
+            );
+        }
 
         if (!cancelado) {
-          setClientes(lista);
+          setClientesApi(
+            listaMaestra
+          );
+          setClientesRecolecciones(
+            listaRecolecciones
+          );
+
+          if (
+            listaMaestra.length === 0
+          ) {
+            setErrorClientes(
+              "No se pudo cargar el catálogo maestro; se están mostrando los clientes encontrados en recolecciones."
+            );
+          }
         }
       } catch (error) {
         console.error(
           "Error cargando clientes para cotizaciones:",
           error
         );
+
+        if (!cancelado) {
+          setErrorClientes(
+            "No se pudo cargar el catálogo completo de clientes."
+          );
+        }
       } finally {
         if (!cancelado) {
           setCargandoClientes(
@@ -274,6 +420,54 @@ export default function CotizacionesPage() {
       cancelado = true;
     };
   }, []);
+
+  const clientes = useMemo(() => {
+    const mapa =
+      new Map<
+        string,
+        ClienteBusqueda
+      >();
+
+    for (const item of [
+      ...clientesRecolecciones,
+      ...clientesApi,
+    ]) {
+      const key =
+        normalizarBusqueda(
+          item.nombre
+        );
+
+      if (!key) {
+        continue;
+      }
+
+      const actual =
+        mapa.get(key);
+
+      mapa.set(key, {
+        nombre: item.nombre.trim(),
+        telefono:
+          item.telefono.trim() ||
+          actual?.telefono ||
+          "",
+      });
+    }
+
+    return Array.from(
+      mapa.values()
+    ).sort((a, b) =>
+      a.nombre.localeCompare(
+        b.nombre,
+        "es",
+        {
+          sensitivity: "base",
+        }
+      )
+    );
+  }, [
+    clientesApi,
+    clientesRecolecciones,
+  ]);
 
   useEffect(() => {
     try {
@@ -396,8 +590,17 @@ export default function CotizacionesPage() {
           cliente
         );
 
-      if (!q) {
-        return [];
+      const telefonoBuscado =
+        cliente.replace(
+          /\D/g,
+          ""
+        );
+
+      if (!q && !telefonoBuscado) {
+        return clientes.slice(
+          0,
+          20
+        );
       }
 
       return clientes
@@ -409,15 +612,15 @@ export default function CotizacionesPage() {
 
           return (
             nombre.includes(q) ||
-            item.telefono.includes(
-              cliente.replace(
-                /\D/g,
-                ""
-              )
+            Boolean(
+              telefonoBuscado &&
+                item.telefono.includes(
+                  telefonoBuscado
+                )
             )
           );
         })
-        .slice(0, 8);
+        .slice(0, 20);
     }, [cliente, clientes]);
 
   const calculo = useMemo(() => {
@@ -804,7 +1007,6 @@ export default function CotizacionesPage() {
                   />
 
                   {mostrarResultadosClientes &&
-                    cliente.trim() &&
                     clientesFiltrados.length >
                       0 && (
                       <div className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
@@ -850,11 +1052,27 @@ export default function CotizacionesPage() {
                       </div>
                     )}
 
-                  <span className="mt-1.5 block text-[11px] leading-4 text-slate-400 sm:text-xs">
-                    {cargandoClientes
-                      ? "Cargando clientes..."
-                      : `${clientes.length} clientes disponibles del control de recolecciones.`}
-                  </span>
+                  <div className="mt-1.5 text-[11px] leading-4 sm:text-xs">
+                    <span className="text-slate-400">
+                      {cargandoClientes
+                        ? "Cargando catálogo completo de clientes..."
+                        : `${clientes.length} clientes disponibles`}
+                    </span>
+
+                    {!cargandoClientes &&
+                      clientesApi.length >
+                        0 && (
+                        <span className="ml-1 font-semibold text-emerald-700">
+                          · catálogo maestro conectado
+                        </span>
+                      )}
+
+                    {errorClientes && (
+                      <p className="mt-1 font-semibold text-amber-700">
+                        {errorClientes}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <label className="block">
