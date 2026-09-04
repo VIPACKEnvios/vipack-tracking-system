@@ -96,6 +96,45 @@ function limpiarTelefonoCliente(
     .trim();
 }
 
+
+function normalizarTelefonoWhatsApp(
+  valor: unknown
+) {
+  const limpio =
+    limpiarTelefonoCliente(valor);
+
+  if (!limpio) {
+    return "";
+  }
+
+  if (
+    limpio.startsWith("521") &&
+    limpio.length === 13
+  ) {
+    return limpio;
+  }
+
+  if (
+    limpio.startsWith("52") &&
+    limpio.length === 12
+  ) {
+    return `521${limpio.slice(2)}`;
+  }
+
+  if (limpio.length === 10) {
+    return `521${limpio}`;
+  }
+
+  return limpio;
+}
+
+const EMOJI = {
+  saludo: "\\u{1F44B}",
+  paquete: "\\u{1F4E6}",
+  avion: "\\u{2708}\\u{FE0F}",
+  camion: "\\u{1F69A}",
+};
+
 function dinero(valor: number) {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
@@ -136,6 +175,16 @@ export default function CotizacionesPage() {
     useState(true);
   const [observaciones, setObservaciones] =
     useState("");
+
+  const [
+    guardandoCotizacion,
+    setGuardandoCotizacion,
+  ] = useState(false);
+
+  const [
+    ultimoFolioCotizacion,
+    setUltimoFolioCotizacion,
+  ] = useState("");
 
   const [
     clientesApi,
@@ -286,7 +335,7 @@ export default function CotizacionesPage() {
             }
 
             const telefonoCliente =
-              limpiarTelefonoCliente(
+              normalizarTelefonoWhatsApp(
                 item.telefono ??
                   item.Telefono ??
                   item["Teléfono"] ??
@@ -351,7 +400,7 @@ export default function CotizacionesPage() {
             }
 
             const telefonoCliente =
-              limpiarTelefonoCliente(
+              normalizarTelefonoWhatsApp(
                 registro.TelefonoWhatsApp
               );
 
@@ -780,17 +829,23 @@ export default function CotizacionesPage() {
     }
   }
 
-  function abrirWhatsApp() {
-    const numero = telefono.replace(/\D/g, "");
+  async function abrirWhatsApp() {
+    const numero =
+      normalizarTelefonoWhatsApp(
+        telefono
+      );
 
     if (!numero) {
       window.alert(
-        "Selecciona o captura el teléfono del cliente."
+        "Selecciona o captura un teléfono válido."
       );
       return;
     }
 
-    if (!enviarAereo && !enviarTerrestre) {
+    if (
+      !enviarAereo &&
+      !enviarTerrestre
+    ) {
       window.alert(
         "Selecciona Aéreo, Terrestre o ambos."
       );
@@ -799,7 +854,8 @@ export default function CotizacionesPage() {
 
     if (
       calculo.detalle.some(
-        (caja) => caja.pesoReal <= 0
+        (caja) =>
+          caja.pesoReal <= 0
       )
     ) {
       window.alert(
@@ -808,19 +864,122 @@ export default function CotizacionesPage() {
       return;
     }
 
-    if (calculo.cajasSinTarifa > 0) {
+    if (
+      calculo.cajasSinTarifa > 0
+    ) {
       window.alert(
         "Hay cajas sin tarifa disponible. Revisa el peso antes de enviar."
       );
       return;
     }
 
-    const lineas = [
-      `Hola${cliente ? ` ${cliente}` : ""} 👋`,
+    if (guardandoCotizacion) {
+      return;
+    }
+
+    let folioGuardado = "";
+
+    try {
+      setGuardandoCotizacion(
+        true
+      );
+
+      const response =
+        await fetch(
+          "/api/cotizaciones",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body:
+              JSON.stringify({
+                cliente:
+                  cliente.trim(),
+                telefono: numero,
+                cajas:
+                  calculo.detalle.map(
+                    (caja) => ({
+                      numero:
+                        caja.numero,
+                      largo:
+                        caja.largo,
+                      ancho:
+                        caja.ancho,
+                      alto:
+                        caja.alto,
+                      pesoReal:
+                        caja.pesoReal,
+                      pesoVolumetrico:
+                        caja.pesoVolumetrico,
+                      pesoCobrable:
+                        caja.pesoCobrable,
+                      precioAereo:
+                        caja.tarifaAerea
+                          ?.precio ??
+                        null,
+                      precioTerrestre:
+                        caja.tarifaTerrestre
+                          ?.precio ??
+                        null,
+                    })
+                  ),
+                totalAereo:
+                  calculo.totalAereo,
+                totalTerrestre:
+                  calculo.totalTerrestre,
+                enviarAereo,
+                enviarTerrestre,
+                observaciones:
+                  observaciones.trim(),
+              }),
+          }
+        );
+
+      const data =
+        (await response.json()) as {
+          success?: boolean;
+          folio?: string;
+          error?: string;
+        };
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        throw new Error(
+          data.error ||
+            "No se pudo guardar la cotización en Excel."
+        );
+      }
+
+      folioGuardado =
+        data.folio || "";
+
+      setUltimoFolioCotizacion(
+        folioGuardado
+      );
+    } catch (error) {
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "No se pudo guardar la cotización en Excel."
+      );
+      return;
+    } finally {
+      setGuardandoCotizacion(
+        false
+      );
+    }
+
+    const lineas: string[] = [
+      `Hola${cliente ? ` ${cliente}` : ""} ${EMOJI.saludo}`,
       "",
-      "Te compartimos tu cotización de VIPACK Envíos 📦",
+      `Te compartimos tu cotización de VIPACK Envíos ${EMOJI.paquete}`,
       "",
       `Cajas: ${cajas.length}`,
+      "",
       `Peso real total: ${calculo.pesoRealTotal.toFixed(
         1
       )} kg`,
@@ -830,29 +989,25 @@ export default function CotizacionesPage() {
       "",
     ];
 
-    calculo.detalle.forEach((caja) => {
-      lineas.push(
-        `Caja ${caja.numero}: real ${caja.pesoReal.toFixed(
-          1
-        )} kg · volumétrico ${caja.pesoVolumetrico.toFixed(
-          1
-        )} kg · cobrable ${caja.pesoCobrable.toFixed(
-          1
-        )} kg${
-          caja.largo &&
-          caja.ancho &&
-          caja.alto
-            ? ` · ${caja.largo}×${caja.ancho}×${caja.alto} cm`
-            : ""
-        }`
-      );
-    });
+    calculo.detalle.forEach(
+      (caja) => {
+        lineas.push(
+          `Caja ${caja.numero}: real ${caja.pesoReal.toFixed(
+            1
+          )} kg · volumétrico ${caja.pesoVolumetrico.toFixed(
+            1
+          )} kg · cobrable ${caja.pesoCobrable.toFixed(
+            1
+          )} kg · ${caja.largo}×${caja.ancho}×${caja.alto} cm`
+        );
+      }
+    );
 
     lineas.push("");
 
     if (enviarAereo) {
       lineas.push(
-        `✈️ Aéreo: ${dinero(
+        `${EMOJI.avion} Aéreo: ${dinero(
           calculo.totalAereo
         )}`
       );
@@ -860,14 +1015,26 @@ export default function CotizacionesPage() {
 
     if (enviarTerrestre) {
       lineas.push(
-        `🚚 Terrestre: ${dinero(
+        `${EMOJI.camion} Terrestre: ${dinero(
           calculo.totalTerrestre
         )}`
       );
     }
 
-    if (observaciones.trim()) {
-      lineas.push("", observaciones.trim());
+    if (
+      observaciones.trim()
+    ) {
+      lineas.push(
+        "",
+        `Observaciones: ${observaciones.trim()}`
+      );
+    }
+
+    if (folioGuardado) {
+      lineas.push(
+        "",
+        `Folio VIPACK: ${folioGuardado}`
+      );
     }
 
     lineas.push(
@@ -875,12 +1042,16 @@ export default function CotizacionesPage() {
       "Quedamos pendientes de tu confirmación."
     );
 
-    const texto = encodeURIComponent(
-      lineas.join("\n")
-    );
+    const mensaje =
+      lineas.join("\n");
+
+    const url =
+      `https://wa.me/${numero}?text=${encodeURIComponent(
+        mensaje
+      )}`;
 
     window.open(
-      `https://wa.me/${numero}?text=${texto}`,
+      url,
       "_blank",
       "noopener,noreferrer"
     );
