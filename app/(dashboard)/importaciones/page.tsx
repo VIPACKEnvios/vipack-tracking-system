@@ -1,11 +1,10 @@
-
+'use client';
 
 import * as XLSX from "xlsx";
-import {
+import { useMemo, useState } from "react";
+import type {
   ChangeEvent,
   DragEvent,
-  useMemo,
-  useState,
 } from "react";
 
 type RegistroBazar = {
