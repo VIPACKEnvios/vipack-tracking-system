@@ -1,4 +1,4 @@
-"use client";
+
 
 import * as XLSX from "xlsx";
 import {
@@ -55,9 +55,84 @@ type RespuestaImportacion = {
   error?: string;
 };
 
-const COLUMNAS_REQUERIDAS = [
-  "nombre_bazar",
-  "estado",
+const ALIAS_COLUMNAS: Record<keyof RegistroBazar, string[]> = {
+  nombre_responsable: [
+    "nombre_responsable",
+    "nombre completo",
+    "nombre",
+    "responsable",
+  ],
+  telefono: [
+    "telefono",
+    "número de teléfono",
+    "numero de telefono",
+    "teléfono",
+    "celular",
+  ],
+  direccion: [
+    "direccion",
+    "dirección",
+    "dirección completa",
+    "direccion completa",
+  ],
+  nombre_bazar: [
+    "nombre_bazar",
+    "nombre del negocio o emprendimiento",
+    "nombre del negocio",
+    "negocio",
+    "bazar",
+  ],
+  correo: [
+    "correo",
+    "correo electrónico1",
+    "correo electronico1",
+    "correo electrónico",
+    "correo electronico",
+    "email",
+  ],
+  productos: [
+    "productos",
+    "¿qué productos vende?",
+    "que productos vende",
+  ],
+  facebook: [
+    "facebook",
+    "facebook del negocio",
+  ],
+  referencia_1_nombre: [
+    "referencia_1_nombre",
+    "1era referencia nombre",
+  ],
+  referencia_1_telefono: [
+    "referencia_1_telefono",
+    "1era referencia telefono",
+  ],
+  referencia_2_nombre: [
+    "referencia_2_nombre",
+    "2da referencia nombre",
+  ],
+  referencia_2_telefono: [
+    "referencia_2_telefono",
+    "2da referencia telefono",
+  ],
+  estado: [
+    "estado",
+    "estatus",
+  ],
+  observaciones: [
+    "observaciones",
+    "notas",
+  ],
+};
+
+const ENCABEZADOS_REFERENCIA_1 = [
+  "por favor, proporciona 1era referencia personales o comerciales. (nombre y núm. de teléfono)",
+  "por favor proporciona 1era referencia personales o comerciales nombre y num de telefono",
+];
+
+const ENCABEZADOS_REFERENCIA_2 = [
+  "por favor, proporciona 2da referencia personales o comerciales. (nombre y núm. de teléfono)",
+  "por favor proporciona 2da referencia personales o comerciales nombre y num de telefono",
 ];
 
 export default function ImportacionesPage() {
@@ -188,20 +263,19 @@ export default function ImportacionesPage() {
         );
       }
 
-      const encabezados =
-        Object.keys(filas[0]);
+      const tieneColumnaBazar = Object.keys(
+        filas[0]
+      ).some((encabezado) =>
+        ALIAS_COLUMNAS.nombre_bazar.some(
+          (alias) =>
+            normalizarEncabezado(encabezado) ===
+            normalizarEncabezado(alias)
+        )
+      );
 
-      const columnasFaltantes =
-        COLUMNAS_REQUERIDAS.filter(
-          (columna) =>
-            !encabezados.includes(columna)
-        );
-
-      if (columnasFaltantes.length > 0) {
+      if (!tieneColumnaBazar) {
         throw new Error(
-          `Faltan estas columnas obligatorias: ${columnasFaltantes.join(
-            ", "
-          )}.`
+          'No encontré la columna del nombre del bazar. Se acepta "nombre_bazar" o "Nombre del negocio o emprendimiento".'
         );
       }
 
@@ -391,16 +465,6 @@ export default function ImportacionesPage() {
                   </p>
                 </div>
               </button>
-
-              <OpcionProximamente
-                icono="👥"
-                titulo="Clientes"
-              />
-
-              <OpcionProximamente
-                icono="📦"
-                titulo="Productos"
-              />
 
               <OpcionProximamente
                 icono="🏷️"
@@ -743,60 +807,172 @@ export default function ImportacionesPage() {
 function convertirRegistro(
   fila: Record<string, unknown>
 ): RegistroBazar {
+  const referencia1 = obtenerValorPorAlias(
+    fila,
+    ENCABEZADOS_REFERENCIA_1
+  );
+
+  const referencia2 = obtenerValorPorAlias(
+    fila,
+    ENCABEZADOS_REFERENCIA_2
+  );
+
+  const referencia1Separada =
+    separarReferencia(referencia1);
+
+  const referencia2Separada =
+    separarReferencia(referencia2);
+
   return {
-    nombre_responsable: limpiarValor(
-      fila.nombre_responsable
+    nombre_responsable: obtenerValorCampo(
+      fila,
+      "nombre_responsable"
     ),
 
     telefono: limpiarTelefono(
-      fila.telefono
+      obtenerValorCampo(fila, "telefono")
     ),
 
-    direccion: limpiarValor(
-      fila.direccion
+    direccion: obtenerValorCampo(
+      fila,
+      "direccion"
     ),
 
-    nombre_bazar: limpiarValor(
-      fila.nombre_bazar
+    nombre_bazar: obtenerValorCampo(
+      fila,
+      "nombre_bazar"
     ),
 
-    correo: limpiarValor(fila.correo)
-      .toLowerCase(),
+    correo: obtenerValorCampo(
+      fila,
+      "correo"
+    ).toLowerCase(),
 
-    productos: limpiarValor(
-      fila.productos
+    productos: obtenerValorCampo(
+      fila,
+      "productos"
     ),
 
-    facebook: limpiarValor(
-      fila.facebook
+    facebook: obtenerValorCampo(
+      fila,
+      "facebook"
     ),
 
-    referencia_1_nombre: limpiarValor(
-      fila.referencia_1_nombre
-    ),
+    referencia_1_nombre:
+      obtenerValorCampo(
+        fila,
+        "referencia_1_nombre"
+      ) || referencia1Separada.nombre,
 
     referencia_1_telefono:
       limpiarTelefono(
-        fila.referencia_1_telefono
+        obtenerValorCampo(
+          fila,
+          "referencia_1_telefono"
+        ) || referencia1Separada.telefono
       ),
 
-    referencia_2_nombre: limpiarValor(
-      fila.referencia_2_nombre
-    ),
+    referencia_2_nombre:
+      obtenerValorCampo(
+        fila,
+        "referencia_2_nombre"
+      ) || referencia2Separada.nombre,
 
     referencia_2_telefono:
       limpiarTelefono(
-        fila.referencia_2_telefono
+        obtenerValorCampo(
+          fila,
+          "referencia_2_telefono"
+        ) || referencia2Separada.telefono
       ),
 
     estado:
-      limpiarValor(fila.estado) ||
+      obtenerValorCampo(fila, "estado") ||
       "activo",
 
-    observaciones: limpiarValor(
-      fila.observaciones
+    observaciones: obtenerValorCampo(
+      fila,
+      "observaciones"
     ),
   };
+}
+
+function obtenerValorCampo(
+  fila: Record<string, unknown>,
+  campo: keyof RegistroBazar
+) {
+  return obtenerValorPorAlias(
+    fila,
+    ALIAS_COLUMNAS[campo]
+  );
+}
+
+function obtenerValorPorAlias(
+  fila: Record<string, unknown>,
+  aliases: string[]
+) {
+  const entradas = Object.entries(fila);
+
+  for (const alias of aliases) {
+    const aliasNormalizado =
+      normalizarEncabezado(alias);
+
+    const coincidencia = entradas.find(
+      ([encabezado]) =>
+        normalizarEncabezado(encabezado) ===
+        aliasNormalizado
+    );
+
+    if (coincidencia) {
+      return limpiarValor(coincidencia[1]);
+    }
+  }
+
+  return "";
+}
+
+function separarReferencia(valor: string) {
+  const limpio = limpiarValor(valor);
+
+  if (!limpio) {
+    return {
+      nombre: "",
+      telefono: "",
+    };
+  }
+
+  const telefonos =
+    limpio.match(/\+?\d[\d\s().-]{6,}\d/g) ||
+    [];
+
+  const telefono = telefonos[0]
+    ? limpiarTelefono(telefonos[0])
+    : "";
+
+  const nombre = limpiarValor(
+    telefonos[0]
+      ? limpio.replace(telefonos[0], "")
+      : limpio
+  )
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[,;:\-\s]+|[,;:\-\s]+$/g, "");
+
+  return {
+    nombre,
+    telefono,
+  };
+}
+
+function normalizarEncabezado(valor: string) {
+  return String(valor ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[\u00a0]/g, " ")
+    .replace(/[¿?]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 function limpiarValor(valor: unknown) {
@@ -921,4 +1097,3 @@ function ResultadoBadge({
     </span>
   );
 }
-2
