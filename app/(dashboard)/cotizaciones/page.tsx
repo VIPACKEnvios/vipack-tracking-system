@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type TipoServicio = "Aereo" | "Terrestre";
 
@@ -18,6 +18,19 @@ type Caja = {
   alto: string;
   peso: string;
 };
+
+type BorradorCotizacion = {
+  cliente: string;
+  telefono: string;
+  cajas: Caja[];
+  enviarAereo: boolean;
+  enviarTerrestre: boolean;
+  observaciones: string;
+  guardadoEn: string;
+};
+
+const CLAVE_BORRADOR_COTIZACION =
+  "vipack-cotizacion-borrador-v1";
 
 const TARIFAS: Tarifa[] = [
   { tipo: "Terrestre", peso_min: 2, peso_max: 5, precio: 650 },
@@ -94,6 +107,135 @@ export default function CotizacionesPage() {
     useState(true);
   const [observaciones, setObservaciones] =
     useState("");
+
+  const [
+    borradorRestaurado,
+    setBorradorRestaurado,
+  ] = useState(false);
+
+  const [
+    ultimoGuardado,
+    setUltimoGuardado,
+  ] = useState<string | null>(
+    null
+  );
+
+  const borradorHidratado =
+    useRef(false);
+
+  useEffect(() => {
+    try {
+      const guardado =
+        window.localStorage.getItem(
+          CLAVE_BORRADOR_COTIZACION
+        );
+
+      if (guardado) {
+        const borrador =
+          JSON.parse(
+            guardado
+          ) as BorradorCotizacion;
+
+        setCliente(
+          borrador.cliente || ""
+        );
+        setTelefono(
+          borrador.telefono || ""
+        );
+        setCajas(
+          Array.isArray(
+            borrador.cajas
+          ) &&
+            borrador.cajas.length >
+              0
+            ? borrador.cajas
+            : [CAJA_INICIAL]
+        );
+        setEnviarAereo(
+          borrador.enviarAereo ??
+            true
+        );
+        setEnviarTerrestre(
+          borrador.enviarTerrestre ??
+            true
+        );
+        setObservaciones(
+          borrador.observaciones ||
+            ""
+        );
+        setUltimoGuardado(
+          borrador.guardadoEn ||
+            null
+        );
+        setBorradorRestaurado(
+          true
+        );
+      }
+    } catch (error) {
+      console.error(
+        "No fue posible restaurar el borrador de cotización:",
+        error
+      );
+    } finally {
+      borradorHidratado.current =
+        true;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (
+      !borradorHidratado.current
+    ) {
+      return;
+    }
+
+    const temporizador =
+      window.setTimeout(() => {
+        try {
+          const guardadoEn =
+            new Date().toISOString();
+
+          const borrador: BorradorCotizacion =
+            {
+              cliente,
+              telefono,
+              cajas,
+              enviarAereo,
+              enviarTerrestre,
+              observaciones,
+              guardadoEn,
+            };
+
+          window.localStorage.setItem(
+            CLAVE_BORRADOR_COTIZACION,
+            JSON.stringify(
+              borrador
+            )
+          );
+
+          setUltimoGuardado(
+            guardadoEn
+          );
+        } catch (error) {
+          console.error(
+            "No fue posible guardar el borrador de cotización:",
+            error
+          );
+        }
+      }, 350);
+
+    return () =>
+      window.clearTimeout(
+        temporizador
+      );
+  }, [
+    cliente,
+    telefono,
+    cajas,
+    enviarAereo,
+    enviarTerrestre,
+    observaciones,
+  ]);
 
   const calculo = useMemo(() => {
     const detalle = cajas.map((caja, indice) => {
@@ -233,6 +375,23 @@ export default function CotizacionesPage() {
     setEnviarAereo(true);
     setEnviarTerrestre(true);
     setObservaciones("");
+    setBorradorRestaurado(
+      false
+    );
+    setUltimoGuardado(
+      null
+    );
+
+    try {
+      window.localStorage.removeItem(
+        CLAVE_BORRADOR_COTIZACION
+      );
+    } catch (error) {
+      console.error(
+        "No fue posible borrar el borrador de cotización:",
+        error
+      );
+    }
   }
 
   function abrirWhatsApp() {
@@ -358,11 +517,56 @@ export default function CotizacionesPage() {
               Calcula una o varias cajas de una misma
               clienta y obtén el total final del envío.
             </p>
+
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-200 sm:text-[11px]">
+                Guardado automático
+              </span>
+
+              {borradorRestaurado && (
+                <span className="text-[10px] font-bold text-blue-700 sm:text-[11px]">
+                  Borrador recuperado
+                </span>
+              )}
+
+              {ultimoGuardado && (
+                <span className="text-[10px] text-slate-400 sm:text-[11px]">
+                  Protegido ante recarga
+                </span>
+              )}
+            </div>
           </div>
 
           <button
             type="button"
-            onClick={limpiarCotizacion}
+            onClick={() => {
+              const hayDatos =
+                Boolean(
+                  cliente.trim() ||
+                    telefono.trim() ||
+                    observaciones.trim()
+                ) ||
+                cajas.some(
+                  (caja) =>
+                    Boolean(
+                      caja.largo ||
+                        caja.ancho ||
+                        caja.alto ||
+                        caja.peso
+                    )
+                );
+
+              if (
+                hayDatos &&
+                !window.confirm(
+                  "¿Quieres borrar la cotización actual y empezar una nueva?"
+                )
+              ) {
+                return;
+              }
+
+              limpiarCotizacion();
+            }}
             className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 sm:w-auto font-bold text-slate-700 shadow-sm hover:bg-slate-50"
           >
             Nueva cotización

@@ -58,6 +58,22 @@ type ClienteOption = {
   telefono: string;
 };
 
+type BorradorRecoleccion = {
+  cliente: string;
+  telefono: string;
+  bodega: string;
+  direccion: string;
+  mercancia: string;
+  cantidad: string;
+  fechaRecoleccion: string;
+  horaCita: string;
+  observaciones: string;
+  guardadoEn: string;
+};
+
+const CLAVE_BORRADOR_RECOLECCION =
+  "vipack-recoleccion-borrador-v1";
+
 type RespuestaApi = {
   success: boolean;
   registros?: RegistroExcel[];
@@ -608,8 +624,33 @@ export default function RecoleccionesPage() {
     Record<string, ResumenEvidenciaFila>
   >({});
 
+  // Detecta móvil para NO renderizar también la lista de escritorio
+  // detrás de la vista móvil. Esto reduce mucho memoria y trabajo de Chrome.
+  const [esMovil, setEsMovil] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia(
+      "(max-width: 767px)"
+    );
+
+    const actualizar = () =>
+      setEsMovil(media.matches);
+
+    actualizar();
+    media.addEventListener(
+      "change",
+      actualizar
+    );
+
+    return () =>
+      media.removeEventListener(
+        "change",
+        actualizar
+      );
+  }, []);
+
   // Límites de render para proteger especialmente Chrome móvil.
-  const [limiteMovil, setLimiteMovil] = useState(40);
+  const [limiteMovil, setLimiteMovil] = useState(24);
   const [limiteDesktop, setLimiteDesktop] = useState(120);
 
   const [
@@ -1081,17 +1122,37 @@ export default function RecoleccionesPage() {
     ]);
 
   const desktopMostrado = useMemo(
-    () => desktop.slice(0, limiteDesktop),
-    [desktop, limiteDesktop]
+    () =>
+      esMovil
+        ? []
+        : desktop.slice(
+            0,
+            limiteDesktop
+          ),
+    [
+      desktop,
+      limiteDesktop,
+      esMovil,
+    ]
   );
 
   const movilMostrado = useMemo(
-    () => movil.slice(0, limiteMovil),
-    [movil, limiteMovil]
+    () =>
+      esMovil
+        ? movil.slice(
+            0,
+            limiteMovil
+          )
+        : [],
+    [
+      movil,
+      limiteMovil,
+      esMovil,
+    ]
   );
 
   useEffect(() => {
-    setLimiteMovil(40);
+    setLimiteMovil(24);
   }, [busqueda, filtroMovil, vistaMovil]);
 
   useEffect(() => {
@@ -1108,7 +1169,7 @@ export default function RecoleccionesPage() {
         ? movilMostrado
         : desktopMostrado
     )
-      .slice(0, 24)
+      .slice(0, 12)
       .filter(
         (item) =>
           Boolean(item.folio) &&
@@ -1121,7 +1182,7 @@ export default function RecoleccionesPage() {
     let cancelado = false;
 
     async function cargarResumenes() {
-      const lote = 3;
+      const lote = 2;
       const acumulados: Array<{
         folio: string;
         notas: number;
@@ -2323,6 +2384,143 @@ function FormularioNuevaRecoleccion({
   ] = useState("");
 
   const [
+    borradorRestaurado,
+    setBorradorRestaurado,
+  ] = useState(false);
+
+  const [
+    ultimoGuardado,
+    setUltimoGuardado,
+  ] = useState<string | null>(
+    null
+  );
+
+  const borradorHidratado =
+    useRef(false);
+
+  useEffect(() => {
+    try {
+      const guardado =
+        window.localStorage.getItem(
+          CLAVE_BORRADOR_RECOLECCION
+        );
+
+      if (guardado) {
+        const borrador =
+          JSON.parse(
+            guardado
+          ) as BorradorRecoleccion;
+
+        setCliente(
+          borrador.cliente || ""
+        );
+        setTelefono(
+          borrador.telefono || ""
+        );
+        setBodega(
+          borrador.bodega || ""
+        );
+        setDireccion(
+          borrador.direccion || ""
+        );
+        setMercancia(
+          borrador.mercancia || ""
+        );
+        setCantidad(
+          borrador.cantidad || ""
+        );
+        setFechaRecoleccion(
+          borrador.fechaRecoleccion ||
+            ""
+        );
+        setHoraCita(
+          borrador.horaCita || ""
+        );
+        setObservaciones(
+          borrador.observaciones ||
+            ""
+        );
+        setUltimoGuardado(
+          borrador.guardadoEn ||
+            null
+        );
+        setBorradorRestaurado(
+          true
+        );
+      }
+    } catch (error) {
+      console.error(
+        "No fue posible restaurar el borrador de recolección:",
+        error
+      );
+    } finally {
+      borradorHidratado.current =
+        true;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (
+      !borradorHidratado.current
+    ) {
+      return;
+    }
+
+    const temporizador =
+      window.setTimeout(() => {
+        try {
+          const guardadoEn =
+            new Date().toISOString();
+
+          const borrador: BorradorRecoleccion =
+            {
+              cliente,
+              telefono,
+              bodega,
+              direccion,
+              mercancia,
+              cantidad,
+              fechaRecoleccion,
+              horaCita,
+              observaciones,
+              guardadoEn,
+            };
+
+          window.localStorage.setItem(
+            CLAVE_BORRADOR_RECOLECCION,
+            JSON.stringify(
+              borrador
+            )
+          );
+
+          setUltimoGuardado(
+            guardadoEn
+          );
+        } catch (error) {
+          console.error(
+            "No fue posible guardar el borrador de recolección:",
+            error
+          );
+        }
+      }, 350);
+
+    return () =>
+      window.clearTimeout(
+        temporizador
+      );
+  }, [
+    cliente,
+    telefono,
+    bodega,
+    direccion,
+    mercancia,
+    cantidad,
+    fechaRecoleccion,
+    horaCita,
+    observaciones,
+  ]);
+
+  const [
     guardando,
     setGuardando,
   ] = useState(false);
@@ -2819,6 +3017,24 @@ function FormularioNuevaRecoleccion({
         );
       }
 
+      try {
+        window.localStorage.removeItem(
+          CLAVE_BORRADOR_RECOLECCION
+        );
+      } catch (error) {
+        console.error(
+          "No fue posible borrar el borrador de recolección:",
+          error
+        );
+      }
+
+      setBorradorRestaurado(
+        false
+      );
+      setUltimoGuardado(
+        null
+      );
+
       await onCreada();
     } catch (
       err: unknown
@@ -2852,6 +3068,24 @@ function FormularioNuevaRecoleccion({
             <h2 className="mt-1 text-xl font-black text-slate-950">
               Nueva recolección
             </h2>
+
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-200">
+                Guardado automático
+              </span>
+
+              {borradorRestaurado && (
+                <span className="text-[10px] font-bold text-blue-700">
+                  Borrador recuperado
+                </span>
+              )}
+
+              {ultimoGuardado && (
+                <span className="text-[10px] text-slate-400">
+                  Protegido ante recarga
+                </span>
+              )}
+            </div>
           </div>
 
           <button
