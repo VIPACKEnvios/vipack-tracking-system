@@ -96,38 +96,6 @@ function limpiarTelefonoCliente(
     .trim();
 }
 
-
-function normalizarTelefonoWhatsApp(
-  valor: unknown
-) {
-  const limpio =
-    limpiarTelefonoCliente(valor);
-
-  if (!limpio) {
-    return "";
-  }
-
-  if (
-    limpio.startsWith("521") &&
-    limpio.length === 13
-  ) {
-    return limpio;
-  }
-
-  if (
-    limpio.startsWith("52") &&
-    limpio.length === 12
-  ) {
-    return `521${limpio.slice(2)}`;
-  }
-
-  if (limpio.length === 10) {
-    return `521${limpio}`;
-  }
-
-  return limpio;
-}
-
 function dinero(valor: number) {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
@@ -168,16 +136,6 @@ export default function CotizacionesPage() {
     useState(true);
   const [observaciones, setObservaciones] =
     useState("");
-
-  const [
-    guardandoCotizacion,
-    setGuardandoCotizacion,
-  ] = useState(false);
-
-  const [
-    ultimoFolioCotizacion,
-    setUltimoFolioCotizacion,
-  ] = useState("");
 
   const [
     clientesApi,
@@ -328,7 +286,7 @@ export default function CotizacionesPage() {
             }
 
             const telefonoCliente =
-              normalizarTelefonoWhatsApp(
+              limpiarTelefonoCliente(
                 item.telefono ??
                   item.Telefono ??
                   item["Teléfono"] ??
@@ -393,7 +351,7 @@ export default function CotizacionesPage() {
             }
 
             const telefonoCliente =
-              normalizarTelefonoWhatsApp(
+              limpiarTelefonoCliente(
                 registro.TelefonoWhatsApp
               );
 
@@ -822,23 +780,17 @@ export default function CotizacionesPage() {
     }
   }
 
-  async function abrirWhatsApp() {
-    const numero =
-      normalizarTelefonoWhatsApp(
-        telefono
-      );
+  function abrirWhatsApp() {
+    const numero = telefono.replace(/\D/g, "");
 
     if (!numero) {
       window.alert(
-        "Selecciona o captura un teléfono válido."
+        "Selecciona o captura el teléfono del cliente."
       );
       return;
     }
 
-    if (
-      !enviarAereo &&
-      !enviarTerrestre
-    ) {
+    if (!enviarAereo && !enviarTerrestre) {
       window.alert(
         "Selecciona Aéreo, Terrestre o ambos."
       );
@@ -847,8 +799,7 @@ export default function CotizacionesPage() {
 
     if (
       calculo.detalle.some(
-        (caja) =>
-          caja.pesoReal <= 0
+        (caja) => caja.pesoReal <= 0
       )
     ) {
       window.alert(
@@ -857,112 +808,17 @@ export default function CotizacionesPage() {
       return;
     }
 
-    if (
-      calculo.cajasSinTarifa > 0
-    ) {
+    if (calculo.cajasSinTarifa > 0) {
       window.alert(
         "Hay cajas sin tarifa disponible. Revisa el peso antes de enviar."
       );
       return;
     }
 
-    if (guardandoCotizacion) {
-      return;
-    }
-
-    try {
-      setGuardandoCotizacion(
-        true
-      );
-
-      const response =
-        await fetch(
-          "/api/cotizaciones",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body:
-              JSON.stringify({
-                cliente,
-                telefono: numero,
-                cajas:
-                  calculo.detalle.map(
-                    (caja) => ({
-                      numero:
-                        caja.numero,
-                      largo:
-                        caja.largo,
-                      ancho:
-                        caja.ancho,
-                      alto:
-                        caja.alto,
-                      pesoReal:
-                        caja.pesoReal,
-                      pesoVolumetrico:
-                        caja.pesoVolumetrico,
-                      pesoCobrable:
-                        caja.pesoCobrable,
-                      precioAereo:
-                        caja.tarifaAerea
-                          ?.precio ??
-                        null,
-                      precioTerrestre:
-                        caja.tarifaTerrestre
-                          ?.precio ??
-                        null,
-                    })
-                  ),
-                totalAereo:
-                  calculo.totalAereo,
-                totalTerrestre:
-                  calculo.totalTerrestre,
-                enviarAereo,
-                enviarTerrestre,
-                observaciones,
-              }),
-          }
-        );
-
-      const data =
-        (await response.json()) as {
-          success?: boolean;
-          folio?: string;
-          error?: string;
-        };
-
-      if (
-        !response.ok ||
-        !data.success
-      ) {
-        throw new Error(
-          data.error ||
-            "No se pudo guardar la cotización."
-        );
-      }
-
-      setUltimoFolioCotizacion(
-        data.folio || ""
-      );
-    } catch (error) {
-      window.alert(
-        error instanceof Error
-          ? error.message
-          : "No se pudo guardar la cotización."
-      );
-      return;
-    } finally {
-      setGuardandoCotizacion(
-        false
-      );
-    }
-
-    const lineas: string[] = [
-      `Hola${cliente ? ` ${cliente}` : ""}`,
+    const lineas = [
+      `Hola${cliente ? ` ${cliente}` : ""} 👋`,
       "",
-      "Te compartimos tu cotización de VIPACK Envíos.",
+      "Te compartimos tu cotización de VIPACK Envíos 📦",
       "",
       `Cajas: ${cajas.length}`,
       `Peso real total: ${calculo.pesoRealTotal.toFixed(
@@ -974,34 +830,29 @@ export default function CotizacionesPage() {
       "",
     ];
 
-    calculo.detalle.forEach(
-      (caja) => {
-        lineas.push(
-          `Caja ${caja.numero}:`,
-          `- Medidas: ${
-            caja.largo || 0
-          } x ${
-            caja.ancho || 0
-          } x ${
-            caja.alto || 0
-          } cm`,
-          `- Peso real: ${caja.pesoReal.toFixed(
-            1
-          )} kg`,
-          `- Peso volumétrico: ${caja.pesoVolumetrico.toFixed(
-            1
-          )} kg`,
-          `- Peso cobrable: ${caja.pesoCobrable.toFixed(
-            1
-          )} kg`,
-          ""
-        );
-      }
-    );
+    calculo.detalle.forEach((caja) => {
+      lineas.push(
+        `Caja ${caja.numero}: real ${caja.pesoReal.toFixed(
+          1
+        )} kg · volumétrico ${caja.pesoVolumetrico.toFixed(
+          1
+        )} kg · cobrable ${caja.pesoCobrable.toFixed(
+          1
+        )} kg${
+          caja.largo &&
+          caja.ancho &&
+          caja.alto
+            ? ` · ${caja.largo}×${caja.ancho}×${caja.alto} cm`
+            : ""
+        }`
+      );
+    });
+
+    lineas.push("");
 
     if (enviarAereo) {
       lineas.push(
-        `Aéreo: ${dinero(
+        `✈️ Aéreo: ${dinero(
           calculo.totalAereo
         )}`
       );
@@ -1009,19 +860,14 @@ export default function CotizacionesPage() {
 
     if (enviarTerrestre) {
       lineas.push(
-        `Terrestre: ${dinero(
+        `🚚 Terrestre: ${dinero(
           calculo.totalTerrestre
         )}`
       );
     }
 
-    if (
-      observaciones.trim()
-    ) {
-      lineas.push(
-        "",
-        `Observaciones: ${observaciones.trim()}`
-      );
+    if (observaciones.trim()) {
+      lineas.push("", observaciones.trim());
     }
 
     lineas.push(
@@ -1029,16 +875,12 @@ export default function CotizacionesPage() {
       "Quedamos pendientes de tu confirmación."
     );
 
-    const mensaje =
-      lineas.join("\n");
-
-    const url =
-      `https://wa.me/${numero}?text=${encodeURIComponent(
-        mensaje
-      )}`;
+    const texto = encodeURIComponent(
+      lineas.join("\n")
+    );
 
     window.open(
-      url,
+      `https://wa.me/${numero}?text=${texto}`,
       "_blank",
       "noopener,noreferrer"
     );
@@ -1523,7 +1365,7 @@ export default function CotizacionesPage() {
                 onClick={abrirWhatsApp}
                 className="mt-3 w-full rounded-xl sm:mt-4 bg-emerald-600 px-5 py-3 font-black text-white shadow-lg transition hover:bg-emerald-700"
               >
-                Enviar cotización por WhatsApp
+                Guardar y enviar por WhatsApp
               </button>
 
               <p className="mt-2 text-center text-[11px] leading-4 text-slate-400 sm:mt-3 sm:text-xs">
