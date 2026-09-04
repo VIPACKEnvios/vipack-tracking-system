@@ -96,6 +96,38 @@ function limpiarTelefonoCliente(
     .trim();
 }
 
+
+function normalizarTelefonoWhatsApp(
+  valor: unknown
+) {
+  const limpio =
+    limpiarTelefonoCliente(valor);
+
+  if (!limpio) {
+    return "";
+  }
+
+  if (
+    limpio.startsWith("521") &&
+    limpio.length === 13
+  ) {
+    return limpio;
+  }
+
+  if (
+    limpio.startsWith("52") &&
+    limpio.length === 12
+  ) {
+    return `521${limpio.slice(2)}`;
+  }
+
+  if (limpio.length === 10) {
+    return `521${limpio}`;
+  }
+
+  return limpio;
+}
+
 function dinero(valor: number) {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
@@ -286,7 +318,7 @@ export default function CotizacionesPage() {
             }
 
             const telefonoCliente =
-              limpiarTelefonoCliente(
+              normalizarTelefonoWhatsApp(
                 item.telefono ??
                   item.Telefono ??
                   item["Teléfono"] ??
@@ -351,7 +383,7 @@ export default function CotizacionesPage() {
             }
 
             const telefonoCliente =
-              limpiarTelefonoCliente(
+              normalizarTelefonoWhatsApp(
                 registro.TelefonoWhatsApp
               );
 
@@ -781,16 +813,22 @@ export default function CotizacionesPage() {
   }
 
   function abrirWhatsApp() {
-    const numero = telefono.replace(/\D/g, "");
+    const numero =
+      normalizarTelefonoWhatsApp(
+        telefono
+      );
 
     if (!numero) {
       window.alert(
-        "Selecciona o captura el teléfono del cliente."
+        "Selecciona o captura un teléfono válido."
       );
       return;
     }
 
-    if (!enviarAereo && !enviarTerrestre) {
+    if (
+      !enviarAereo &&
+      !enviarTerrestre
+    ) {
       window.alert(
         "Selecciona Aéreo, Terrestre o ambos."
       );
@@ -799,7 +837,8 @@ export default function CotizacionesPage() {
 
     if (
       calculo.detalle.some(
-        (caja) => caja.pesoReal <= 0
+        (caja) =>
+          caja.pesoReal <= 0
       )
     ) {
       window.alert(
@@ -808,17 +847,19 @@ export default function CotizacionesPage() {
       return;
     }
 
-    if (calculo.cajasSinTarifa > 0) {
+    if (
+      calculo.cajasSinTarifa > 0
+    ) {
       window.alert(
         "Hay cajas sin tarifa disponible. Revisa el peso antes de enviar."
       );
       return;
     }
 
-    const lineas = [
-      `Hola${cliente ? ` ${cliente}` : ""} 👋`,
+    const lineas: string[] = [
+      `Hola${cliente ? ` ${cliente}` : ""}`,
       "",
-      "Te compartimos tu cotización de VIPACK Envíos 📦",
+      "Te compartimos tu cotización de VIPACK Envíos.",
       "",
       `Cajas: ${cajas.length}`,
       `Peso real total: ${calculo.pesoRealTotal.toFixed(
@@ -830,29 +871,34 @@ export default function CotizacionesPage() {
       "",
     ];
 
-    calculo.detalle.forEach((caja) => {
-      lineas.push(
-        `Caja ${caja.numero}: real ${caja.pesoReal.toFixed(
-          1
-        )} kg · volumétrico ${caja.pesoVolumetrico.toFixed(
-          1
-        )} kg · cobrable ${caja.pesoCobrable.toFixed(
-          1
-        )} kg${
-          caja.largo &&
-          caja.ancho &&
-          caja.alto
-            ? ` · ${caja.largo}×${caja.ancho}×${caja.alto} cm`
-            : ""
-        }`
-      );
-    });
-
-    lineas.push("");
+    calculo.detalle.forEach(
+      (caja) => {
+        lineas.push(
+          `Caja ${caja.numero}:`,
+          `- Medidas: ${
+            caja.largo || 0
+          } x ${
+            caja.ancho || 0
+          } x ${
+            caja.alto || 0
+          } cm`,
+          `- Peso real: ${caja.pesoReal.toFixed(
+            1
+          )} kg`,
+          `- Peso volumétrico: ${caja.pesoVolumetrico.toFixed(
+            1
+          )} kg`,
+          `- Peso cobrable: ${caja.pesoCobrable.toFixed(
+            1
+          )} kg`,
+          ""
+        );
+      }
+    );
 
     if (enviarAereo) {
       lineas.push(
-        `✈️ Aéreo: ${dinero(
+        `Aéreo: ${dinero(
           calculo.totalAereo
         )}`
       );
@@ -860,14 +906,19 @@ export default function CotizacionesPage() {
 
     if (enviarTerrestre) {
       lineas.push(
-        `🚚 Terrestre: ${dinero(
+        `Terrestre: ${dinero(
           calculo.totalTerrestre
         )}`
       );
     }
 
-    if (observaciones.trim()) {
-      lineas.push("", observaciones.trim());
+    if (
+      observaciones.trim()
+    ) {
+      lineas.push(
+        "",
+        `Observaciones: ${observaciones.trim()}`
+      );
     }
 
     lineas.push(
@@ -875,12 +926,16 @@ export default function CotizacionesPage() {
       "Quedamos pendientes de tu confirmación."
     );
 
-    const texto = encodeURIComponent(
-      lineas.join("\n")
-    );
+    const mensaje =
+      lineas.join("\n");
+
+    const url =
+      `https://wa.me/${numero}?text=${encodeURIComponent(
+        mensaje
+      )}`;
 
     window.open(
-      `https://wa.me/${numero}?text=${texto}`,
+      url,
       "_blank",
       "noopener,noreferrer"
     );
