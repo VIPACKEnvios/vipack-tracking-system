@@ -170,6 +170,16 @@ export default function CotizacionesPage() {
     useState("");
 
   const [
+    guardandoCotizacion,
+    setGuardandoCotizacion,
+  ] = useState(false);
+
+  const [
+    ultimoFolioCotizacion,
+    setUltimoFolioCotizacion,
+  ] = useState("");
+
+  const [
     clientesApi,
     setClientesApi,
   ] = useState<ClienteBusqueda[]>(
@@ -812,7 +822,7 @@ export default function CotizacionesPage() {
     }
   }
 
-  function abrirWhatsApp() {
+  async function abrirWhatsApp() {
     const numero =
       normalizarTelefonoWhatsApp(
         telefono
@@ -854,6 +864,99 @@ export default function CotizacionesPage() {
         "Hay cajas sin tarifa disponible. Revisa el peso antes de enviar."
       );
       return;
+    }
+
+    if (guardandoCotizacion) {
+      return;
+    }
+
+    try {
+      setGuardandoCotizacion(
+        true
+      );
+
+      const response =
+        await fetch(
+          "/api/cotizaciones",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body:
+              JSON.stringify({
+                cliente,
+                telefono: numero,
+                cajas:
+                  calculo.detalle.map(
+                    (caja) => ({
+                      numero:
+                        caja.numero,
+                      largo:
+                        caja.largo,
+                      ancho:
+                        caja.ancho,
+                      alto:
+                        caja.alto,
+                      pesoReal:
+                        caja.pesoReal,
+                      pesoVolumetrico:
+                        caja.pesoVolumetrico,
+                      pesoCobrable:
+                        caja.pesoCobrable,
+                      precioAereo:
+                        caja.tarifaAerea
+                          ?.precio ??
+                        null,
+                      precioTerrestre:
+                        caja.tarifaTerrestre
+                          ?.precio ??
+                        null,
+                    })
+                  ),
+                totalAereo:
+                  calculo.totalAereo,
+                totalTerrestre:
+                  calculo.totalTerrestre,
+                enviarAereo,
+                enviarTerrestre,
+                observaciones,
+              }),
+          }
+        );
+
+      const data =
+        (await response.json()) as {
+          success?: boolean;
+          folio?: string;
+          error?: string;
+        };
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        throw new Error(
+          data.error ||
+            "No se pudo guardar la cotización."
+        );
+      }
+
+      setUltimoFolioCotizacion(
+        data.folio || ""
+      );
+    } catch (error) {
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "No se pudo guardar la cotización."
+      );
+      return;
+    } finally {
+      setGuardandoCotizacion(
+        false
+      );
     }
 
     const lineas: string[] = [
