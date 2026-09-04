@@ -1,4 +1,4 @@
-"use client";
+
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -37,6 +37,19 @@ const menuOperaciones: EnlaceMenu[] = [
     etiqueta: "Importaciones",
     href: "/importaciones",
     icono: <IconoImportar />,
+  },
+];
+
+const menuVentas: EnlaceMenu[] = [
+  {
+    etiqueta: "Cotizaciones",
+    href: "/cotizaciones",
+    icono: <IconoCotizacion />,
+  },
+  {
+    etiqueta: "Pagos",
+    href: "/pagos",
+    icono: <IconoPago />,
   },
 ];
 
@@ -121,6 +134,13 @@ export default function DashboardLayout({
             />
 
             <GrupoMenu
+              titulo="Ventas y cobranza"
+              enlaces={menuVentas}
+              pathname={pathname}
+              contraido={menuContraido}
+            />
+
+            <GrupoMenu
               titulo="Bazares"
               enlaces={menuBazares}
               pathname={pathname}
@@ -184,6 +204,13 @@ export default function DashboardLayout({
                 <GrupoMenu
                   titulo="Operaciones"
                   enlaces={menuOperaciones}
+                  pathname={pathname}
+                  contraido={false}
+                />
+
+                <GrupoMenu
+                  titulo="Ventas y cobranza"
+                  enlaces={menuVentas}
                   pathname={pathname}
                   contraido={false}
                 />
@@ -559,6 +586,28 @@ function IconoUbicacion() {
     <IconoBase>
       <path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" />
       <circle cx="12" cy="10" r="2.5" />
+    </IconoBase>
+  );
+}
+
+function IconoCotizacion() {
+  return (
+    <IconoBase>
+      <path d="M6 3h9l3 3v15H6V3Z" />
+      <path d="M14 3v4h4" />
+      <path d="M9 11h6" />
+      <path d="M9 15h6" />
+      <path d="M9 19h4" />
+    </IconoBase>
+  );
+}
+
+function IconoPago() {
+  return (
+    <IconoBase>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M7 15h4" />
     </IconoBase>
   );
 }
