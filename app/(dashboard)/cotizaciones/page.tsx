@@ -1,711 +1,638 @@
 'use client';
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
+import { useMemo, useState } from "react";
 
-type EnlaceMenu = {
-  etiqueta: string;
-  href: string;
-  icono: ReactNode;
-  exacto?: boolean;
-  nuevaPestana?: boolean;
+type TipoServicio = "Aereo" | "Terrestre";
+
+type Tarifa = {
+  tipo: TipoServicio;
+  peso_min: number;
+  peso_max: number;
+  precio: number;
 };
 
-const menuOperaciones: EnlaceMenu[] = [
-  {
-    etiqueta: "Inicio",
-    href: "/",
-    icono: <IconoInicio />,
-    exacto: true,
-  },
-  {
-    etiqueta: "Guías",
-    href: "/guias",
-    icono: <IconoPaquete />,
-  },
-  {
-    etiqueta: "Envíos",
-    href: "/envios",
-    icono: <IconoCamion />,
-  },
-  {
-    etiqueta: "Importaciones",
-    href: "/importaciones",
-    icono: <IconoImportar />,
-  },
+type Caja = {
+  id: number;
+  largo: string;
+  ancho: string;
+  alto: string;
+  peso: string;
+};
+
+const TARIFAS: Tarifa[] = [
+  { tipo: "Terrestre", peso_min: 2, peso_max: 5, precio: 650 },
+  { tipo: "Terrestre", peso_min: 6, peso_max: 10, precio: 950 },
+  { tipo: "Terrestre", peso_min: 11, peso_max: 15, precio: 1050 },
+  { tipo: "Terrestre", peso_min: 16, peso_max: 20, precio: 1250 },
+  { tipo: "Terrestre", peso_min: 21, peso_max: 25, precio: 1350 },
+  { tipo: "Terrestre", peso_min: 26, peso_max: 30, precio: 1500 },
+  { tipo: "Terrestre", peso_min: 31, peso_max: 35, precio: 1650 },
+  { tipo: "Terrestre", peso_min: 36, peso_max: 40, precio: 1850 },
+  { tipo: "Terrestre", peso_min: 41, peso_max: 45, precio: 2000 },
+  { tipo: "Terrestre", peso_min: 46, peso_max: 50, precio: 2250 },
+  { tipo: "Terrestre", peso_min: 51, peso_max: 55, precio: 2450 },
+  { tipo: "Terrestre", peso_min: 56, peso_max: 60, precio: 2650 },
+
+  { tipo: "Aereo", peso_min: 2, peso_max: 5, precio: 850 },
+  { tipo: "Aereo", peso_min: 6, peso_max: 10, precio: 1130 },
+  { tipo: "Aereo", peso_min: 11, peso_max: 15, precio: 1350 },
+  { tipo: "Aereo", peso_min: 16, peso_max: 20, precio: 1600 },
+  { tipo: "Aereo", peso_min: 21, peso_max: 25, precio: 1700 },
+  { tipo: "Aereo", peso_min: 26, peso_max: 30, precio: 1990 },
+  { tipo: "Aereo", peso_min: 31, peso_max: 35, precio: 2160 },
+  { tipo: "Aereo", peso_min: 36, peso_max: 40, precio: 2355 },
+  { tipo: "Aereo", peso_min: 41, peso_max: 45, precio: 2530 },
+  { tipo: "Aereo", peso_min: 46, peso_max: 50, precio: 2750 },
+  { tipo: "Aereo", peso_min: 51, peso_max: 60, precio: 3100 },
 ];
 
-const menuVentas: EnlaceMenu[] = [
-  {
-    etiqueta: "Cotizaciones",
-    href: "/cotizaciones",
-    icono: <IconoCotizacion />,
-  },
-  {
-    etiqueta: "Pagos",
-    href: "/pagos",
-    icono: <IconoPago />,
-  },
-];
+const CAJA_INICIAL: Caja = {
+  id: 1,
+  largo: "",
+  ancho: "",
+  alto: "",
+  peso: "",
+};
 
-const menuBazares: EnlaceMenu[] = [
-  {
-    etiqueta: "Administración",
-    href: "/admin/bazares",
-    icono: <IconoCarpeta />,
-  },
-  {
-    etiqueta: "Consulta",
-    href: "/consulta-bazares",
-    icono: <IconoBuscar />,
-  },
-  {
-    etiqueta: "Nuevo registro",
-    href: "/registro-bazar",
-    icono: <IconoFormulario />,
-    nuevaPestana: true,
-  },
-];
+function dinero(valor: number) {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    maximumFractionDigits: 0,
+  }).format(valor);
+}
 
-const menuInventario: EnlaceMenu[] = [
-  {
-    etiqueta: "Inventarios",
-    href: "/inventarios",
-    icono: <IconoInventario />,
-  },
-  {
-    etiqueta: "Recolecciones",
-    href: "/recolecciones",
-    icono: <IconoUbicacion />,
-  },
-  {
-    etiqueta: "Clientes",
-    href: "/clientes",
-    icono: <IconoUsuarios />,
-  },
-];
+function obtenerTarifa(
+  tipo: TipoServicio,
+  pesoIngresado: number
+) {
+  if (!Number.isFinite(pesoIngresado) || pesoIngresado <= 0) {
+    return null;
+  }
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
-  const pathname = usePathname();
+  const pesoRedondeado = Math.ceil(pesoIngresado);
 
-  const [menuMovilAbierto, setMenuMovilAbierto] =
-    useState(false);
+  return (
+    TARIFAS.find(
+      (tarifa) =>
+        tarifa.tipo === tipo &&
+        pesoRedondeado >= tarifa.peso_min &&
+        pesoRedondeado <= tarifa.peso_max
+    ) || null
+  );
+}
 
-  const [menuContraido, setMenuContraido] =
-    useState(false);
+export default function CotizacionesPage() {
+  const [cliente, setCliente] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [cajas, setCajas] = useState<Caja[]>([
+    CAJA_INICIAL,
+  ]);
+  const [enviarAereo, setEnviarAereo] =
+    useState(true);
+  const [enviarTerrestre, setEnviarTerrestre] =
+    useState(true);
+  const [observaciones, setObservaciones] =
+    useState("");
 
-  useEffect(() => {
-    setMenuMovilAbierto(false);
-  }, [pathname]);
+  const calculo = useMemo(() => {
+    const detalle = cajas.map((caja, indice) => {
+      const peso = Number(caja.peso || 0);
+      const tarifaAerea = obtenerTarifa(
+        "Aereo",
+        peso
+      );
+      const tarifaTerrestre = obtenerTarifa(
+        "Terrestre",
+        peso
+      );
 
-  function cerrarSesion() {
-    document.cookie =
-      "vipack-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+      return {
+        ...caja,
+        numero: indice + 1,
+        peso,
+        tarifaAerea,
+        tarifaTerrestre,
+      };
+    });
 
-    window.location.href = "/login";
+    const totalAereo = detalle.reduce(
+      (total, caja) =>
+        total + (caja.tarifaAerea?.precio || 0),
+      0
+    );
+
+    const totalTerrestre = detalle.reduce(
+      (total, caja) =>
+        total +
+        (caja.tarifaTerrestre?.precio || 0),
+      0
+    );
+
+    const pesoTotal = detalle.reduce(
+      (total, caja) => total + caja.peso,
+      0
+    );
+
+    const cajasSinTarifa = detalle.filter(
+      (caja) =>
+        caja.peso > 0 &&
+        (!caja.tarifaAerea ||
+          !caja.tarifaTerrestre)
+    ).length;
+
+    return {
+      detalle,
+      totalAereo,
+      totalTerrestre,
+      pesoTotal,
+      cajasSinTarifa,
+    };
+  }, [cajas]);
+
+  function agregarCaja() {
+    setCajas((actuales) => [
+      ...actuales,
+      {
+        id: Date.now(),
+        largo: "",
+        ancho: "",
+        alto: "",
+        peso: "",
+      },
+    ]);
+  }
+
+  function eliminarCaja(id: number) {
+    setCajas((actuales) => {
+      if (actuales.length === 1) {
+        return actuales;
+      }
+
+      return actuales.filter(
+        (caja) => caja.id !== id
+      );
+    });
+  }
+
+  function actualizarCaja(
+    id: number,
+    campo: keyof Omit<Caja, "id">,
+    valor: string
+  ) {
+    setCajas((actuales) =>
+      actuales.map((caja) =>
+        caja.id === id
+          ? {
+              ...caja,
+              [campo]: valor,
+            }
+          : caja
+      )
+    );
+  }
+
+  function limpiarCotizacion() {
+    setCliente("");
+    setTelefono("");
+    setCajas([CAJA_INICIAL]);
+    setEnviarAereo(true);
+    setEnviarTerrestre(true);
+    setObservaciones("");
+  }
+
+  function abrirWhatsApp() {
+    const numero = telefono.replace(/\D/g, "");
+
+    if (!numero) {
+      window.alert(
+        "Selecciona o captura el teléfono del cliente."
+      );
+      return;
+    }
+
+    if (!enviarAereo && !enviarTerrestre) {
+      window.alert(
+        "Selecciona Aéreo, Terrestre o ambos."
+      );
+      return;
+    }
+
+    if (
+      calculo.detalle.some(
+        (caja) => caja.peso <= 0
+      )
+    ) {
+      window.alert(
+        "Captura el peso de todas las cajas."
+      );
+      return;
+    }
+
+    if (calculo.cajasSinTarifa > 0) {
+      window.alert(
+        "Hay cajas sin tarifa disponible. Revisa el peso antes de enviar."
+      );
+      return;
+    }
+
+    const lineas = [
+      `Hola${cliente ? ` ${cliente}` : ""} 👋`,
+      "",
+      "Te compartimos tu cotización de VIPACK Envíos 📦",
+      "",
+      `Cajas: ${cajas.length}`,
+      `Peso total registrado: ${calculo.pesoTotal.toFixed(
+        1
+      )} kg`,
+      "",
+    ];
+
+    calculo.detalle.forEach((caja) => {
+      lineas.push(
+        `Caja ${caja.numero}: ${caja.peso.toFixed(
+          1
+        )} kg${
+          caja.largo &&
+          caja.ancho &&
+          caja.alto
+            ? ` · ${caja.largo}×${caja.ancho}×${caja.alto} cm`
+            : ""
+        }`
+      );
+    });
+
+    lineas.push("");
+
+    if (enviarAereo) {
+      lineas.push(
+        `✈️ Aéreo: ${dinero(
+          calculo.totalAereo
+        )}`
+      );
+    }
+
+    if (enviarTerrestre) {
+      lineas.push(
+        `🚚 Terrestre: ${dinero(
+          calculo.totalTerrestre
+        )}`
+      );
+    }
+
+    if (observaciones.trim()) {
+      lineas.push("", observaciones.trim());
+    }
+
+    lineas.push(
+      "",
+      "Quedamos pendientes de tu confirmación."
+    );
+
+    const texto = encodeURIComponent(
+      lineas.join("\n")
+    );
+
+    window.open(
+      `https://wa.me/${numero}?text=${texto}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
   }
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <div className="flex min-h-screen">
-        {/* Menú lateral de escritorio */}
-        <aside
-          className={`hidden shrink-0 flex-col border-r border-slate-800 bg-[#071b3f] text-white transition-[width] duration-300 lg:flex ${
-            menuContraido ? "w-20" : "w-64"
-          }`}
-        >
-          <LogoMenu contraido={menuContraido} />
+    <main className="min-h-[calc(100vh-4rem)] bg-slate-100 p-4 md:p-8">
+      <div className="mx-auto max-w-7xl">
+        <header className="mb-7 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+          <div>
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-cyan-700">
+              Ventas y cobranza
+            </p>
 
-          <nav className="flex-1 overflow-y-auto px-3 py-5">
-            <GrupoMenu
-              titulo="Operaciones"
-              enlaces={menuOperaciones}
-              pathname={pathname}
-              contraido={menuContraido}
-            />
+            <h1 className="mt-2 text-3xl font-black text-slate-950 md:text-4xl">
+              Cotizaciones
+            </h1>
 
-            <GrupoMenu
-              titulo="Ventas y cobranza"
-              enlaces={menuVentas}
-              pathname={pathname}
-              contraido={menuContraido}
-            />
+            <p className="mt-2 max-w-3xl text-slate-600">
+              Calcula una o varias cajas de una misma
+              clienta y obtén el total final del envío.
+            </p>
+          </div>
 
-            <GrupoMenu
-              titulo="Bazares"
-              enlaces={menuBazares}
-              pathname={pathname}
-              contraido={menuContraido}
-            />
+          <button
+            type="button"
+            onClick={limpiarCotizacion}
+            className="rounded-xl border border-slate-300 bg-white px-5 py-3 font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+          >
+            Nueva cotización
+          </button>
+        </header>
 
-            <GrupoMenu
-              titulo="Inventario"
-              enlaces={menuInventario}
-              pathname={pathname}
-              contraido={menuContraido}
-            />
+        <div className="grid gap-6 xl:grid-cols-[1fr_390px]">
+          <div className="space-y-6">
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="mb-5">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">
+                  Cliente
+                </p>
+                <h2 className="mt-1 text-xl font-black text-slate-950">
+                  Datos de la clienta
+                </h2>
+              </div>
 
-            <div className="mt-6 border-t border-white/10 pt-5">
-              <BotonProximamente
-                etiqueta="Empaque"
-                icono={<IconoCaja />}
-                contraido={menuContraido}
-              />
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-bold text-slate-700">
+                    Buscar cliente
+                  </span>
+                  <input
+                    value={cliente}
+                    onChange={(e) =>
+                      setCliente(e.target.value)
+                    }
+                    placeholder="Nombre o número de cliente"
+                    className="h-12 w-full rounded-xl border border-slate-300 bg-white px-4 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                  />
+                  <span className="mt-2 block text-xs text-slate-400">
+                    En el siguiente paso conectaremos este
+                    buscador con
+                    control_recolecciones_bodega.xlsx.
+                  </span>
+                </label>
 
-              <BotonProximamente
-                etiqueta="Reportes"
-                icono={<IconoGrafica />}
-                contraido={menuContraido}
-              />
-            </div>
-          </nav>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-bold text-slate-700">
+                    WhatsApp
+                  </span>
+                  <input
+                    value={telefono}
+                    onChange={(e) =>
+                      setTelefono(e.target.value)
+                    }
+                    placeholder="Ej. 6641234567"
+                    inputMode="tel"
+                    className="h-12 w-full rounded-xl border border-slate-300 bg-white px-4 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                  />
+                </label>
+              </div>
+            </section>
 
-          <EstadoSistema contraido={menuContraido} />
-        </aside>
-
-        {/* Menú móvil */}
-        {menuMovilAbierto && (
-          <>
-            <button
-              type="button"
-              aria-label="Cerrar menú"
-              onClick={() =>
-                setMenuMovilAbierto(false)
-              }
-              className="fixed inset-0 z-40 bg-slate-950/60 lg:hidden"
-            />
-
-            <aside className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-[#071b3f] text-white shadow-2xl lg:hidden">
-              <div className="flex items-center justify-between border-b border-white/10 p-4">
-                <LogoMenu contraido={false} />
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">
+                    Mercancía
+                  </p>
+                  <h2 className="mt-1 text-xl font-black text-slate-950">
+                    Cajas del envío
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Cada caja se cotiza por separado y
+                    después se suman para obtener el total.
+                  </p>
+                </div>
 
                 <button
                   type="button"
-                  onClick={() =>
-                    setMenuMovilAbierto(false)
-                  }
-                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 hover:bg-white/20"
-                  aria-label="Cerrar menú"
+                  onClick={agregarCaja}
+                  className="rounded-xl bg-[#072c74] px-5 py-3 font-black text-white shadow-md transition hover:bg-blue-900"
                 >
-                  <IconoCerrar />
+                  + Agregar caja
                 </button>
               </div>
 
-              <nav className="flex-1 overflow-y-auto px-3 py-5">
-                <GrupoMenu
-                  titulo="Operaciones"
-                  enlaces={menuOperaciones}
-                  pathname={pathname}
-                  contraido={false}
-                />
+              <div className="mt-6 space-y-4">
+                {calculo.detalle.map((caja) => (
+                  <article
+                    key={caja.id}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
+                  >
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-black text-slate-900">
+                          Caja {caja.numero}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          Medidas en cm · peso en kg
+                        </p>
+                      </div>
 
-                <GrupoMenu
-                  titulo="Ventas y cobranza"
-                  enlaces={menuVentas}
-                  pathname={pathname}
-                  contraido={false}
-                />
+                      {cajas.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            eliminarCaja(caja.id)
+                          }
+                          className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-black text-red-700 hover:bg-red-50"
+                        >
+                          Eliminar
+                        </button>
+                      )}
+                    </div>
 
-                <GrupoMenu
-                  titulo="Bazares"
-                  enlaces={menuBazares}
-                  pathname={pathname}
-                  contraido={false}
-                />
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      {[
+                        ["largo", "Largo"],
+                        ["ancho", "Ancho"],
+                        ["alto", "Alto"],
+                        ["peso", "Peso"],
+                      ].map(([campo, etiqueta]) => (
+                        <label
+                          key={campo}
+                          className="block"
+                        >
+                          <span className="mb-1.5 block text-xs font-bold text-slate-600">
+                            {etiqueta}
+                          </span>
+                          <input
+                            value={
+                              caja[
+                                campo as keyof Omit<
+                                  Caja,
+                                  "id"
+                                >
+                              ]
+                            }
+                            onChange={(e) =>
+                              actualizarCaja(
+                                caja.id,
+                                campo as keyof Omit<
+                                  Caja,
+                                  "id"
+                                >,
+                                e.target.value
+                              )
+                            }
+                            type="number"
+                            min="0"
+                            step="0.1"
+                            className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                          />
+                        </label>
+                      ))}
+                    </div>
 
-                <GrupoMenu
-                  titulo="Inventario"
-                  enlaces={menuInventario}
-                  pathname={pathname}
-                  contraido={false}
-                />
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-xl border border-sky-200 bg-sky-50 p-4">
+                        <p className="text-xs font-bold uppercase text-sky-700">
+                          Aéreo
+                        </p>
+                        <p className="mt-1 text-xl font-black text-sky-950">
+                          {caja.peso <= 0
+                            ? "—"
+                            : caja.tarifaAerea
+                            ? dinero(
+                                caja.tarifaAerea
+                                  .precio
+                              )
+                            : "Sin tarifa"}
+                        </p>
+                      </div>
 
-                <div className="mt-6 border-t border-white/10 pt-5">
-                  <BotonProximamente
-                    etiqueta="Empaque"
-                    icono={<IconoCaja />}
-                    contraido={false}
-                  />
-
-                  <BotonProximamente
-                    etiqueta="Reportes"
-                    icono={<IconoGrafica />}
-                    contraido={false}
-                  />
-                </div>
-              </nav>
-
-              <EstadoSistema contraido={false} />
-            </aside>
-          </>
-        )}
-
-        {/* Columna derecha */}
-        <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 shadow-sm md:px-6">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() =>
-                  setMenuMovilAbierto(true)
-                }
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 lg:hidden"
-                aria-label="Abrir menú"
-              >
-                <IconoMenu />
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setMenuContraido(
-                    (actual) => !actual
-                  )
-                }
-                className="hidden h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 lg:flex"
-                aria-label="Contraer menú"
-              >
-                <IconoMenu />
-              </button>
-
-              <div>
-                <p className="font-black text-[#072c74]">
-                  Centro de Operaciones
-                </p>
-
-                <p className="hidden text-xs text-slate-500 sm:block">
-                  Administración interna de VIPACK
-                </p>
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                        <p className="text-xs font-bold uppercase text-amber-700">
+                          Terrestre
+                        </p>
+                        <p className="mt-1 text-xl font-black text-amber-950">
+                          {caja.peso <= 0
+                            ? "—"
+                            : caja.tarifaTerrestre
+                            ? dinero(
+                                caja.tarifaTerrestre
+                                  .precio
+                              )
+                            : "Sin tarifa"}
+                        </p>
+                      </div>
+                    </div>
+                  </article>
+                ))}
               </div>
-            </div>
+            </section>
+          </div>
 
-            <div className="flex items-center gap-3">
-              <div className="hidden items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 sm:flex">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#072c74] text-sm font-black text-white">
-                  V
+          <aside className="space-y-6">
+            <section className="sticky top-24 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-cyan-700">
+                Resumen
+              </p>
+
+              <h2 className="mt-1 text-2xl font-black text-slate-950">
+                Total de la cotización
+              </h2>
+
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-slate-100 p-4">
+                  <p className="text-xs font-bold text-slate-500">
+                    Cajas
+                  </p>
+                  <p className="mt-1 text-2xl font-black text-slate-950">
+                    {cajas.length}
+                  </p>
                 </div>
 
-                <div className="leading-tight">
-                  <p className="text-sm font-bold text-slate-800">
-                    Viridiana
+                <div className="rounded-2xl bg-slate-100 p-4">
+                  <p className="text-xs font-bold text-slate-500">
+                    Peso total
                   </p>
-
-                  <p className="text-xs text-slate-500">
-                    Administradora
+                  <p className="mt-1 text-2xl font-black text-slate-950">
+                    {calculo.pesoTotal.toFixed(1)} kg
                   </p>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={cerrarSesion}
-                className="flex h-10 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 text-sm font-bold text-red-700 hover:bg-red-100"
-              >
-                <IconoSalir />
+              <div className="mt-5 space-y-3">
+                <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                  <div>
+                    <p className="font-black text-sky-950">
+                      ✈️ Aéreo
+                    </p>
+                    <p className="mt-1 text-2xl font-black text-sky-950">
+                      {dinero(
+                        calculo.totalAereo
+                      )}
+                    </p>
+                  </div>
 
-                <span className="hidden sm:inline">
-                  Cerrar sesión
-                </span>
-              </button>
-            </div>
-          </header>
+                  <input
+                    type="checkbox"
+                    checked={enviarAereo}
+                    onChange={(e) =>
+                      setEnviarAereo(
+                        e.target.checked
+                      )
+                    }
+                    className="h-5 w-5"
+                  />
+                </label>
 
-          <main className="min-w-0 flex-1 overflow-x-hidden">
-            {children}
-          </main>
-        </div>
-      </div>
-    </div>
-  );
-}
+                <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                  <div>
+                    <p className="font-black text-amber-950">
+                      🚚 Terrestre
+                    </p>
+                    <p className="mt-1 text-2xl font-black text-amber-950">
+                      {dinero(
+                        calculo.totalTerrestre
+                      )}
+                    </p>
+                  </div>
 
-function LogoMenu({
-  contraido,
-}: {
-  contraido: boolean;
-}) {
-  return (
-    <div
-      className={`flex items-center gap-3 px-4 py-5 ${
-        contraido ? "justify-center" : ""
-      }`}
-    >
-      <img
-        src="/vipack-logo.jpg"
-        alt="VIPACK"
-        className="h-12 w-12 shrink-0 rounded-xl object-contain"
-      />
+                  <input
+                    type="checkbox"
+                    checked={enviarTerrestre}
+                    onChange={(e) =>
+                      setEnviarTerrestre(
+                        e.target.checked
+                      )
+                    }
+                    className="h-5 w-5"
+                  />
+                </label>
+              </div>
 
-      {!contraido && (
-        <div className="min-w-0">
-          <p className="truncate text-lg font-black">
-            VIPACK ERP
-          </p>
-
-          <p className="truncate text-xs text-cyan-200">
-            Sistema de operaciones
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function GrupoMenu({
-  titulo,
-  enlaces,
-  pathname,
-  contraido,
-}: {
-  titulo: string;
-  enlaces: EnlaceMenu[];
-  pathname: string;
-  contraido: boolean;
-}) {
-  return (
-    <section className="mb-7">
-      {!contraido && (
-        <p className="mb-2 px-3 text-[11px] font-black uppercase tracking-[0.16em] text-cyan-200/70">
-          {titulo}
-        </p>
-      )}
-
-      <div className="space-y-1">
-        {enlaces.map((enlace) => {
-          const activo = enlace.exacto
-            ? pathname === enlace.href
-            : pathname === enlace.href ||
-              pathname.startsWith(
-                `${enlace.href}/`
-              );
-
-          return (
-            <Link
-              key={enlace.href}
-              href={enlace.href}
-              target={
-                enlace.nuevaPestana
-                  ? "_blank"
-                  : undefined
-              }
-              rel={
-                enlace.nuevaPestana
-                  ? "noopener noreferrer"
-                  : undefined
-              }
-              title={
-                contraido
-                  ? enlace.etiqueta
-                  : undefined
-              }
-              className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 transition ${
-                activo
-                  ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-950/20"
-                  : "text-slate-200 hover:bg-white/10 hover:text-white"
-              } ${
-                contraido
-                  ? "justify-center"
-                  : ""
-              }`}
-            >
-              <span className="shrink-0">
-                {enlace.icono}
-              </span>
-
-              {!contraido && (
-                <span className="text-sm font-bold">
-                  {enlace.etiqueta}
-                </span>
+              {calculo.cajasSinTarifa > 0 && (
+                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">
+                  Hay {calculo.cajasSinTarifa} caja(s)
+                  fuera del rango de tarifas de 2 a 60
+                  kg.
+                </div>
               )}
-            </Link>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
 
-function BotonProximamente({
-  etiqueta,
-  icono,
-  contraido,
-}: {
-  etiqueta: string;
-  icono: ReactNode;
-  contraido: boolean;
-}) {
-  return (
-    <div
-      title={
-        contraido
-          ? `${etiqueta} — Próximamente`
-          : undefined
-      }
-      className={`mb-1 flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-slate-500 ${
-        contraido
-          ? "justify-center"
-          : ""
-      }`}
-    >
-      <span className="shrink-0">
-        {icono}
-      </span>
+              <label className="mt-5 block">
+                <span className="mb-2 block text-sm font-bold text-slate-700">
+                  Observaciones
+                </span>
+                <textarea
+                  value={observaciones}
+                  onChange={(e) =>
+                    setObservaciones(
+                      e.target.value
+                    )
+                  }
+                  rows={3}
+                  placeholder="Opcional"
+                  className="w-full rounded-xl border border-slate-300 p-3 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                />
+              </label>
 
-      {!contraido && (
-        <>
-          <span className="flex-1 text-sm font-semibold">
-            {etiqueta}
-          </span>
+              <button
+                type="button"
+                onClick={abrirWhatsApp}
+                className="mt-5 w-full rounded-xl bg-emerald-600 px-5 py-3.5 font-black text-white shadow-lg transition hover:bg-emerald-700"
+              >
+                Enviar cotización por WhatsApp
+              </button>
 
-          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[9px] font-black uppercase text-slate-400">
-            Próximamente
-          </span>
-        </>
-      )}
-    </div>
-  );
-}
-
-function EstadoSistema({
-  contraido,
-}: {
-  contraido: boolean;
-}) {
-  return (
-    <div className="border-t border-white/10 p-3">
-      <div
-        className={`rounded-xl bg-emerald-400/10 p-3 ${
-          contraido
-            ? "flex justify-center"
-            : ""
-        }`}
-      >
-        <div className="flex items-center gap-3">
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_0_5px_rgba(52,211,153,0.12)]" />
-
-          {!contraido && (
-            <div>
-              <p className="text-xs font-black text-emerald-300">
-                Sistema operativo
+              <p className="mt-3 text-center text-xs text-slate-400">
+                En el siguiente paso guardaremos la
+                cotización automáticamente en
+                control_cotizaciones.xlsx.
               </p>
-
-              <p className="text-xs text-emerald-200/70">
-                Servicios conectados
-              </p>
-            </div>
-          )}
+            </section>
+          </aside>
         </div>
       </div>
-    </div>
-  );
-}
-
-function IconoInicio() {
-  return (
-    <IconoBase>
-      <path d="m3 11 9-8 9 8" />
-      <path d="M5 10v10h14V10" />
-      <path d="M9 20v-6h6v6" />
-    </IconoBase>
-  );
-}
-
-function IconoPaquete() {
-  return (
-    <IconoBase>
-      <path d="m3 7 9-4 9 4-9 4-9-4Z" />
-      <path d="M3 7v10l9 4 9-4V7" />
-      <path d="M12 11v10" />
-    </IconoBase>
-  );
-}
-
-function IconoCamion() {
-  return (
-    <IconoBase>
-      <path d="M3 6h11v11H3V6Z" />
-      <path d="M14 10h4l3 3v4h-7v-7Z" />
-      <circle cx="7" cy="18" r="2" />
-      <circle cx="18" cy="18" r="2" />
-    </IconoBase>
-  );
-}
-
-function IconoCarpeta() {
-  return (
-    <IconoBase>
-      <path d="M3 6h7l2 2h9v11H3V6Z" />
-      <path d="M8 12h8" />
-      <path d="M8 16h6" />
-    </IconoBase>
-  );
-}
-
-function IconoBuscar() {
-  return (
-    <IconoBase>
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-4-4" />
-    </IconoBase>
-  );
-}
-
-function IconoFormulario() {
-  return (
-    <IconoBase>
-      <path d="M6 3h9l3 3v15H6V3Z" />
-      <path d="M14 3v4h4" />
-      <path d="M9 12h6" />
-      <path d="M9 16h6" />
-    </IconoBase>
-  );
-}
-
-function IconoUsuarios() {
-  return (
-    <IconoBase>
-      <circle cx="9" cy="8" r="3" />
-      <path d="M3 20a6 6 0 0 1 12 0" />
-      <path d="M16 5a3 3 0 0 1 0 6" />
-      <path d="M18 14a5 5 0 0 1 3 6" />
-    </IconoBase>
-  );
-}
-
-function IconoUbicacion() {
-  return (
-    <IconoBase>
-      <path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" />
-      <circle cx="12" cy="10" r="2.5" />
-    </IconoBase>
-  );
-}
-
-function IconoCotizacion() {
-  return (
-    <IconoBase>
-      <path d="M6 3h9l3 3v15H6V3Z" />
-      <path d="M14 3v4h4" />
-      <path d="M9 11h6" />
-      <path d="M9 15h6" />
-      <path d="M9 19h4" />
-    </IconoBase>
-  );
-}
-
-function IconoPago() {
-  return (
-    <IconoBase>
-      <rect x="3" y="5" width="18" height="14" rx="2" />
-      <path d="M3 10h18" />
-      <path d="M7 15h4" />
-    </IconoBase>
-  );
-}
-
-function IconoCaja() {
-  return (
-    <IconoBase>
-      <path d="M4 8h16v12H4V8Z" />
-      <path d="M8 8V4h8v4" />
-      <path d="M9 13h6" />
-    </IconoBase>
-  );
-}
-
-function IconoInventario() {
-  return (
-    <IconoBase>
-      <path d="M4 7 12 3l8 4-8 4-8-4Z" />
-      <path d="M4 7v10l8 4 8-4V7" />
-      <path d="M12 11v10" />
-      <path d="M8 9v4l4 2 4-2V9" />
-    </IconoBase>
-  );
-}
-
-function IconoGrafica() {
-  return (
-    <IconoBase>
-      <path d="M4 20V10" />
-      <path d="M10 20V4" />
-      <path d="M16 20v-7" />
-      <path d="M22 20H2" />
-    </IconoBase>
-  );
-}
-
-function IconoImportar() {
-  return (
-    <IconoBase>
-      <path d="M12 3v12" />
-      <path d="m7 10 5 5 5-5" />
-      <path d="M5 21h14" />
-    </IconoBase>
-  );
-}
-
-function IconoMenu() {
-  return (
-    <IconoBase>
-      <path d="M4 6h16" />
-      <path d="M4 12h16" />
-      <path d="M4 18h16" />
-    </IconoBase>
-  );
-}
-
-function IconoCerrar() {
-  return (
-    <IconoBase>
-      <path d="m6 6 12 12" />
-      <path d="m18 6-12 12" />
-    </IconoBase>
-  );
-}
-
-function IconoSalir() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-4 w-4"
-      aria-hidden="true"
-    >
-      <path d="M10 17l5-5-5-5" />
-      <path d="M15 12H3" />
-      <path d="M15 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" />
-    </svg>
-  );
-}
-
-function IconoBase({
-  children,
-}: {
-  children: ReactNode;
-}) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-5 w-5"
-      aria-hidden="true"
-    >
-      {children}
-    </svg>
+    </main>
   );
 }
