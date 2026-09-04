@@ -13,12 +13,75 @@ type RegistroClienteBody = {
   referencia_domicilio?: string;
 };
 
-function limpiarTelefono(valor: unknown) {
-  return String(valor || "").replace(/\D/g, "");
+function soloDigitos(valor: unknown) {
+  return String(valor ?? "")
+    .replace(/\D/g, "")
+    .trim();
+}
+
+function normalizarTelefonoWhatsApp(
+  valor: unknown
+) {
+  const telefono =
+    soloDigitos(valor);
+
+  if (!telefono) {
+    return "";
+  }
+
+  /*
+   * México:
+   * 10 dígitos       -> 521 + número
+   * 52 + 10 dígitos -> 521 + número
+   * 521 + 10 dígitos -> se conserva
+   */
+  if (
+    telefono.startsWith("521") &&
+    telefono.length === 13
+  ) {
+    return telefono;
+  }
+
+  if (
+    telefono.startsWith("52") &&
+    telefono.length === 12
+  ) {
+    return `521${telefono.slice(2)}`;
+  }
+
+  if (telefono.length === 10) {
+    return `521${telefono}`;
+  }
+
+  return "";
+}
+
+function variantesTelefonoMexico(
+  telefonoNormalizado: string
+) {
+  if (
+    !telefonoNormalizado.startsWith(
+      "521"
+    ) ||
+    telefonoNormalizado.length !== 13
+  ) {
+    return [telefonoNormalizado];
+  }
+
+  const nacional =
+    telefonoNormalizado.slice(3);
+
+  return [
+    telefonoNormalizado,
+    `52${nacional}`,
+    nacional,
+  ];
 }
 
 function limpiarTexto(valor: unknown) {
-  return String(valor || "").trim().replace(/\s+/g, " ");
+  return String(valor ?? "")
+    .trim()
+    .replace(/\s+/g, " ");
 }
 
 function generarFolio() {
@@ -26,8 +89,12 @@ function generarFolio() {
 
   const fecha =
     `${ahora.getFullYear()}` +
-    `${String(ahora.getMonth() + 1).padStart(2, "0")}` +
-    `${String(ahora.getDate()).padStart(2, "0")}`;
+    `${String(
+      ahora.getMonth() + 1
+    ).padStart(2, "0")}` +
+    `${String(
+      ahora.getDate()
+    ).padStart(2, "0")}`;
 
   const sufijo =
     randomUUID()
@@ -38,22 +105,32 @@ function generarFolio() {
   return `CLI-${fecha}-${sufijo}`;
 }
 
-export async function POST(request: Request) {
+export async function POST(
+  request: Request
+) {
   try {
     const body =
       (await request.json()) as RegistroClienteBody;
 
     const nombre =
-      limpiarTexto(body?.nombre);
+      limpiarTexto(
+        body?.nombre
+      );
 
     const telefono =
-      limpiarTelefono(body?.telefono);
+      normalizarTelefonoWhatsApp(
+        body?.telefono
+      );
 
     const direccion =
-      limpiarTexto(body?.direccion);
+      limpiarTexto(
+        body?.direccion
+      );
 
     const referenciaDomicilio =
-      limpiarTexto(body?.referencia_domicilio);
+      limpiarTexto(
+        body?.referencia_domicilio
+      );
 
     if (!nombre) {
       return NextResponse.json(
@@ -77,12 +154,12 @@ export async function POST(request: Request) {
       );
     }
 
-    if (telefono.length !== 10) {
+    if (!telefono) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "El teléfono debe tener 10 dígitos.",
+            "Ingresa un teléfono mexicano válido de 10 dígitos.",
         },
         { status: 400 }
       );
@@ -111,10 +188,12 @@ export async function POST(request: Request) {
     }
 
     const supabaseUrl =
-      process.env.NEXT_PUBLIC_SUPABASE_URL;
+      process.env
+        .NEXT_PUBLIC_SUPABASE_URL;
 
     const supabaseServiceRoleKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY;
+      process.env
+        .SUPABASE_SERVICE_ROLE_KEY;
 
     if (
       !supabaseUrl ||
@@ -136,28 +215,39 @@ export async function POST(request: Request) {
         supabaseServiceRoleKey,
         {
           auth: {
-            autoRefreshToken: false,
-            persistSession: false,
+            autoRefreshToken:
+              false,
+            persistSession:
+              false,
           },
         }
       );
 
     /*
-     * Evitamos duplicados mientras exista
-     * una solicitud pendiente o ya aprobada.
+     * Revisamos también formatos antiguos:
+     * 10 dígitos, 52 + número y 521 + número.
+     * Así evitamos duplicar un cliente que ya
+     * estaba guardado antes de esta corrección.
      */
+    const telefonosEquivalentes =
+      variantesTelefonoMexico(
+        telefono
+      );
+
     const {
       data: existente,
       error: buscarError,
     } =
       await supabase
-        .from("solicitudes_clientes")
-        .select(
-          "id, folio, estado"
+        .from(
+          "solicitudes_clientes"
         )
-        .eq(
+        .select(
+          "id, folio, estado, telefono"
+        )
+        .in(
           "telefono",
-          telefono
+          telefonosEquivalentes
         )
         .in(
           "estado",
@@ -198,7 +288,8 @@ export async function POST(request: Request) {
         {
           success: false,
           error:
-            existente.estado === "aprobado"
+            existente.estado ===
+            "aprobado"
               ? "Este número de teléfono ya pertenece a un cliente registrado."
               : "Ya existe una solicitud pendiente con este número de teléfono.",
           folio:
@@ -216,7 +307,9 @@ export async function POST(request: Request) {
       error: insertError,
     } =
       await supabase
-        .from("solicitudes_clientes")
+        .from(
+          "solicitudes_clientes"
+        )
         .insert({
           folio,
           nombre,
@@ -269,6 +362,8 @@ export async function POST(request: Request) {
         solicitud.folio,
       estado:
         solicitud.estado,
+      telefono:
+        solicitud.telefono,
     });
   } catch (error: unknown) {
     console.error(
