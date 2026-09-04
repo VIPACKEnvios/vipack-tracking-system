@@ -97,20 +97,40 @@ export default function CotizacionesPage() {
 
   const calculo = useMemo(() => {
     const detalle = cajas.map((caja, indice) => {
-      const peso = Number(caja.peso || 0);
+      const largo = Number(caja.largo || 0);
+      const ancho = Number(caja.ancho || 0);
+      const alto = Number(caja.alto || 0);
+      const pesoReal = Number(caja.peso || 0);
+
+      const pesoVolumetrico =
+        largo > 0 && ancho > 0 && alto > 0
+          ? (largo * ancho * alto) / 5000
+          : 0;
+
+      const pesoCobrable = Math.max(
+        pesoReal,
+        pesoVolumetrico
+      );
+
       const tarifaAerea = obtenerTarifa(
         "Aereo",
-        peso
+        pesoCobrable
       );
+
       const tarifaTerrestre = obtenerTarifa(
         "Terrestre",
-        peso
+        pesoCobrable
       );
 
       return {
         ...caja,
         numero: indice + 1,
-        peso,
+        largo,
+        ancho,
+        alto,
+        pesoReal,
+        pesoVolumetrico,
+        pesoCobrable,
         tarifaAerea,
         tarifaTerrestre,
       };
@@ -129,14 +149,26 @@ export default function CotizacionesPage() {
       0
     );
 
-    const pesoTotal = detalle.reduce(
-      (total, caja) => total + caja.peso,
+    const pesoRealTotal = detalle.reduce(
+      (total, caja) => total + caja.pesoReal,
+      0
+    );
+
+    const pesoVolumetricoTotal = detalle.reduce(
+      (total, caja) =>
+        total + caja.pesoVolumetrico,
+      0
+    );
+
+    const pesoCobrableTotal = detalle.reduce(
+      (total, caja) =>
+        total + caja.pesoCobrable,
       0
     );
 
     const cajasSinTarifa = detalle.filter(
       (caja) =>
-        caja.peso > 0 &&
+        caja.pesoCobrable > 0 &&
         (!caja.tarifaAerea ||
           !caja.tarifaTerrestre)
     ).length;
@@ -145,7 +177,9 @@ export default function CotizacionesPage() {
       detalle,
       totalAereo,
       totalTerrestre,
-      pesoTotal,
+      pesoRealTotal,
+      pesoVolumetricoTotal,
+      pesoCobrableTotal,
       cajasSinTarifa,
     };
   }, [cajas]);
@@ -220,7 +254,7 @@ export default function CotizacionesPage() {
 
     if (
       calculo.detalle.some(
-        (caja) => caja.peso <= 0
+        (caja) => caja.pesoReal <= 0
       )
     ) {
       window.alert(
@@ -242,7 +276,10 @@ export default function CotizacionesPage() {
       "Te compartimos tu cotización de VIPACK Envíos 📦",
       "",
       `Cajas: ${cajas.length}`,
-      `Peso total registrado: ${calculo.pesoTotal.toFixed(
+      `Peso real total: ${calculo.pesoRealTotal.toFixed(
+        1
+      )} kg`,
+      `Peso cobrable total: ${calculo.pesoCobrableTotal.toFixed(
         1
       )} kg`,
       "",
@@ -250,7 +287,11 @@ export default function CotizacionesPage() {
 
     calculo.detalle.forEach((caja) => {
       lineas.push(
-        `Caja ${caja.numero}: ${caja.peso.toFixed(
+        `Caja ${caja.numero}: real ${caja.pesoReal.toFixed(
+          1
+        )} kg · volumétrico ${caja.pesoVolumetrico.toFixed(
+          1
+        )} kg · cobrable ${caja.pesoCobrable.toFixed(
           1
         )} kg${
           caja.largo &&
@@ -472,13 +513,42 @@ export default function CotizacionesPage() {
                       ))}
                     </div>
 
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-xl border border-slate-200 bg-white p-4">
+                        <p className="text-xs font-bold uppercase text-slate-600">
+                          Peso real
+                        </p>
+                        <p className="mt-1 text-lg font-black text-slate-950">
+                          {caja.pesoReal.toFixed(1)} kg
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+                        <p className="text-xs font-bold uppercase text-violet-700">
+                          Peso volumétrico
+                        </p>
+                        <p className="mt-1 text-lg font-black text-violet-950">
+                          {caja.pesoVolumetrico.toFixed(1)} kg
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                        <p className="text-xs font-bold uppercase text-emerald-700">
+                          Peso cobrable
+                        </p>
+                        <p className="mt-1 text-lg font-black text-emerald-950">
+                          {caja.pesoCobrable.toFixed(1)} kg
+                        </p>
+                      </div>
+                    </div>
+
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-xl border border-sky-200 bg-sky-50 p-4">
                         <p className="text-xs font-bold uppercase text-sky-700">
                           Aéreo
                         </p>
                         <p className="mt-1 text-xl font-black text-sky-950">
-                          {caja.peso <= 0
+                          {caja.pesoCobrable <= 0
                             ? "—"
                             : caja.tarifaAerea
                             ? dinero(
@@ -494,7 +564,7 @@ export default function CotizacionesPage() {
                           Terrestre
                         </p>
                         <p className="mt-1 text-xl font-black text-amber-950">
-                          {caja.peso <= 0
+                          {caja.pesoCobrable <= 0
                             ? "—"
                             : caja.tarifaTerrestre
                             ? dinero(
@@ -536,7 +606,7 @@ export default function CotizacionesPage() {
                     Peso total
                   </p>
                   <p className="mt-1 text-2xl font-black text-slate-950">
-                    {calculo.pesoTotal.toFixed(1)} kg
+                    {calculo.pesoCobrableTotal.toFixed(1)} kg
                   </p>
                 </div>
               </div>
