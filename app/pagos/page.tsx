@@ -48,7 +48,7 @@ function EstadoPago({
 
   return (
     <span
-      className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${estilos}`}
+      className={`inline-flex whitespace-nowrap rounded-full border px-3 py-1 text-xs font-bold ${estilos}`}
     >
       {estado}
     </span>
@@ -512,8 +512,8 @@ export default function PagosPage() {
   }
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-slate-100 p-4 md:p-6">
-      <div className="mx-auto max-w-7xl">
+    <main className="min-h-[calc(100vh-4rem)] overflow-x-hidden bg-slate-100 p-3 sm:p-4 md:p-6">
+      <div className="mx-auto w-full max-w-7xl">
 
         {/* ENCABEZADO */}
 
@@ -523,7 +523,7 @@ export default function PagosPage() {
               Ventas y cobranza
             </p>
 
-            <h1 className="mt-1 text-3xl font-black text-slate-950">
+            <h1 className="mt-1 text-2xl font-black text-slate-950 sm:text-3xl">
               Pagos
             </h1>
 
@@ -535,37 +535,37 @@ export default function PagosPage() {
 
         {/* RESUMEN */}
 
-        <div className="mb-5 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-5 grid gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Total cotizado
             </p>
 
-            <p className="mt-2 text-2xl font-black text-slate-950">
+            <p className="mt-2 break-words text-xl font-black text-slate-950 sm:text-2xl">
               {dinero(
                 totales.cotizado
               )}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm">
+          <div className="rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm sm:p-5">
             <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
               Cobrado
             </p>
 
-            <p className="mt-2 text-2xl font-black text-emerald-700">
+            <p className="mt-2 break-words text-xl font-black text-emerald-700 sm:text-2xl">
               {dinero(
                 totales.cobrado
               )}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm">
+          <div className="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm sm:p-5">
             <p className="text-xs font-bold uppercase tracking-wider text-amber-700">
               Saldo pendiente
             </p>
 
-            <p className="mt-2 text-2xl font-black text-amber-700">
+            <p className="mt-2 break-words text-xl font-black text-amber-700 sm:text-2xl">
               {dinero(
                 totales.pendiente
               )}
@@ -573,9 +573,12 @@ export default function PagosPage() {
           </div>
         </div>
 
-        {/* TABLA */}
+        {/* COTIZACIONES Y PAGOS */}
 
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+          {/* BUSCADOR */}
+
           <div className="border-b border-slate-200 p-4 md:p-5">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
@@ -589,16 +592,14 @@ export default function PagosPage() {
               </div>
 
               <input
-                value={
-                  busqueda
-                }
+                value={busqueda}
                 onChange={(e) =>
                   setBusqueda(
                     e.target.value
                   )
                 }
                 placeholder="Buscar folio, cliente o teléfono..."
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100 md:max-w-md"
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100 md:max-w-md"
               />
             </div>
           </div>
@@ -608,166 +609,293 @@ export default function PagosPage() {
               Cargando pagos...
             </div>
           ) : error ? (
-            <div className="p-8">
+            <div className="p-4 md:p-8">
               <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                 {error}
               </div>
             </div>
-          ) : filtrados.length ===
-            0 ? (
+          ) : filtrados.length === 0 ? (
             <div className="p-10 text-center">
               <p className="font-bold text-slate-800">
                 No hay registros para mostrar.
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px]">
-                <thead className="bg-slate-50">
-                  <tr className="border-b border-slate-200 text-left">
-                    <th className="px-5 py-3 text-xs font-black uppercase text-slate-500">
-                      Folio
-                    </th>
+            <>
+              {/* =========================================
+                  CELULAR
+              ========================================== */}
 
-                    <th className="px-5 py-3 text-xs font-black uppercase text-slate-500">
-                      Cliente
-                    </th>
+              <div className="divide-y divide-slate-200 md:hidden">
+                {filtrados.map((pago) => (
+                  <div
+                    key={pago.folio}
+                    className="p-4"
+                  >
+                    {/* FOLIO Y ESTADO */}
 
-                    <th className="px-5 py-3 text-xs font-black uppercase text-slate-500">
-                      Fecha
-                    </th>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                          Folio
+                        </p>
 
-                    <th className="px-5 py-3 text-right text-xs font-black uppercase text-slate-500">
-                      Total
-                    </th>
+                        <p className="mt-1 break-all text-sm font-black leading-snug text-blue-800">
+                          {pago.folio}
+                        </p>
+                      </div>
 
-                    <th className="px-5 py-3 text-right text-xs font-black uppercase text-slate-500">
-                      Pagado
-                    </th>
+                      <div className="shrink-0">
+                        <EstadoPago
+                          estado={pago.estado}
+                        />
+                      </div>
+                    </div>
 
-                    <th className="px-5 py-3 text-right text-xs font-black uppercase text-slate-500">
-                      Saldo
-                    </th>
+                    {/* CLIENTE */}
 
-                    <th className="px-5 py-3 text-xs font-black uppercase text-slate-500">
-                      Estado
-                    </th>
+                    <div className="mt-4">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        Cliente
+                      </p>
 
-                    <th className="px-5 py-3"></th>
-                  </tr>
-                </thead>
+                      <p className="mt-1 break-words text-base font-black leading-snug text-slate-950">
+                        {pago.cliente}
+                      </p>
 
-                <tbody>
-                  {filtrados.map(
-                    (pago) => (
-                      <tr
-                        key={
-                          pago.folio
-                        }
-                        className="border-b border-slate-100 transition hover:bg-slate-50"
-                      >
-                        <td className="px-5 py-4">
-                          <p className="font-bold text-blue-800">
-                            {
-                              pago.folio
-                            }
-                          </p>
-                        </td>
+                      <p className="mt-1 break-all text-xs text-slate-500">
+                        {pago.whatsapp}
+                      </p>
+                    </div>
 
-                        <td className="px-5 py-4">
-                          <p className="font-bold text-slate-900">
-                            {
-                              pago.cliente
-                            }
-                          </p>
+                    {/* FECHA */}
 
-                          <p className="text-xs text-slate-500">
-                            {
-                              pago.whatsapp
-                            }
-                          </p>
-                        </td>
+                    <div className="mt-4">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        Fecha
+                      </p>
 
-                        <td className="px-5 py-4 text-sm text-slate-600">
-                          {
-                            pago.fecha
-                          }
-                        </td>
+                      <p className="mt-1 text-sm font-medium text-slate-700">
+                        {pago.fecha}
+                      </p>
+                    </div>
 
-                        <td className="px-5 py-4 text-right font-bold text-slate-900">
+                    {/* CANTIDADES */}
+
+                    <div className="mt-4 grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
+                      <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                          Total
+                        </p>
+
+                        <p className="mt-1 break-words text-sm font-black text-slate-950">
                           {pago.total > 0
                             ? dinero(
                                 pago.total
                               )
                             : "Por definir"}
-                        </td>
+                        </p>
+                      </div>
 
-                        <td className="px-5 py-4 text-right font-bold text-emerald-700">
+                      <div className="min-w-0 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                        <p className="text-[10px] font-black uppercase tracking-wide text-emerald-700">
+                          Pagado
+                        </p>
+
+                        <p className="mt-1 break-words text-sm font-black text-emerald-700">
                           {dinero(
                             pago.pagado
                           )}
-                        </td>
+                        </p>
+                      </div>
 
-                        <td className="px-5 py-4 text-right font-black text-slate-900">
+                      <div className="min-w-0 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                        <p className="text-[10px] font-black uppercase tracking-wide text-amber-700">
+                          Saldo
+                        </p>
+
+                        <p className="mt-1 break-words text-sm font-black text-amber-700">
                           {pago.total > 0
                             ? dinero(
                                 pago.saldo
                               )
                             : "—"}
-                        </td>
+                        </p>
+                      </div>
+                    </div>
 
-                        <td className="px-5 py-4">
-                          <EstadoPago
-                            estado={
-                              pago.estado
-                            }
-                          />
-                        </td>
+                    {/* BOTÓN */}
 
-                        <td className="px-5 py-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              abrirPago(
-                                pago
-                              )
+                    <button
+                      type="button"
+                      onClick={() =>
+                        abrirPago(
+                          pago
+                        )
+                      }
+                      className="mt-4 w-full rounded-xl bg-blue-700 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-800"
+                    >
+                      Ver / Abonar
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* =========================================
+                  TABLET / COMPUTADORA
+              ========================================== */}
+
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full min-w-[900px]">
+                  <thead className="bg-slate-50">
+                    <tr className="border-b border-slate-200 text-left">
+                      <th className="px-5 py-3 text-xs font-black uppercase text-slate-500">
+                        Folio
+                      </th>
+
+                      <th className="px-5 py-3 text-xs font-black uppercase text-slate-500">
+                        Cliente
+                      </th>
+
+                      <th className="px-5 py-3 text-xs font-black uppercase text-slate-500">
+                        Fecha
+                      </th>
+
+                      <th className="px-5 py-3 text-right text-xs font-black uppercase text-slate-500">
+                        Total
+                      </th>
+
+                      <th className="px-5 py-3 text-right text-xs font-black uppercase text-slate-500">
+                        Pagado
+                      </th>
+
+                      <th className="px-5 py-3 text-right text-xs font-black uppercase text-slate-500">
+                        Saldo
+                      </th>
+
+                      <th className="px-5 py-3 text-xs font-black uppercase text-slate-500">
+                        Estado
+                      </th>
+
+                      <th className="px-5 py-3"></th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {filtrados.map(
+                      (pago) => (
+                        <tr
+                          key={
+                            pago.folio
+                          }
+                          className="border-b border-slate-100 transition hover:bg-slate-50"
+                        >
+                          <td className="px-5 py-4">
+                            <p className="font-bold text-blue-800">
+                              {
+                                pago.folio
+                              }
+                            </p>
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <p className="font-bold text-slate-900">
+                              {
+                                pago.cliente
+                              }
+                            </p>
+
+                            <p className="text-xs text-slate-500">
+                              {
+                                pago.whatsapp
+                              }
+                            </p>
+                          </td>
+
+                          <td className="px-5 py-4 text-sm text-slate-600">
+                            {
+                              pago.fecha
                             }
-                            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
-                          >
-                            Ver / Abonar
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  )}
-                </tbody>
-              </table>
-            </div>
+                          </td>
+
+                          <td className="px-5 py-4 text-right font-bold text-slate-900">
+                            {pago.total > 0
+                              ? dinero(
+                                  pago.total
+                                )
+                              : "Por definir"}
+                          </td>
+
+                          <td className="px-5 py-4 text-right font-bold text-emerald-700">
+                            {dinero(
+                              pago.pagado
+                            )}
+                          </td>
+
+                          <td className="px-5 py-4 text-right font-black text-slate-900">
+                            {pago.total > 0
+                              ? dinero(
+                                  pago.saldo
+                                )
+                              : "—"}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <EstadoPago
+                              estado={
+                                pago.estado
+                              }
+                            />
+                          </td>
+
+                          <td className="px-5 py-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                abrirPago(
+                                  pago
+                                )
+                              }
+                              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                            >
+                              Ver / Abonar
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </div>
 
-      {/* MODAL */}
+      {/* =========================================
+          MODAL
+      ========================================== */}
 
       {seleccionado && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="max-h-[95vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4">
 
-            {/* CABECERA MODAL */}
+          <div className="max-h-[96vh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:max-h-[95vh] sm:max-w-2xl sm:rounded-2xl">
 
-            <div className="flex items-start justify-between border-b border-slate-200 p-5">
-              <div>
+            {/* CABECERA */}
+
+            <div className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-200 bg-white p-4 sm:p-5">
+              <div className="min-w-0 pr-3">
                 <p className="text-xs font-black uppercase tracking-wider text-blue-700">
                   Registrar pago
                 </p>
 
-                <h2 className="mt-1 text-xl font-black text-slate-950">
+                <h2 className="mt-1 break-words text-lg font-black text-slate-950 sm:text-xl">
                   {
                     seleccionado.cliente
                   }
                 </h2>
 
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 break-all text-xs text-slate-500 sm:text-sm">
                   {
                     seleccionado.folio
                   }
@@ -782,13 +910,13 @@ export default function PagosPage() {
                 disabled={
                   guardando
                 }
-                className="rounded-lg px-3 py-2 text-lg font-bold text-slate-500 hover:bg-slate-100 disabled:opacity-50"
+                className="shrink-0 rounded-lg px-3 py-2 text-xl font-bold text-slate-500 hover:bg-slate-100 disabled:opacity-50"
               >
                 ×
               </button>
             </div>
 
-            <div className="space-y-5 p-5">
+            <div className="space-y-5 p-4 sm:p-5">
 
               {/* CLIENTE */}
 
@@ -798,7 +926,7 @@ export default function PagosPage() {
                     WhatsApp
                   </p>
 
-                  <p className="mt-1 font-bold text-slate-900">
+                  <p className="mt-1 break-all font-bold text-slate-900">
                     {
                       seleccionado.whatsapp
                     }
@@ -910,37 +1038,37 @@ export default function PagosPage() {
 
               {/* TOTALES */}
 
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border border-slate-200 p-4">
-                  <p className="text-xs font-bold uppercase text-slate-500">
+              <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
+                <div className="rounded-xl border border-slate-200 p-3 sm:p-4">
+                  <p className="text-[10px] font-bold uppercase text-slate-500 sm:text-xs">
                     Total
                   </p>
 
-                  <p className="mt-1 text-lg font-black text-slate-950">
+                  <p className="mt-1 break-words text-base font-black text-slate-950 sm:text-lg">
                     {dinero(
                       totalSeleccionado
                     )}
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                  <p className="text-xs font-bold uppercase text-amber-700">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 sm:p-4">
+                  <p className="text-[10px] font-bold uppercase text-amber-700 sm:text-xs">
                     Saldo actual
                   </p>
 
-                  <p className="mt-1 text-lg font-black text-amber-700">
+                  <p className="mt-1 break-words text-base font-black text-amber-700 sm:text-lg">
                     {dinero(
                       saldoActual
                     )}
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                  <p className="text-xs font-bold uppercase text-emerald-700">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 sm:p-4">
+                  <p className="text-[10px] font-bold uppercase text-emerald-700 sm:text-xs">
                     Nuevo saldo
                   </p>
 
-                  <p className="mt-1 text-lg font-black text-emerald-700">
+                  <p className="mt-1 break-words text-base font-black text-emerald-700 sm:text-lg">
                     {dinero(
                       nuevoSaldo
                     )}
@@ -959,6 +1087,7 @@ export default function PagosPage() {
                   type="number"
                   min="0"
                   step="0.01"
+                  inputMode="decimal"
                   value={
                     montoPago
                   }
@@ -1046,12 +1175,12 @@ export default function PagosPage() {
               {/* COMPROBANTE */}
 
               <div>
-                <div className="mb-1 flex items-center justify-between">
+                <div className="mb-1 flex items-center justify-between gap-2">
                   <label className="block text-sm font-bold text-slate-800">
                     Comprobante de pago
                   </label>
 
-                  <span className="text-xs text-slate-500">
+                  <span className="shrink-0 text-xs text-slate-500">
                     Opcional
                   </span>
                 </div>
@@ -1095,7 +1224,7 @@ export default function PagosPage() {
                 ) : (
                   <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
 
-                    <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                    <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
                       <div className="min-w-0">
                         <p className="text-sm font-bold text-slate-800">
                           Comprobante seleccionado
@@ -1116,13 +1245,13 @@ export default function PagosPage() {
                         onClick={
                           quitarComprobante
                         }
-                        className="ml-3 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                        className="shrink-0 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"
                       >
                         Quitar
                       </button>
                     </div>
 
-                    <div className="flex justify-center bg-slate-100 p-4">
+                    <div className="flex justify-center bg-slate-100 p-3 sm:p-4">
                       <img
                         src={
                           previewComprobante
@@ -1201,7 +1330,7 @@ export default function PagosPage() {
 
             {/* BOTONES */}
 
-            <div className="flex flex-col-reverse gap-3 border-t border-slate-200 p-5 sm:flex-row sm:justify-end">
+            <div className="sticky bottom-0 flex flex-col-reverse gap-3 border-t border-slate-200 bg-white p-4 sm:flex-row sm:justify-end sm:p-5">
               <button
                 type="button"
                 onClick={
@@ -1210,7 +1339,7 @@ export default function PagosPage() {
                 disabled={
                   guardando
                 }
-                className="rounded-xl border border-slate-300 bg-white px-5 py-3 font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-xl border border-slate-300 bg-white px-5 py-3 font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
               >
                 Cancelar
               </button>
@@ -1223,7 +1352,7 @@ export default function PagosPage() {
                 disabled={
                   guardando
                 }
-                className="rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
                 {guardando
                   ? comprobante

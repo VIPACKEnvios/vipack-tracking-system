@@ -7,15 +7,14 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const RUTA_EXCEL = "Envios/control_cotizaciones.xlsx";
-const CARPETA_COMPROBANTES = "Envios/Comprobantes_Pagos";
+const CARPETA_COMPROBANTES =
+  "Envios/Comprobantes_Pagos";
 
 const HOJA_COTIZACIONES = "Cotizaciones";
 const HOJA_HISTORIAL = "Historial_Pagos";
 
 /* =========================================================
-   CONEXION ACTUAL A ONEDRIVE
-   Supabase aqui SOLO conserva el refresh token existente.
-   Pagos, Excel y comprobantes se guardan en OneDrive.
+   CONEXIÓN ONEDRIVE
 ========================================================= */
 
 function crearSupabase() {
@@ -27,7 +26,7 @@ function crearSupabase() {
 
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error(
-      "Faltan variables de configuración para recuperar la conexión de OneDrive."
+      "Faltan variables para recuperar la conexión de OneDrive."
     );
   }
 
@@ -66,7 +65,8 @@ async function obtenerAccessToken() {
     );
   }
 
-  const supabase = crearSupabase();
+  const supabase =
+    crearSupabase();
 
   const {
     data: conexion,
@@ -82,7 +82,7 @@ async function obtenerAccessToken() {
 
   if (error) {
     throw new Error(
-      `No se pudo consultar la conexión de OneDrive: ${error.message}`
+      `No se pudo consultar OneDrive: ${error.message}`
     );
   }
 
@@ -105,10 +105,15 @@ async function obtenerAccessToken() {
 
         body: new URLSearchParams({
           client_id: clientId,
-          client_secret: clientSecret,
-          grant_type: "refresh_token",
+          client_secret:
+            clientSecret,
+
+          grant_type:
+            "refresh_token",
+
           refresh_token:
             conexion.refresh_token,
+
           scope:
             "openid profile offline_access User.Read Files.ReadWrite",
         }),
@@ -147,17 +152,18 @@ async function obtenerAccessToken() {
     nuevoRefreshToken !==
       conexion.refresh_token
   ) {
-    const { error: updateError } =
-      await supabase
-        .from("onedrive_connections")
-        .update({
-          refresh_token:
-            nuevoRefreshToken,
+    const {
+      error: updateError,
+    } = await supabase
+      .from("onedrive_connections")
+      .update({
+        refresh_token:
+          nuevoRefreshToken,
 
-          updated_at:
-            new Date().toISOString(),
-        })
-        .eq("id", conexion.id);
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq("id", conexion.id);
 
     if (updateError) {
       console.error(
@@ -171,7 +177,7 @@ async function obtenerAccessToken() {
 }
 
 /* =========================================================
-   EXCEL ONEDRIVE
+   ONEDRIVE EXCEL
 ========================================================= */
 
 async function descargarExcel(
@@ -242,7 +248,7 @@ async function subirExcel(
 }
 
 /* =========================================================
-   COMPROBANTES EN ONEDRIVE
+   COMPROBANTES
 ========================================================= */
 
 async function asegurarCarpetaComprobantes(
@@ -254,20 +260,25 @@ async function asegurarCarpetaComprobantes(
     )}`;
 
   const existe =
-    await fetch(consultar, {
-      headers: {
-        Authorization:
-          `Bearer ${accessToken}`,
-      },
+    await fetch(
+      consultar,
+      {
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+        },
 
-      cache: "no-store",
-    });
+        cache: "no-store",
+      }
+    );
 
   if (existe.ok) {
     return;
   }
 
-  if (existe.status !== 404) {
+  if (
+    existe.status !== 404
+  ) {
     const detalle =
       await existe.text();
 
@@ -291,7 +302,8 @@ async function asegurarCarpetaComprobantes(
         },
 
         body: JSON.stringify({
-          name: "Comprobantes_Pagos",
+          name:
+            "Comprobantes_Pagos",
 
           folder: {},
 
@@ -303,14 +315,61 @@ async function asegurarCarpetaComprobantes(
       }
     );
 
-  if (!crear.ok && crear.status !== 409) {
+  if (
+    !crear.ok &&
+    crear.status !== 409
+  ) {
     const detalle =
       await crear.text();
 
     throw new Error(
-      `No se pudo crear la carpeta Comprobantes_Pagos. ${detalle}`
+      `No se pudo crear Comprobantes_Pagos. ${detalle}`
     );
   }
+}
+
+function timestampTijuana() {
+  const partes =
+    new Intl.DateTimeFormat(
+      "en-US",
+      {
+        timeZone:
+          "America/Tijuana",
+
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+
+        hour12: false,
+      }
+    ).formatToParts(
+      new Date()
+    );
+
+  const valores:
+    Record<string, string> =
+    {};
+
+  for (
+    const parte of partes
+  ) {
+    if (
+      parte.type !==
+      "literal"
+    ) {
+      valores[
+        parte.type
+      ] = parte.value;
+    }
+  }
+
+  return `${valores.year}${valores.month}${valores.day}_${valores.hour}${valores.minute}${valores.second}_${Date.now()
+    .toString()
+    .slice(-4)}`;
 }
 
 function limpiarNombreArchivo(
@@ -333,19 +392,19 @@ function extensionArchivo(
   const nombre =
     archivo.name || "";
 
-  const ultima =
+  const extension =
     nombre
       .split(".")
       .pop()
       ?.toLowerCase();
 
   if (
-    ultima === "jpg" ||
-    ultima === "jpeg" ||
-    ultima === "png" ||
-    ultima === "webp"
+    extension === "jpg" ||
+    extension === "jpeg" ||
+    extension === "png" ||
+    extension === "webp"
   ) {
-    return ultima;
+    return extension;
   }
 
   if (
@@ -383,16 +442,15 @@ async function subirComprobante(
     );
   }
 
-  const tiposPermitidos =
-    [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-    ];
+  const permitidos = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+  ];
 
   if (
     archivo.type &&
-    !tiposPermitidos.includes(
+    !permitidos.includes(
       archivo.type
     )
   ) {
@@ -401,46 +459,11 @@ async function subirComprobante(
     );
   }
 
-  const ahora =
-    new Date();
-
-  const marca =
-    [
-      ahora.getFullYear(),
-      String(
-        ahora.getMonth() + 1
-      ).padStart(2, "0"),
-      String(
-        ahora.getDate()
-      ).padStart(2, "0"),
-
-      "_",
-
-      String(
-        ahora.getHours()
-      ).padStart(2, "0"),
-      String(
-        ahora.getMinutes()
-      ).padStart(2, "0"),
-      String(
-        ahora.getSeconds()
-      ).padStart(2, "0"),
-
-      "_",
-
-      String(
-        ahora.getMilliseconds()
-      ).padStart(3, "0"),
-    ].join("");
-
-  const extension =
-    extensionArchivo(
-      archivo
-    );
-
   const nombre =
     limpiarNombreArchivo(
-      `${folio}_${marca}.${extension}`
+      `${folio}_${timestampTijuana()}.${extensionArchivo(
+        archivo
+      )}`
     );
 
   const ruta =
@@ -457,25 +480,28 @@ async function subirComprobante(
     );
 
   const response =
-    await fetch(url, {
-      method: "PUT",
+    await fetch(
+      url,
+      {
+        method: "PUT",
 
-      headers: {
-        Authorization:
-          `Bearer ${accessToken}`,
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
 
-        "Content-Type":
-          archivo.type ||
-          "application/octet-stream",
-      },
+          "Content-Type":
+            archivo.type ||
+            "application/octet-stream",
+        },
 
-      body:
-        new Uint8Array(
-          buffer
-        ),
+        body:
+          new Uint8Array(
+            buffer
+          ),
 
-      cache: "no-store",
-    });
+        cache: "no-store",
+      }
+    );
 
   if (!response.ok) {
     const detalle =
@@ -493,7 +519,6 @@ async function subirComprobante(
 
   return {
     ruta,
-    nombre,
 
     webUrl:
       typeof data?.webUrl ===
@@ -521,9 +546,7 @@ function numero(
   if (
     typeof valor ===
       "number" &&
-    Number.isFinite(
-      valor
-    )
+    Number.isFinite(valor)
   ) {
     return valor;
   }
@@ -536,12 +559,26 @@ function numero(
       .replace(/,/g, "")
       .trim();
 
+  if (!limpio) {
+    return 0;
+  }
+
   const n =
     Number(limpio);
 
   return Number.isFinite(n)
     ? n
     : 0;
+}
+
+function dineroRedondeado(
+  valor: number
+) {
+  return Math.round(
+    (valor +
+      Number.EPSILON) *
+      100
+  ) / 100;
 }
 
 function valorCelda(
@@ -602,8 +639,7 @@ function asegurarRango(
 }
 
 function siguienteFilaLibre(
-  hoja: XLSX.WorkSheet,
-  columna = "A"
+  hoja: XLSX.WorkSheet
 ) {
   const rango =
     XLSX.utils.decode_range(
@@ -618,43 +654,22 @@ function siguienteFilaLibre(
     fila += 1
   ) {
     const valor =
-      hoja[
-        `${columna}${fila}`
-      ]?.v;
+      valorCelda(
+        hoja,
+        "A",
+        fila
+      );
 
     if (
       valor === undefined ||
       valor === null ||
-      String(valor).trim() ===
-        ""
+      texto(valor) === ""
     ) {
       return fila;
     }
   }
 
   return rango.e.r + 2;
-}
-
-function fechaTijuana() {
-  return new Intl.DateTimeFormat(
-    "es-MX",
-    {
-      timeZone:
-        "America/Tijuana",
-
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-
-      hour12: true,
-    }
-  ).format(
-    new Date()
-  );
 }
 
 function buscarFilaPorFolio(
@@ -691,6 +706,64 @@ function buscarFilaPorFolio(
 
   return 0;
 }
+
+function fechaTijuana() {
+  return new Intl.DateTimeFormat(
+    "es-MX",
+    {
+      timeZone:
+        "America/Tijuana",
+
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+
+      hour12: true,
+    }
+  ).format(
+    new Date()
+  );
+}
+
+function normalizarServicio(
+  valor: unknown
+):
+  | "Aéreo"
+  | "Terrestre"
+  | "" {
+  const limpio =
+    texto(valor)
+      .toLowerCase();
+
+  if (
+    limpio.includes(
+      "aéreo"
+    ) ||
+    limpio.includes(
+      "aereo"
+    )
+  ) {
+    return "Aéreo";
+  }
+
+  if (
+    limpio.includes(
+      "terrestre"
+    )
+  ) {
+    return "Terrestre";
+  }
+
+  return "";
+}
+
+/* =========================================================
+   HISTORIAL
+========================================================= */
 
 function obtenerOCrearHistorial(
   workbook: XLSX.WorkBook
@@ -736,8 +809,141 @@ function obtenerOCrearHistorial(
   return hoja;
 }
 
+type ResumenHistorial = {
+  pagado: number;
+  total: number;
+  servicio:
+    | "Aéreo"
+    | "Terrestre"
+    | "";
+  ultimaFecha: string;
+  ultimoMetodo: string;
+  ultimaReferencia: string;
+};
+
+function resumenHistorialPorFolio(
+  hoja:
+    | XLSX.WorkSheet
+    | undefined,
+  folio: string
+): ResumenHistorial {
+  const resumen:
+    ResumenHistorial = {
+      pagado: 0,
+      total: 0,
+      servicio: "",
+      ultimaFecha: "",
+      ultimoMetodo: "",
+      ultimaReferencia: "",
+    };
+
+  if (!hoja) {
+    return resumen;
+  }
+
+  const rango =
+    XLSX.utils.decode_range(
+      hoja["!ref"] ||
+        "A1:O1"
+    );
+
+  for (
+    let fila = 2;
+    fila <=
+    rango.e.r + 1;
+    fila += 1
+  ) {
+    const folioHistorial =
+      texto(
+        valorCelda(
+          hoja,
+          "C",
+          fila
+        )
+      );
+
+    if (
+      folioHistorial !==
+      folio
+    ) {
+      continue;
+    }
+
+    resumen.pagado =
+      dineroRedondeado(
+        resumen.pagado +
+          numero(
+            valorCelda(
+              hoja,
+              "I",
+              fila
+            )
+          )
+      );
+
+    const totalMovimiento =
+      numero(
+        valorCelda(
+          hoja,
+          "G",
+          fila
+        )
+      );
+
+    if (
+      totalMovimiento > 0
+    ) {
+      resumen.total =
+        totalMovimiento;
+    }
+
+    const servicio =
+      normalizarServicio(
+        valorCelda(
+          hoja,
+          "F",
+          fila
+        )
+      );
+
+    if (servicio) {
+      resumen.servicio =
+        servicio;
+    }
+
+    resumen.ultimaFecha =
+      texto(
+        valorCelda(
+          hoja,
+          "B",
+          fila
+        )
+      );
+
+    resumen.ultimoMetodo =
+      texto(
+        valorCelda(
+          hoja,
+          "K",
+          fila
+        )
+      );
+
+    resumen.ultimaReferencia =
+      texto(
+        valorCelda(
+          hoja,
+          "L",
+          fila
+        )
+      );
+  }
+
+  return resumen;
+}
+
 /* =========================================================
-   GET - LISTADO
+   GET
 ========================================================= */
 
 export async function GET() {
@@ -782,6 +988,11 @@ export async function GET() {
       );
     }
 
+    const historial =
+      workbook.Sheets[
+        HOJA_HISTORIAL
+      ];
+
     const rango =
       XLSX.utils.decode_range(
         hoja["!ref"] ||
@@ -789,6 +1000,9 @@ export async function GET() {
       );
 
     const pagos = [];
+
+    let necesitaReparacion =
+      false;
 
     for (
       let fila = 2;
@@ -863,8 +1077,20 @@ export async function GET() {
           )
         );
 
-      const montoDefinitivo =
-        numero(
+      /*
+       * ESTRUCTURA REAL:
+       *
+       * L = Servicio elegido
+       * M = Precio final
+       * N = Estado de pago
+       * O = Fecha de pago
+       * P = Método de pago
+       * Q = Referencia
+       * R = Observaciones
+       */
+
+      let servicioElegido =
+        normalizarServicio(
           valorCelda(
             hoja,
             "L",
@@ -872,8 +1098,168 @@ export async function GET() {
           )
         );
 
+      let precioFinal =
+        numero(
+          valorCelda(
+            hoja,
+            "M",
+            fila
+          )
+        );
+
+      const resumen =
+        resumenHistorialPorFolio(
+          historial,
+          folio
+        );
+
+      /*
+       * REPARA EL ERROR DE LA VERSIÓN ANTERIOR.
+       *
+       * La versión anterior escribió:
+       * L = precio
+       * M = pagado
+       * O = servicio
+       *
+       * Si encontramos esa firma y existe historial,
+       * restauramos las columnas correctas.
+       */
+
+      const valorL =
+        valorCelda(
+          hoja,
+          "L",
+          fila
+        );
+
+      const servicioEnO =
+        normalizarServicio(
+          valorCelda(
+            hoja,
+            "O",
+            fila
+          )
+        );
+
+      const lEsNumero =
+        numero(valorL) >
+          0 &&
+        !normalizarServicio(
+          valorL
+        );
+
+      if (
+        lEsNumero &&
+        servicioEnO &&
+        resumen.pagado > 0
+      ) {
+        servicioElegido =
+          resumen.servicio ||
+          servicioEnO;
+
+        precioFinal =
+          resumen.total ||
+          numero(valorL);
+
+        const saldoReparado =
+          dineroRedondeado(
+            Math.max(
+              precioFinal -
+                resumen.pagado,
+              0
+            )
+          );
+
+        const estadoReparado =
+          saldoReparado <= 0
+            ? "Pagado"
+            : "Parcial";
+
+        escribirCelda(
+          hoja,
+          `L${fila}`,
+          servicioElegido
+        );
+
+        escribirCelda(
+          hoja,
+          `M${fila}`,
+          precioFinal
+        );
+
+        escribirCelda(
+          hoja,
+          `N${fila}`,
+          estadoReparado
+        );
+
+        escribirCelda(
+          hoja,
+          `O${fila}`,
+          resumen.ultimaFecha ||
+            fechaTijuana()
+        );
+
+        if (
+          resumen.ultimoMetodo
+        ) {
+          escribirCelda(
+            hoja,
+            `P${fila}`,
+            resumen.ultimoMetodo
+          );
+        }
+
+        if (
+          resumen.ultimaReferencia
+        ) {
+          escribirCelda(
+            hoja,
+            `Q${fila}`,
+            resumen.ultimaReferencia
+          );
+        }
+
+        necesitaReparacion =
+          true;
+      }
+
       let total =
-        montoDefinitivo;
+        precioFinal;
+
+      if (
+        total <= 0 &&
+        resumen.total > 0
+      ) {
+        total =
+          resumen.total;
+      }
+
+      if (
+        !servicioElegido &&
+        resumen.servicio
+      ) {
+        servicioElegido =
+          resumen.servicio;
+      }
+
+      if (
+        total <= 0 &&
+        servicioElegido ===
+          "Aéreo"
+      ) {
+        total =
+          totalAereo;
+      }
+
+      if (
+        total <= 0 &&
+        servicioElegido ===
+          "Terrestre"
+      ) {
+        total =
+          totalTerrestre;
+      }
 
       const opcionesLower =
         opciones.toLowerCase();
@@ -909,20 +1295,44 @@ export async function GET() {
           totalTerrestre;
       }
 
-      const pagado =
-        numero(
+      let pagado =
+        resumen.pagado;
+
+      /*
+       * Compatibilidad con algún registro antiguo marcado
+       * como Pagado antes de existir Historial_Pagos.
+       */
+      const estadoExcel =
+        texto(
           valorCelda(
             hoja,
-            "M",
+            "N",
             fila
           )
         );
 
+      if (
+        pagado <= 0 &&
+        estadoExcel.toLowerCase() ===
+          "pagado" &&
+        total > 0
+      ) {
+        pagado =
+          total;
+      }
+
+      pagado =
+        dineroRedondeado(
+          pagado
+        );
+
       const saldo =
-        Math.max(
-          total -
-            pagado,
-          0
+        dineroRedondeado(
+          Math.max(
+            total -
+              pagado,
+            0
+          )
         );
 
       let estado:
@@ -950,7 +1360,11 @@ export async function GET() {
         whatsapp,
         fecha,
 
-        total,
+        total:
+          dineroRedondeado(
+            total
+          ),
+
         pagado,
         saldo,
         estado,
@@ -959,6 +1373,8 @@ export async function GET() {
         totalTerrestre,
         opciones,
 
+        servicioElegido,
+
         requiereSeleccionServicio:
           total <= 0 &&
           tieneAereo &&
@@ -966,12 +1382,36 @@ export async function GET() {
       });
     }
 
+    /*
+     * Si detectamos la versión anterior equivocada,
+     * la corregimos una sola vez en el Excel de OneDrive.
+     */
+    if (
+      necesitaReparacion
+    ) {
+      const salida =
+        XLSX.write(
+          workbook,
+          {
+            type: "buffer",
+            bookType: "xlsx",
+            cellStyles: true,
+          }
+        );
+
+      await subirExcel(
+        accessToken,
+        salida
+      );
+    }
+
     pagos.reverse();
 
     return NextResponse.json({
       success: true,
       pagos,
-      total: pagos.length,
+      total:
+        pagos.length,
     });
   } catch (
     error: unknown
@@ -999,7 +1439,7 @@ export async function GET() {
 }
 
 /* =========================================================
-   POST - REGISTRAR ABONO
+   POST
 ========================================================= */
 
 export async function POST(
@@ -1021,11 +1461,6 @@ export async function POST(
     let comprobante:
       | File
       | null = null;
-
-    /*
-      Soporta el JSON que actualmente manda tu pantalla
-      y también FormData cuando agreguemos la fotografía.
-    */
 
     if (
       contentType.includes(
@@ -1137,6 +1572,11 @@ export async function POST(
         }
       );
     }
+
+    monto =
+      dineroRedondeado(
+        monto
+      );
 
     if (
       monto <= 0
@@ -1255,17 +1695,41 @@ export async function POST(
         )
       );
 
-    let total =
-      numero(
+    const opciones =
+      texto(
         valorCelda(
           hoja,
-          "L",
+          "K",
           fila
         )
       );
 
-    let servicioFinal =
-      texto(
+    const historial =
+      obtenerOCrearHistorial(
+        workbook
+      );
+
+    const resumen =
+      resumenHistorialPorFolio(
+        historial,
+        folio
+      );
+
+    /*
+     * Si la fila todavía tiene el error de la versión
+     * anterior, primero recuperamos los datos correctos
+     * desde Historial_Pagos.
+     */
+
+    const valorL =
+      valorCelda(
+        hoja,
+        "L",
+        fila
+      );
+
+    const servicioViejoEnO =
+      normalizarServicio(
         valorCelda(
           hoja,
           "O",
@@ -1273,40 +1737,121 @@ export async function POST(
         )
       );
 
+    const lCorrupto =
+      numero(valorL) >
+        0 &&
+      !normalizarServicio(
+        valorL
+      );
+
+    let servicioGuardado =
+      normalizarServicio(
+        valorL
+      );
+
+    let totalGuardado =
+      numero(
+        valorCelda(
+          hoja,
+          "M",
+          fila
+        )
+      );
+
     if (
-      total <= 0
+      lCorrupto &&
+      servicioViejoEnO &&
+      resumen.pagado > 0
     ) {
-      const servicioLower =
-        servicio.toLowerCase();
+      servicioGuardado =
+        resumen.servicio ||
+        servicioViejoEnO;
+
+      totalGuardado =
+        resumen.total ||
+        numero(valorL);
+    }
+
+    let servicioFinal =
+      servicioGuardado;
+
+    let total =
+      totalGuardado;
+
+    /*
+     * Una vez elegido un servicio en el primer pago,
+     * queda bloqueado para evitar que otro abono cambie
+     * de terrestre a aéreo accidentalmente.
+     */
+
+    const solicitado =
+      normalizarServicio(
+        servicio
+      );
+
+    if (
+      servicioFinal
+    ) {
+      if (
+        solicitado &&
+        solicitado !==
+          servicioFinal
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+
+            error:
+              `Esta cotización ya tiene seleccionado el servicio ${servicioFinal}.`,
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+    } else {
+      servicioFinal =
+        solicitado;
 
       if (
-        servicioLower.includes(
-          "aéreo"
-        ) ||
-        servicioLower.includes(
-          "aereo"
-        )
+        !servicioFinal
       ) {
-        total =
-          totalAereo;
+        const opcionesLower =
+          opciones.toLowerCase();
 
-        servicioFinal =
-          "Aéreo";
-      } else if (
-        servicioLower.includes(
-          "terrestre"
-        )
-      ) {
-        total =
-          totalTerrestre;
+        const tieneAereo =
+          opcionesLower.includes(
+            "aéreo"
+          ) ||
+          opcionesLower.includes(
+            "aereo"
+          );
 
-        servicioFinal =
-          "Terrestre";
+        const tieneTerrestre =
+          opcionesLower.includes(
+            "terrestre"
+          );
+
+        if (
+          tieneAereo &&
+          !tieneTerrestre
+        ) {
+          servicioFinal =
+            "Aéreo";
+        }
+
+        if (
+          tieneTerrestre &&
+          !tieneAereo
+        ) {
+          servicioFinal =
+            "Terrestre";
+        }
       }
     }
 
     if (
-      total <= 0
+      !servicioFinal
     ) {
       return NextResponse.json(
         {
@@ -1321,20 +1866,49 @@ export async function POST(
       );
     }
 
+    if (
+      total <= 0
+    ) {
+      total =
+        servicioFinal ===
+        "Aéreo"
+          ? totalAereo
+          : totalTerrestre;
+    }
+
+    total =
+      dineroRedondeado(
+        total
+      );
+
+    if (
+      total <= 0
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          error:
+            "No existe un precio válido para el servicio seleccionado.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
     const pagadoAnterior =
-      numero(
-        valorCelda(
-          hoja,
-          "M",
-          fila
-        )
+      dineroRedondeado(
+        resumen.pagado
       );
 
     const saldoAnterior =
-      Math.max(
-        total -
-          pagadoAnterior,
-        0
+      dineroRedondeado(
+        Math.max(
+          total -
+            pagadoAnterior,
+          0
+        )
       );
 
     if (
@@ -1378,7 +1952,9 @@ export async function POST(
     let urlComprobante =
       "";
 
-    if (comprobante) {
+    if (
+      comprobante
+    ) {
       const resultado =
         await subirComprobante(
           accessToken,
@@ -1394,43 +1970,52 @@ export async function POST(
     }
 
     const nuevoPagado =
-      pagadoAnterior +
-      monto;
-
-    const nuevoSaldo =
-      Math.max(
-        total -
-          nuevoPagado,
-        0
+      dineroRedondeado(
+        pagadoAnterior +
+          monto
       );
 
-    const nuevoEstado =
+    const nuevoSaldo =
+      dineroRedondeado(
+        Math.max(
+          total -
+            nuevoPagado,
+          0
+        )
+      );
+
+    const nuevoEstado:
+      | "Parcial"
+      | "Pagado" =
       nuevoSaldo <= 0
         ? "Pagado"
-        : nuevoPagado > 0
-        ? "Parcial"
-        : "Pendiente";
+        : "Parcial";
+
+    const fechaMovimiento =
+      fechaTijuana();
 
     /*
-      Cotizaciones:
-      L = Total definitivo
-      M = Total pagado acumulado
-      N = Estado
-      O = Servicio elegido
-      P = Último método
-      Q = Última referencia
-    */
+     * COTIZACIONES - ESTRUCTURA CORRECTA
+     *
+     * L Servicio elegido
+     * M Precio final
+     * N Estado de pago
+     * O Fecha de pago
+     * P Método de pago
+     * Q Referencia
+     * R Observaciones originales
+     */
 
     escribirCelda(
       hoja,
       `L${fila}`,
-      total
+      servicioFinal
     );
 
     escribirCelda(
       hoja,
       `M${fila}`,
-      nuevoPagado
+      total
     );
 
     escribirCelda(
@@ -1442,7 +2027,7 @@ export async function POST(
     escribirCelda(
       hoja,
       `O${fila}`,
-      servicioFinal
+      fechaMovimiento
     );
 
     escribirCelda(
@@ -1457,21 +2042,24 @@ export async function POST(
       referencia
     );
 
+    /*
+     * NO sobrescribimos R.
+     * Ahí permanecen las observaciones originales
+     * de la cotización.
+     *
+     * Las observaciones del pago se guardan
+     * en Historial_Pagos.
+     */
+
     asegurarRango(
       hoja,
       fila,
       17
     );
 
-    /*
-      Historial independiente.
-      Nunca se reemplaza un abono anterior.
-    */
-
-    const historial =
-      obtenerOCrearHistorial(
-        workbook
-      );
+    /* =====================================================
+       NUEVO MOVIMIENTO EN HISTORIAL
+    ===================================================== */
 
     const filaHistorial =
       siguienteFilaLibre(
@@ -1490,7 +2078,7 @@ export async function POST(
     escribirCelda(
       historial,
       `B${filaHistorial}`,
-      fechaTijuana()
+      fechaMovimiento
     );
 
     escribirCelda(
@@ -1596,8 +2184,10 @@ export async function POST(
       success: true,
 
       idPago,
-
       folio,
+
+      servicio:
+        servicioFinal,
 
       total,
 
