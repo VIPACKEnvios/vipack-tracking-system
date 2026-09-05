@@ -49,6 +49,12 @@ type MetodoPago =
   | "Tarjeta"
   | "Otro";
 
+type VisorComprobante = {
+  ruta: string;
+  fecha: string;
+  monto: number;
+} | null;
+
 function dinero(valor: number) {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
@@ -63,10 +69,10 @@ function EstadoPago({
 }) {
   const estilos =
     estado === "Pagado"
-      ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+      ? "border-emerald-200 bg-emerald-100 text-emerald-700"
       : estado === "Parcial"
-      ? "bg-blue-100 text-blue-700 border-blue-200"
-      : "bg-amber-100 text-amber-700 border-amber-200";
+      ? "border-blue-200 bg-blue-100 text-blue-700"
+      : "border-amber-200 bg-amber-100 text-amber-700";
 
   return (
     <span
@@ -94,30 +100,21 @@ export default function PagosPage() {
     useState<PagoRow | null>(null);
 
   const [servicio, setServicio] =
-    useState<
-      "Aéreo" | "Terrestre" | ""
-    >("");
+    useState<"Aéreo" | "Terrestre" | "">("");
 
   const [montoPago, setMontoPago] =
     useState("");
 
   const [metodoPago, setMetodoPago] =
-    useState<MetodoPago>(
-      "Transferencia"
-    );
+    useState<MetodoPago>("Transferencia");
 
   const [referencia, setReferencia] =
     useState("");
 
-  const [
-    observaciones,
-    setObservaciones,
-  ] = useState("");
+  const [observaciones, setObservaciones] =
+    useState("");
 
-  const [
-    comprobante,
-    setComprobante,
-  ] =
+  const [comprobante, setComprobante] =
     useState<File | null>(null);
 
   const [
@@ -131,17 +128,12 @@ export default function PagosPage() {
   const [errorPago, setErrorPago] =
     useState("");
 
-  const [
-    mensajePago,
-    setMensajePago,
-  ] = useState("");
+  const [mensajePago, setMensajePago] =
+    useState("");
 
   /* HISTORIAL */
 
-  const [
-    historial,
-    setHistorial,
-  ] =
+  const [historial, setHistorial] =
     useState<HistorialPago[]>([]);
 
   const [
@@ -159,15 +151,25 @@ export default function PagosPage() {
     setMostrarHistorial,
   ] = useState(true);
 
+  /* VISOR COMPROBANTE */
+
+  const [
+    visorComprobante,
+    setVisorComprobante,
+  ] = useState<VisorComprobante>(null);
+
+  const [
+    errorVisor,
+    setErrorVisor,
+  ] = useState("");
+
   useEffect(() => {
     cargarPagos();
   }, []);
 
   useEffect(() => {
     return () => {
-      if (
-        previewComprobante
-      ) {
+      if (previewComprobante) {
         URL.revokeObjectURL(
           previewComprobante
         );
@@ -181,12 +183,9 @@ export default function PagosPage() {
       setError("");
 
       const respuesta =
-        await fetch(
-          "/api/pagos",
-          {
-            cache: "no-store",
-          }
-        );
+        await fetch("/api/pagos", {
+          cache: "no-store",
+        });
 
       const data =
         await respuesta.json();
@@ -222,10 +221,7 @@ export default function PagosPage() {
     folio: string
   ) {
     try {
-      setCargandoHistorial(
-        true
-      );
-
+      setCargandoHistorial(true);
       setErrorHistorial("");
 
       const respuesta =
@@ -266,9 +262,7 @@ export default function PagosPage() {
 
       setHistorial([]);
     } finally {
-      setCargandoHistorial(
-        false
-      );
+      setCargandoHistorial(false);
     }
   }
 
@@ -284,30 +278,18 @@ export default function PagosPage() {
       }
 
       return pagos.filter(
-        (pago) => {
-          return (
-            pago.folio
-              ?.toLowerCase()
-              .includes(
-                texto
-              ) ||
-            pago.cliente
-              ?.toLowerCase()
-              .includes(
-                texto
-              ) ||
-            pago.whatsapp
-              ?.toLowerCase()
-              .includes(
-                texto
-              )
-          );
-        }
+        (pago) =>
+          pago.folio
+            ?.toLowerCase()
+            .includes(texto) ||
+          pago.cliente
+            ?.toLowerCase()
+            .includes(texto) ||
+          pago.whatsapp
+            ?.toLowerCase()
+            .includes(texto)
       );
-    }, [
-      pagos,
-      busqueda,
-    ]);
+    }, [pagos, busqueda]);
 
   const totales =
     useMemo(() => {
@@ -339,9 +321,7 @@ export default function PagosPage() {
     }, [pagos]);
 
   function limpiarComprobante() {
-    if (
-      previewComprobante
-    ) {
+    if (previewComprobante) {
       URL.revokeObjectURL(
         previewComprobante
       );
@@ -372,25 +352,21 @@ export default function PagosPage() {
     setHistorial([]);
     setErrorHistorial("");
 
-    setMostrarHistorial(
-      true
-    );
+    setMostrarHistorial(true);
+    setVisorComprobante(null);
+    setErrorVisor("");
 
     cargarHistorial(
       pago.folio
     );
 
     const opciones =
-      pago.opciones?.toLowerCase() ||
-      "";
+      pago.opciones
+        ?.toLowerCase() || "";
 
     const tieneAereo =
-      opciones.includes(
-        "aéreo"
-      ) ||
-      opciones.includes(
-        "aereo"
-      );
+      opciones.includes("aéreo") ||
+      opciones.includes("aereo");
 
     const tieneTerrestre =
       opciones.includes(
@@ -401,9 +377,7 @@ export default function PagosPage() {
       tieneAereo &&
       !tieneTerrestre
     ) {
-      setServicio(
-        "Aéreo"
-      );
+      setServicio("Aéreo");
     } else if (
       tieneTerrestre &&
       !tieneAereo
@@ -434,6 +408,35 @@ export default function PagosPage() {
 
     setHistorial([]);
     setErrorHistorial("");
+
+    setVisorComprobante(null);
+    setErrorVisor("");
+  }
+
+  function abrirVisor(
+    movimiento: HistorialPago
+  ) {
+    if (!movimiento.comprobante) {
+      return;
+    }
+
+    setErrorVisor("");
+
+    setVisorComprobante({
+      ruta:
+        movimiento.comprobante,
+
+      fecha:
+        movimiento.fecha,
+
+      monto:
+        movimiento.monto,
+    });
+  }
+
+  function cerrarVisor() {
+    setVisorComprobante(null);
+    setErrorVisor("");
   }
 
   function seleccionarComprobante(
@@ -445,12 +448,11 @@ export default function PagosPage() {
 
     setErrorPago("");
 
-    const tiposPermitidos =
-      [
-        "image/jpeg",
-        "image/png",
-        "image/webp",
-      ];
+    const tiposPermitidos = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
 
     if (
       archivo.type &&
@@ -467,9 +469,7 @@ export default function PagosPage() {
 
     if (
       archivo.size >
-      10 *
-        1024 *
-        1024
+      10 * 1024 * 1024
     ) {
       setErrorPago(
         "La imagen no puede pesar más de 10 MB."
@@ -478,9 +478,7 @@ export default function PagosPage() {
       return;
     }
 
-    if (
-      previewComprobante
-    ) {
+    if (previewComprobante) {
       URL.revokeObjectURL(
         previewComprobante
       );
@@ -508,15 +506,13 @@ export default function PagosPage() {
       }
 
       if (
-        seleccionado.total >
-        0
+        seleccionado.total > 0
       ) {
         return seleccionado.total;
       }
 
       if (
-        servicio ===
-        "Aéreo"
+        servicio === "Aéreo"
       ) {
         return Number(
           seleccionado.totalAereo ||
@@ -590,8 +586,7 @@ export default function PagosPage() {
     setMensajePago("");
 
     if (
-      totalSeleccionado <=
-      0
+      totalSeleccionado <= 0
     ) {
       setErrorPago(
         "Selecciona si el cliente pagará Aéreo o Terrestre."
@@ -673,9 +668,7 @@ export default function PagosPage() {
         observaciones.trim()
       );
 
-      if (
-        comprobante
-      ) {
+      if (comprobante) {
         formData.append(
           "comprobante",
           comprobante
@@ -717,12 +710,6 @@ export default function PagosPage() {
         seleccionado.folio
       );
 
-      /*
-       * Actualizamos localmente
-       * el registro seleccionado
-       * para no cerrar el modal.
-       */
-
       setSeleccionado(
         (actual) => {
           if (!actual) {
@@ -734,13 +721,13 @@ export default function PagosPage() {
 
             total:
               Number(
-                data?.total ||
+                data?.total ??
                   actual.total
               ),
 
             pagado:
               Number(
-                data?.pagado ||
+                data?.pagado ??
                   actual.pagado
               ),
 
@@ -756,12 +743,6 @@ export default function PagosPage() {
           };
         }
       );
-
-      /*
-       * Ya NO cerramos automáticamente.
-       * Así puedes ver el pago recién
-       * registrado dentro del historial.
-       */
 
       setTimeout(() => {
         setMensajePago("");
@@ -781,60 +762,59 @@ export default function PagosPage() {
 
   return (
     <main className="min-h-[calc(100vh-4rem)] overflow-x-hidden bg-slate-100 p-3 sm:p-4 md:p-6">
+
       <div className="mx-auto w-full max-w-7xl">
 
         {/* ENCABEZADO */}
 
-        <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-700">
-              Ventas y cobranza
-            </p>
+        <div className="mb-5">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-700">
+            Ventas y cobranza
+          </p>
 
-            <h1 className="mt-1 text-2xl font-black text-slate-950 sm:text-3xl">
-              Pagos
-            </h1>
+          <h1 className="mt-1 text-2xl font-black text-slate-950 sm:text-3xl">
+            Pagos
+          </h1>
 
-            <p className="mt-1 text-sm text-slate-600">
-              Controla pagos, abonos y saldos pendientes de las cotizaciones.
-            </p>
-          </div>
+          <p className="mt-1 text-sm text-slate-600">
+            Controla pagos, abonos y saldos pendientes de las cotizaciones.
+          </p>
         </div>
 
         {/* RESUMEN */}
 
-        <div className="mb-5 grid gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-4">
+        <div className="mb-5 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-bold uppercase text-slate-500">
               Total cotizado
             </p>
 
-            <p className="mt-2 break-words text-xl font-black text-slate-950 sm:text-2xl">
+            <p className="mt-2 text-xl font-black text-slate-950 sm:text-2xl">
               {dinero(
                 totales.cotizado
               )}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm sm:p-5">
-            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+          <div className="rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-bold uppercase text-emerald-700">
               Cobrado
             </p>
 
-            <p className="mt-2 break-words text-xl font-black text-emerald-700 sm:text-2xl">
+            <p className="mt-2 text-xl font-black text-emerald-700 sm:text-2xl">
               {dinero(
                 totales.cobrado
               )}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm sm:p-5">
-            <p className="text-xs font-bold uppercase tracking-wider text-amber-700">
+          <div className="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-bold uppercase text-amber-700">
               Saldo pendiente
             </p>
 
-            <p className="mt-2 break-words text-xl font-black text-amber-700 sm:text-2xl">
+            <p className="mt-2 text-xl font-black text-amber-700 sm:text-2xl">
               {dinero(
                 totales.pendiente
               )}
@@ -847,6 +827,7 @@ export default function PagosPage() {
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
 
           <div className="border-b border-slate-200 p-4 md:p-5">
+
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
 
               <div>
@@ -860,16 +841,14 @@ export default function PagosPage() {
               </div>
 
               <input
-                value={
-                  busqueda
-                }
+                value={busqueda}
                 onChange={(e) =>
                   setBusqueda(
                     e.target.value
                   )
                 }
                 placeholder="Buscar folio, cliente o teléfono..."
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100 md:max-w-md"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 md:max-w-md"
               />
             </div>
           </div>
@@ -879,17 +858,15 @@ export default function PagosPage() {
               Cargando pagos...
             </div>
           ) : error ? (
-            <div className="p-4 md:p-8">
+            <div className="p-4">
               <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                 {error}
               </div>
             </div>
           ) : filtrados.length ===
             0 ? (
-            <div className="p-10 text-center">
-              <p className="font-bold text-slate-800">
-                No hay registros para mostrar.
-              </p>
+            <div className="p-10 text-center font-bold text-slate-700">
+              No hay registros para mostrar.
             </div>
           ) : (
             <>
@@ -908,64 +885,54 @@ export default function PagosPage() {
                       <div className="flex items-start justify-between gap-3">
 
                         <div className="min-w-0 flex-1">
-                          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                          <p className="text-[10px] font-black uppercase text-slate-400">
                             Folio
                           </p>
 
-                          <p className="mt-1 break-all text-sm font-black leading-snug text-blue-800">
+                          <p className="mt-1 break-all text-sm font-black text-blue-800">
                             {
                               pago.folio
                             }
                           </p>
                         </div>
 
-                        <div className="shrink-0">
-                          <EstadoPago
-                            estado={
-                              pago.estado
-                            }
-                          />
-                        </div>
+                        <EstadoPago
+                          estado={
+                            pago.estado
+                          }
+                        />
                       </div>
 
                       <div className="mt-4">
-                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        <p className="text-[10px] font-black uppercase text-slate-400">
                           Cliente
                         </p>
 
-                        <p className="mt-1 break-words text-base font-black leading-snug text-slate-950">
+                        <p className="mt-1 font-black text-slate-950">
                           {
                             pago.cliente
                           }
                         </p>
 
-                        <p className="mt-1 break-all text-xs text-slate-500">
+                        <p className="mt-1 text-xs text-slate-500">
                           {
                             pago.whatsapp
                           }
                         </p>
                       </div>
 
-                      <div className="mt-4">
-                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                          Fecha
-                        </p>
-
-                        <p className="mt-1 text-sm font-medium text-slate-700">
-                          {
-                            pago.fecha
-                          }
-                        </p>
+                      <div className="mt-4 text-sm text-slate-700">
+                        {pago.fecha}
                       </div>
 
-                      <div className="mt-4 grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
+                      <div className="mt-4 grid grid-cols-3 gap-2">
 
-                        <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                          <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                        <div className="rounded-xl bg-slate-50 p-3">
+                          <p className="text-[10px] font-black uppercase text-slate-500">
                             Total
                           </p>
 
-                          <p className="mt-1 break-words text-sm font-black text-slate-950">
+                          <p className="mt-1 text-sm font-black">
                             {pago.total >
                             0
                               ? dinero(
@@ -975,24 +942,24 @@ export default function PagosPage() {
                           </p>
                         </div>
 
-                        <div className="min-w-0 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                          <p className="text-[10px] font-black uppercase tracking-wide text-emerald-700">
+                        <div className="rounded-xl bg-emerald-50 p-3">
+                          <p className="text-[10px] font-black uppercase text-emerald-700">
                             Pagado
                           </p>
 
-                          <p className="mt-1 break-words text-sm font-black text-emerald-700">
+                          <p className="mt-1 text-sm font-black text-emerald-700">
                             {dinero(
                               pago.pagado
                             )}
                           </p>
                         </div>
 
-                        <div className="min-w-0 rounded-xl border border-amber-200 bg-amber-50 p-3">
-                          <p className="text-[10px] font-black uppercase tracking-wide text-amber-700">
+                        <div className="rounded-xl bg-amber-50 p-3">
+                          <p className="text-[10px] font-black uppercase text-amber-700">
                             Saldo
                           </p>
 
-                          <p className="mt-1 break-words text-sm font-black text-amber-700">
+                          <p className="mt-1 text-sm font-black text-amber-700">
                             {pago.total >
                             0
                               ? dinero(
@@ -1010,7 +977,7 @@ export default function PagosPage() {
                             pago
                           )
                         }
-                        className="mt-4 w-full rounded-xl bg-blue-700 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-800"
+                        className="mt-4 w-full rounded-xl bg-blue-700 px-4 py-3 text-sm font-black text-white"
                       >
                         Ver / Abonar
                       </button>
@@ -1022,20 +989,20 @@ export default function PagosPage() {
               {/* COMPUTADORA */}
 
               <div className="hidden overflow-x-auto md:block">
+
                 <table className="w-full min-w-[900px]">
 
                   <thead className="bg-slate-50">
-                    <tr className="border-b border-slate-200 text-left">
-
-                      <th className="px-5 py-3 text-xs font-black uppercase text-slate-500">
+                    <tr>
+                      <th className="px-5 py-3 text-left text-xs font-black uppercase text-slate-500">
                         Folio
                       </th>
 
-                      <th className="px-5 py-3 text-xs font-black uppercase text-slate-500">
+                      <th className="px-5 py-3 text-left text-xs font-black uppercase text-slate-500">
                         Cliente
                       </th>
 
-                      <th className="px-5 py-3 text-xs font-black uppercase text-slate-500">
+                      <th className="px-5 py-3 text-left text-xs font-black uppercase text-slate-500">
                         Fecha
                       </th>
 
@@ -1051,11 +1018,11 @@ export default function PagosPage() {
                         Saldo
                       </th>
 
-                      <th className="px-5 py-3 text-xs font-black uppercase text-slate-500">
+                      <th className="px-5 py-3 text-left text-xs font-black uppercase text-slate-500">
                         Estado
                       </th>
 
-                      <th className="px-5 py-3"></th>
+                      <th></th>
                     </tr>
                   </thead>
 
@@ -1066,14 +1033,12 @@ export default function PagosPage() {
                           key={
                             pago.folio
                           }
-                          className="border-b border-slate-100 transition hover:bg-slate-50"
+                          className="border-t border-slate-100"
                         >
-                          <td className="px-5 py-4">
-                            <p className="font-bold text-blue-800">
-                              {
-                                pago.folio
-                              }
-                            </p>
+                          <td className="px-5 py-4 font-bold text-blue-800">
+                            {
+                              pago.folio
+                            }
                           </td>
 
                           <td className="px-5 py-4">
@@ -1096,7 +1061,7 @@ export default function PagosPage() {
                             }
                           </td>
 
-                          <td className="px-5 py-4 text-right font-bold text-slate-900">
+                          <td className="px-5 py-4 text-right font-bold">
                             {pago.total >
                             0
                               ? dinero(
@@ -1111,7 +1076,7 @@ export default function PagosPage() {
                             )}
                           </td>
 
-                          <td className="px-5 py-4 text-right font-black text-slate-900">
+                          <td className="px-5 py-4 text-right font-black">
                             {pago.total >
                             0
                               ? dinero(
@@ -1129,6 +1094,7 @@ export default function PagosPage() {
                           </td>
 
                           <td className="px-5 py-4 text-right">
+
                             <button
                               type="button"
                               onClick={() =>
@@ -1136,7 +1102,7 @@ export default function PagosPage() {
                                   pago
                                 )
                               }
-                              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold"
                             >
                               Ver / Abonar
                             </button>
@@ -1152,29 +1118,27 @@ export default function PagosPage() {
         </div>
       </div>
 
-      {/* MODAL */}
+      {/* MODAL PAGO */}
 
       {seleccionado && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 sm:items-center sm:p-4">
 
-          <div className="max-h-[96vh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:max-h-[95vh] sm:max-w-2xl sm:rounded-2xl">
+          <div className="max-h-[96vh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:max-w-2xl sm:rounded-2xl">
 
-            {/* CABECERA */}
+            <div className="sticky top-0 z-20 flex items-start justify-between border-b bg-white p-4 sm:p-5">
 
-            <div className="sticky top-0 z-20 flex items-start justify-between border-b border-slate-200 bg-white p-4 sm:p-5">
-
-              <div className="min-w-0 pr-3">
-                <p className="text-xs font-black uppercase tracking-wider text-blue-700">
+              <div>
+                <p className="text-xs font-black uppercase text-blue-700">
                   Pagos del cliente
                 </p>
 
-                <h2 className="mt-1 break-words text-lg font-black text-slate-950 sm:text-xl">
+                <h2 className="mt-1 text-lg font-black">
                   {
                     seleccionado.cliente
                   }
                 </h2>
 
-                <p className="mt-1 break-all text-xs text-slate-500 sm:text-sm">
+                <p className="text-xs text-slate-500">
                   {
                     seleccionado.folio
                   }
@@ -1186,18 +1150,13 @@ export default function PagosPage() {
                 onClick={
                   cerrarPago
                 }
-                disabled={
-                  guardando
-                }
-                className="shrink-0 rounded-lg px-3 py-2 text-xl font-bold text-slate-500 hover:bg-slate-100 disabled:opacity-50"
+                className="text-xl font-bold text-slate-500"
               >
                 ×
               </button>
             </div>
 
             <div className="space-y-5 p-4 sm:p-5">
-
-              {/* RESUMEN */}
 
               <div className="grid gap-3 sm:grid-cols-2">
 
@@ -1206,7 +1165,7 @@ export default function PagosPage() {
                     WhatsApp
                   </p>
 
-                  <p className="mt-1 break-all font-bold text-slate-900">
+                  <p className="mt-1 font-bold">
                     {
                       seleccionado.whatsapp
                     }
@@ -1226,36 +1185,39 @@ export default function PagosPage() {
                 </div>
               </div>
 
-              {/* =========================================
-                  HISTORIAL
-              ========================================== */}
+              {/* HISTORIAL */}
 
-              <div className="overflow-hidden rounded-2xl border border-slate-200">
+              <div className="overflow-hidden rounded-2xl border">
 
                 <button
                   type="button"
                   onClick={() =>
                     setMostrarHistorial(
-                      (actual) =>
-                        !actual
+                      !mostrarHistorial
                     )
                   }
-                  className="flex w-full items-center justify-between bg-slate-50 px-4 py-4 text-left"
+                  className="flex w-full items-center justify-between bg-slate-50 p-4"
                 >
-                  <div>
-                    <p className="font-black text-slate-950">
+                  <div className="text-left">
+                    <p className="font-black">
                       Historial de pagos
                     </p>
 
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="text-xs text-slate-500">
+                      {historial.length} pago
                       {historial.length ===
                       1
-                        ? "1 pago registrado"
-                        : `${historial.length} pagos registrados`}
+                        ? ""
+                        : "s"}{" "}
+                      registrado
+                      {historial.length ===
+                      1
+                        ? ""
+                        : "s"}
                     </p>
                   </div>
 
-                  <span className="text-xl font-bold text-slate-500">
+                  <span>
                     {mostrarHistorial
                       ? "−"
                       : "+"}
@@ -1263,33 +1225,25 @@ export default function PagosPage() {
                 </button>
 
                 {mostrarHistorial && (
-                  <div className="border-t border-slate-200">
+                  <div className="border-t">
 
                     {cargandoHistorial ? (
                       <div className="p-6 text-center text-sm text-slate-500">
                         Cargando historial...
                       </div>
                     ) : errorHistorial ? (
-                      <div className="p-4">
-                        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                          {
-                            errorHistorial
-                          }
-                        </div>
+                      <div className="p-4 text-sm text-red-700">
+                        {
+                          errorHistorial
+                        }
                       </div>
                     ) : historial.length ===
                       0 ? (
-                      <div className="p-6 text-center">
-                        <p className="font-bold text-slate-700">
-                          Aún no hay pagos registrados.
-                        </p>
-
-                        <p className="mt-1 text-sm text-slate-500">
-                          El primer pago aparecerá aquí.
-                        </p>
+                      <div className="p-6 text-center text-sm text-slate-500">
+                        Aún no hay pagos registrados.
                       </div>
                     ) : (
-                      <div className="divide-y divide-slate-200">
+                      <div className="divide-y">
 
                         {historial.map(
                           (
@@ -1299,20 +1253,18 @@ export default function PagosPage() {
                             <div
                               key={
                                 movimiento.idPago ||
-                                `${movimiento.fecha}-${indice}`
+                                indice
                               }
                               className="p-4"
                             >
-                              {/* FECHA */}
-
-                              <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div className="flex items-start justify-between gap-2">
 
                                 <div>
-                                  <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                                  <p className="text-xs font-black uppercase text-slate-400">
                                     Pago
                                   </p>
 
-                                  <p className="mt-1 text-sm font-bold text-slate-700">
+                                  <p className="mt-1 text-sm font-bold">
                                     {
                                       movimiento.fecha
                                     }
@@ -1326,8 +1278,6 @@ export default function PagosPage() {
                                 </span>
                               </div>
 
-                              {/* DATOS */}
-
                               <div className="mt-4 grid grid-cols-2 gap-2">
 
                                 <div className="rounded-xl bg-slate-50 p-3">
@@ -1335,7 +1285,7 @@ export default function PagosPage() {
                                     Servicio
                                   </p>
 
-                                  <p className="mt-1 text-sm font-bold text-slate-900">
+                                  <p className="mt-1 text-sm font-bold">
                                     {movimiento.servicio ||
                                       "—"}
                                   </p>
@@ -1346,7 +1296,7 @@ export default function PagosPage() {
                                     Método
                                   </p>
 
-                                  <p className="mt-1 text-sm font-bold text-slate-900">
+                                  <p className="mt-1 text-sm font-bold">
                                     {movimiento.metodo ||
                                       "—"}
                                   </p>
@@ -1377,15 +1327,13 @@ export default function PagosPage() {
                                 </div>
                               </div>
 
-                              {/* REFERENCIA */}
-
                               {movimiento.referencia && (
-                                <div className="mt-3 rounded-xl border border-slate-200 p-3">
+                                <div className="mt-3 rounded-xl border p-3">
                                   <p className="text-[10px] font-black uppercase text-slate-500">
                                     Referencia
                                   </p>
 
-                                  <p className="mt-1 break-words text-sm font-medium text-slate-800">
+                                  <p className="mt-1 text-sm">
                                     {
                                       movimiento.referencia
                                     }
@@ -1393,15 +1341,13 @@ export default function PagosPage() {
                                 </div>
                               )}
 
-                              {/* OBSERVACIONES */}
-
                               {movimiento.observaciones && (
-                                <div className="mt-3 rounded-xl border border-slate-200 p-3">
+                                <div className="mt-3 rounded-xl border p-3">
                                   <p className="text-[10px] font-black uppercase text-slate-500">
                                     Observaciones
                                   </p>
 
-                                  <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700">
+                                  <p className="mt-1 text-sm">
                                     {
                                       movimiento.observaciones
                                     }
@@ -1409,35 +1355,20 @@ export default function PagosPage() {
                                 </div>
                               )}
 
-                              {/* COMPROBANTE */}
+                              {/* NUEVO VISOR INTERNO */}
 
-                              {movimiento.urlComprobante ? (
-                                <a
-                                  href={
-                                    movimiento.urlComprobante
+                              {movimiento.comprobante ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    abrirVisor(
+                                      movimiento
+                                    )
                                   }
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-black text-blue-700 transition hover:bg-blue-100"
+                                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-black text-blue-700"
                                 >
-                                  <span>
-                                    📷
-                                  </span>
-
-                                  Ver comprobante
-                                </a>
-                              ) : movimiento.comprobante ? (
-                                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                  <p className="text-[10px] font-black uppercase text-slate-500">
-                                    Comprobante
-                                  </p>
-
-                                  <p className="mt-1 break-all text-xs text-slate-600">
-                                    {
-                                      movimiento.comprobante
-                                    }
-                                  </p>
-                                </div>
+                                  📷 Ver comprobante
+                                </button>
                               ) : (
                                 <p className="mt-3 text-xs text-slate-400">
                                   Sin comprobante adjunto
@@ -1452,29 +1383,27 @@ export default function PagosPage() {
                 )}
               </div>
 
-              {/* =========================================
-                  NUEVO ABONO
-              ========================================== */}
+              {/* NUEVO ABONO */}
 
-              <div className="border-t border-slate-200 pt-5">
-
+              <div className="border-t pt-5">
                 <p className="text-xs font-black uppercase tracking-[0.15em] text-blue-700">
                   Registrar nuevo abono
                 </p>
               </div>
 
-              {/* SERVICIO */}
-
-              {Number(
+              {(Number(
                 seleccionado.totalAereo ||
                   0
-              ) > 0 ||
-              Number(
-                seleccionado.totalTerrestre ||
-                  0
-              ) > 0 ? (
+              ) >
+                0 ||
+                Number(
+                  seleccionado.totalTerrestre ||
+                    0
+                ) >
+                  0) && (
                 <div>
-                  <label className="mb-2 block text-sm font-bold text-slate-800">
+
+                  <label className="mb-2 block text-sm font-bold">
                     Servicio elegido por el cliente
                   </label>
 
@@ -1483,7 +1412,8 @@ export default function PagosPage() {
                     {Number(
                       seleccionado.totalAereo ||
                         0
-                    ) > 0 && (
+                    ) >
+                      0 && (
                       <button
                         type="button"
                         onClick={() =>
@@ -1491,19 +1421,17 @@ export default function PagosPage() {
                             "Aéreo"
                           )
                         }
-                        disabled={
-                          guardando
-                        }
                         className={`rounded-xl border p-4 text-left ${
                           servicio ===
                           "Aéreo"
                             ? "border-blue-600 bg-blue-50 ring-2 ring-blue-100"
-                            : "border-slate-200 bg-white"
+                            : ""
                         }`}
                       >
-                        <p className="font-black text-slate-900">
-                          ✈ Aéreo
-                        </p>
+                        ✈{" "}
+                        <strong>
+                          Aéreo
+                        </strong>
 
                         <p className="mt-1 text-xl font-black text-blue-800">
                           {dinero(
@@ -1518,7 +1446,8 @@ export default function PagosPage() {
                     {Number(
                       seleccionado.totalTerrestre ||
                         0
-                    ) > 0 && (
+                    ) >
+                      0 && (
                       <button
                         type="button"
                         onClick={() =>
@@ -1526,19 +1455,17 @@ export default function PagosPage() {
                             "Terrestre"
                           )
                         }
-                        disabled={
-                          guardando
-                        }
                         className={`rounded-xl border p-4 text-left ${
                           servicio ===
                           "Terrestre"
                             ? "border-amber-500 bg-amber-50 ring-2 ring-amber-100"
-                            : "border-slate-200 bg-white"
+                            : ""
                         }`}
                       >
-                        <p className="font-black text-slate-900">
-                          🚚 Terrestre
-                        </p>
+                        🚚{" "}
+                        <strong>
+                          Terrestre
+                        </strong>
 
                         <p className="mt-1 text-xl font-black text-amber-700">
                           {dinero(
@@ -1551,42 +1478,40 @@ export default function PagosPage() {
                     )}
                   </div>
                 </div>
-              ) : null}
+              )}
 
-              {/* TOTALES */}
+              <div className="grid grid-cols-3 gap-2">
 
-              <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
-
-                <div className="rounded-xl border border-slate-200 p-3 sm:p-4">
-                  <p className="text-[10px] font-bold uppercase text-slate-500 sm:text-xs">
+                <div className="rounded-xl border p-3">
+                  <p className="text-[10px] font-bold uppercase text-slate-500">
                     Total
                   </p>
 
-                  <p className="mt-1 break-words text-base font-black text-slate-950 sm:text-lg">
+                  <p className="mt-1 font-black">
                     {dinero(
                       totalSeleccionado
                     )}
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 sm:p-4">
-                  <p className="text-[10px] font-bold uppercase text-amber-700 sm:text-xs">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-[10px] font-bold uppercase text-amber-700">
                     Saldo actual
                   </p>
 
-                  <p className="mt-1 break-words text-base font-black text-amber-700 sm:text-lg">
+                  <p className="mt-1 font-black text-amber-700">
                     {dinero(
                       saldoActual
                     )}
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 sm:p-4">
-                  <p className="text-[10px] font-bold uppercase text-emerald-700 sm:text-xs">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                  <p className="text-[10px] font-bold uppercase text-emerald-700">
                     Nuevo saldo
                   </p>
 
-                  <p className="mt-1 break-words text-base font-black text-emerald-700 sm:text-lg">
+                  <p className="mt-1 font-black text-emerald-700">
                     {dinero(
                       nuevoSaldo
                     )}
@@ -1594,10 +1519,8 @@ export default function PagosPage() {
                 </div>
               </div>
 
-              {/* MONTO */}
-
               <div>
-                <label className="mb-1 block text-sm font-bold text-slate-800">
+                <label className="mb-1 block text-sm font-bold">
                   Cantidad que paga ahora
                 </label>
 
@@ -1606,214 +1529,131 @@ export default function PagosPage() {
                   min="0"
                   step="0.01"
                   inputMode="decimal"
-                  value={
-                    montoPago
-                  }
-                  disabled={
-                    guardando
-                  }
+                  value={montoPago}
                   onChange={(e) =>
                     setMontoPago(
                       e.target.value
                     )
                   }
-                  placeholder="0.00"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-lg font-bold outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+                  className="w-full rounded-xl border px-4 py-3 text-lg font-bold"
                 />
               </div>
 
-              {/* MÉTODO */}
-
               <div>
-                <label className="mb-1 block text-sm font-bold text-slate-800">
+                <label className="mb-1 block text-sm font-bold">
                   Método de pago
                 </label>
 
                 <select
-                  value={
-                    metodoPago
-                  }
-                  disabled={
-                    guardando
-                  }
+                  value={metodoPago}
                   onChange={(e) =>
                     setMetodoPago(
                       e.target
                         .value as MetodoPago
                     )
                   }
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-600 disabled:bg-slate-100"
+                  className="w-full rounded-xl border bg-white px-4 py-3"
                 >
-                  <option value="Transferencia">
+                  <option>
                     Transferencia
                   </option>
 
-                  <option value="Efectivo">
+                  <option>
                     Efectivo
                   </option>
 
-                  <option value="Depósito">
+                  <option>
                     Depósito
                   </option>
 
-                  <option value="Tarjeta">
+                  <option>
                     Tarjeta
                   </option>
 
-                  <option value="Otro">
+                  <option>
                     Otro
                   </option>
                 </select>
               </div>
 
-              {/* REFERENCIA */}
-
               <div>
-                <label className="mb-1 block text-sm font-bold text-slate-800">
+                <label className="mb-1 block text-sm font-bold">
                   Referencia
                 </label>
 
                 <input
-                  value={
-                    referencia
-                  }
-                  disabled={
-                    guardando
-                  }
+                  value={referencia}
                   onChange={(e) =>
                     setReferencia(
                       e.target.value
                     )
                   }
-                  placeholder="Ej. últimos 4 dígitos, folio bancario..."
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 disabled:bg-slate-100"
+                  className="w-full rounded-xl border px-4 py-3"
                 />
               </div>
 
-              {/* COMPROBANTE */}
+              {/* SUBIR FOTO */}
 
               <div>
-                <div className="mb-1 flex items-center justify-between gap-2">
-
-                  <label className="block text-sm font-bold text-slate-800">
-                    Comprobante de pago
-                  </label>
-
-                  <span className="shrink-0 text-xs text-slate-500">
-                    Opcional
-                  </span>
-                </div>
+                <label className="mb-2 block text-sm font-bold">
+                  Comprobante de pago
+                </label>
 
                 {!previewComprobante ? (
-                  <div className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-5">
+                  <label className="flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed bg-slate-50 p-5 text-center">
 
-                    <label className="flex cursor-pointer flex-col items-center justify-center text-center">
+                    <div className="text-3xl">
+                      📷
+                    </div>
 
-                      <div className="mb-2 text-3xl">
-                        📷
-                      </div>
+                    <p className="mt-2 font-bold">
+                      Tomar foto o seleccionar imagen
+                    </p>
 
-                      <p className="font-bold text-slate-800">
-                        Tomar foto o seleccionar imagen
-                      </p>
+                    <p className="text-xs text-slate-500">
+                      JPG, PNG o WEBP · Máximo 10 MB
+                    </p>
 
-                      <p className="mt-1 text-xs text-slate-500">
-                        JPG, PNG o WEBP · Máximo 10 MB
-                      </p>
-
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        capture="environment"
-                        disabled={
-                          guardando
-                        }
-                        className="hidden"
-                        onChange={(e) => {
-                          seleccionarComprobante(
-                            e.target
-                              .files?.[0] ||
-                              null
-                          );
-
-                          e.target.value =
-                            "";
-                        }}
-                      />
-                    </label>
-                  </div>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      capture="environment"
+                      className="hidden"
+                      onChange={(e) =>
+                        seleccionarComprobante(
+                          e.target
+                            .files?.[0] ||
+                            null
+                        )
+                      }
+                    />
+                  </label>
                 ) : (
-                  <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                  <div className="overflow-hidden rounded-xl border">
 
-                    <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                    <img
+                      src={
+                        previewComprobante
+                      }
+                      alt="Vista previa"
+                      className="max-h-72 w-full object-contain"
+                    />
 
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-800">
-                          Comprobante seleccionado
-                        </p>
-
-                        <p className="truncate text-xs text-slate-500">
-                          {
-                            comprobante?.name
-                          }
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        disabled={
-                          guardando
-                        }
-                        onClick={
-                          quitarComprobante
-                        }
-                        className="shrink-0 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"
-                      >
-                        Quitar
-                      </button>
-                    </div>
-
-                    <div className="flex justify-center bg-slate-100 p-3 sm:p-4">
-                      <img
-                        src={
-                          previewComprobante
-                        }
-                        alt="Vista previa del comprobante"
-                        className="max-h-72 max-w-full rounded-lg object-contain shadow-sm"
-                      />
-                    </div>
-
-                    <label className="block cursor-pointer border-t border-slate-200 bg-white px-4 py-3 text-center text-sm font-bold text-blue-700 hover:bg-blue-50">
-                      Cambiar imagen
-
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        capture="environment"
-                        disabled={
-                          guardando
-                        }
-                        className="hidden"
-                        onChange={(e) => {
-                          seleccionarComprobante(
-                            e.target
-                              .files?.[0] ||
-                              null
-                          );
-
-                          e.target.value =
-                            "";
-                        }}
-                      />
-                    </label>
+                    <button
+                      type="button"
+                      onClick={
+                        quitarComprobante
+                      }
+                      className="w-full border-t px-4 py-3 font-bold text-red-600"
+                    >
+                      Quitar imagen
+                    </button>
                   </div>
                 )}
               </div>
 
-              {/* OBSERVACIONES */}
-
               <div>
-                <label className="mb-1 block text-sm font-bold text-slate-800">
+                <label className="mb-1 block text-sm font-bold">
                   Observaciones
                 </label>
 
@@ -1821,52 +1661,37 @@ export default function PagosPage() {
                   value={
                     observaciones
                   }
-                  disabled={
-                    guardando
-                  }
                   onChange={(e) =>
                     setObservaciones(
                       e.target.value
                     )
                   }
-                  placeholder="Opcional"
                   rows={3}
-                  className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 disabled:bg-slate-100"
+                  className="w-full rounded-xl border px-4 py-3"
                 />
               </div>
 
-              {/* MENSAJES */}
-
               {errorPago && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700">
-                  {
-                    errorPago
-                  }
+                <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
+                  {errorPago}
                 </div>
               )}
 
               {mensajePago && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-700">
-                  {
-                    mensajePago
-                  }
+                <div className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700">
+                  {mensajePago}
                 </div>
               )}
             </div>
 
-            {/* BOTONES */}
-
-            <div className="sticky bottom-0 z-20 flex flex-col-reverse gap-3 border-t border-slate-200 bg-white p-4 sm:flex-row sm:justify-end sm:p-5">
+            <div className="sticky bottom-0 z-20 flex gap-3 border-t bg-white p-4 sm:justify-end">
 
               <button
                 type="button"
                 onClick={
                   cerrarPago
                 }
-                disabled={
-                  guardando
-                }
-                className="w-full rounded-xl border border-slate-300 bg-white px-5 py-3 font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                className="flex-1 rounded-xl border px-5 py-3 font-bold sm:flex-none"
               >
                 Cerrar
               </button>
@@ -1881,15 +1706,94 @@ export default function PagosPage() {
                   disabled={
                     guardando
                   }
-                  className="w-full rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                  className="flex-1 rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white disabled:opacity-60 sm:flex-none"
                 >
                   {guardando
-                    ? comprobante
-                      ? "Subiendo comprobante..."
-                      : "Guardando pago..."
+                    ? "Guardando..."
                     : "Guardar pago"}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =============================================
+          VISOR INTERNO DEL COMPROBANTE
+      ============================================== */}
+
+      {visorComprobante && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/85 p-3 sm:p-6">
+
+          <div className="flex max-h-[96vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+
+            <div className="flex items-center justify-between gap-3 border-b bg-white px-4 py-3 sm:px-5 sm:py-4">
+
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-wider text-blue-700">
+                  Comprobante de pago
+                </p>
+
+                <p className="mt-1 text-lg font-black text-emerald-700">
+                  {dinero(
+                    visorComprobante.monto
+                  )}
+                </p>
+
+                <p className="text-xs text-slate-500">
+                  {
+                    visorComprobante.fecha
+                  }
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={
+                  cerrarVisor
+                }
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-2xl font-bold text-slate-600 hover:bg-slate-200"
+                aria-label="Cerrar comprobante"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex min-h-[300px] flex-1 items-center justify-center overflow-auto bg-slate-100 p-3 sm:p-5">
+
+              <img
+                src={`/api/pagos/comprobante?ruta=${encodeURIComponent(
+                  visorComprobante.ruta
+                )}`}
+                alt="Comprobante de pago"
+                onError={() =>
+                  setErrorVisor(
+                    "No fue posible mostrar el comprobante."
+                  )
+                }
+                className="max-h-[75vh] max-w-full rounded-lg bg-white object-contain shadow"
+              />
+            </div>
+
+            {errorVisor && (
+              <div className="border-t border-red-200 bg-red-50 p-3 text-center text-sm font-bold text-red-700">
+                {
+                  errorVisor
+                }
+              </div>
+            )}
+
+            <div className="border-t bg-white p-3 sm:p-4">
+
+              <button
+                type="button"
+                onClick={
+                  cerrarVisor
+                }
+                className="w-full rounded-xl bg-blue-700 px-5 py-3 font-black text-white hover:bg-blue-800 sm:mx-auto sm:block sm:w-auto sm:min-w-48"
+              >
+                Cerrar comprobante
+              </button>
             </div>
           </div>
         </div>
