@@ -56,17 +56,10 @@ function EstadoPago({
 }
 
 export default function PagosPage() {
-  const [pagos, setPagos] =
-    useState<PagoRow[]>([]);
-
-  const [busqueda, setBusqueda] =
-    useState("");
-
-  const [cargando, setCargando] =
-    useState(true);
-
-  const [error, setError] =
-    useState("");
+  const [pagos, setPagos] = useState<PagoRow[]>([]);
+  const [busqueda, setBusqueda] = useState("");
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState("");
 
   const [seleccionado, setSeleccionado] =
     useState<PagoRow | null>(null);
@@ -74,40 +67,46 @@ export default function PagosPage() {
   const [servicio, setServicio] =
     useState<"Aéreo" | "Terrestre" | "">("");
 
-  const [montoPago, setMontoPago] =
-    useState("");
+  const [montoPago, setMontoPago] = useState("");
 
   const [metodoPago, setMetodoPago] =
     useState<MetodoPago>("Transferencia");
 
-  const [referencia, setReferencia] =
+  const [referencia, setReferencia] = useState("");
+  const [observaciones, setObservaciones] = useState("");
+
+  const [comprobante, setComprobante] =
+    useState<File | null>(null);
+
+  const [previewComprobante, setPreviewComprobante] =
     useState("");
 
-  const [observaciones, setObservaciones] =
-    useState("");
-
-  const [guardando, setGuardando] =
-    useState(false);
-
-  const [errorPago, setErrorPago] =
-    useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [errorPago, setErrorPago] = useState("");
+  const [mensajePago, setMensajePago] = useState("");
 
   useEffect(() => {
     cargarPagos();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (previewComprobante) {
+        URL.revokeObjectURL(previewComprobante);
+      }
+    };
+  }, [previewComprobante]);
 
   async function cargarPagos() {
     try {
       setCargando(true);
       setError("");
 
-      const respuesta =
-        await fetch("/api/pagos", {
-          cache: "no-store",
-        });
+      const respuesta = await fetch("/api/pagos", {
+        cache: "no-store",
+      });
 
-      const data =
-        await respuesta.json();
+      const data = await respuesta.json();
 
       if (!respuesta.ok) {
         throw new Error(
@@ -181,16 +180,27 @@ export default function PagosPage() {
     );
   }, [pagos]);
 
-  function abrirPago(
-    pago: PagoRow
-  ) {
-    setSeleccionado(pago);
+  function limpiarComprobante() {
+    if (previewComprobante) {
+      URL.revokeObjectURL(
+        previewComprobante
+      );
+    }
 
+    setComprobante(null);
+    setPreviewComprobante("");
+  }
+
+  function abrirPago(pago: PagoRow) {
+    limpiarComprobante();
+
+    setSeleccionado(pago);
     setMontoPago("");
     setReferencia("");
     setObservaciones("");
     setMetodoPago("Transferencia");
     setErrorPago("");
+    setMensajePago("");
 
     const opciones =
       pago.opciones?.toLowerCase() || "";
@@ -222,8 +232,71 @@ export default function PagosPage() {
       return;
     }
 
+    limpiarComprobante();
+
     setSeleccionado(null);
+    setServicio("");
+    setMontoPago("");
+    setReferencia("");
+    setObservaciones("");
     setErrorPago("");
+    setMensajePago("");
+  }
+
+  function seleccionarComprobante(
+    archivo: File | null
+  ) {
+    if (!archivo) {
+      return;
+    }
+
+    setErrorPago("");
+
+    const tiposPermitidos = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+
+    if (
+      archivo.type &&
+      !tiposPermitidos.includes(
+        archivo.type
+      )
+    ) {
+      setErrorPago(
+        "El comprobante debe ser una imagen JPG, PNG o WEBP."
+      );
+
+      return;
+    }
+
+    if (
+      archivo.size >
+      10 * 1024 * 1024
+    ) {
+      setErrorPago(
+        "La imagen no puede pesar más de 10 MB."
+      );
+
+      return;
+    }
+
+    if (previewComprobante) {
+      URL.revokeObjectURL(
+        previewComprobante
+      );
+    }
+
+    setComprobante(archivo);
+
+    setPreviewComprobante(
+      URL.createObjectURL(archivo)
+    );
+  }
+
+  function quitarComprobante() {
+    limpiarComprobante();
   }
 
   const totalSeleccionado =
@@ -232,24 +305,33 @@ export default function PagosPage() {
         return 0;
       }
 
-      if (seleccionado.total > 0) {
+      if (
+        seleccionado.total > 0
+      ) {
         return seleccionado.total;
       }
 
-      if (servicio === "Aéreo") {
+      if (
+        servicio === "Aéreo"
+      ) {
         return Number(
           seleccionado.totalAereo || 0
         );
       }
 
-      if (servicio === "Terrestre") {
+      if (
+        servicio === "Terrestre"
+      ) {
         return Number(
           seleccionado.totalTerrestre || 0
         );
       }
 
       return 0;
-    }, [seleccionado, servicio]);
+    }, [
+      seleccionado,
+      servicio,
+    ]);
 
   const saldoActual =
     useMemo(() => {
@@ -257,7 +339,9 @@ export default function PagosPage() {
         return 0;
       }
 
-      if (seleccionado.total > 0) {
+      if (
+        seleccionado.total > 0
+      ) {
         return Number(
           seleccionado.saldo || 0
         );
@@ -280,7 +364,8 @@ export default function PagosPage() {
 
   const nuevoSaldo =
     Math.max(
-      saldoActual - pagoCapturado,
+      saldoActual -
+        pagoCapturado,
       0
     );
 
@@ -290,6 +375,7 @@ export default function PagosPage() {
     }
 
     setErrorPago("");
+    setMensajePago("");
 
     if (
       totalSeleccionado <= 0
@@ -330,38 +416,63 @@ export default function PagosPage() {
     try {
       setGuardando(true);
 
+      const formData =
+        new FormData();
+
+      formData.append(
+        "folio",
+        seleccionado.folio
+      );
+
+      formData.append(
+        "servicio",
+        servicio ||
+          seleccionado.opciones ||
+          ""
+      );
+
+      formData.append(
+        "total",
+        String(
+          totalSeleccionado
+        )
+      );
+
+      formData.append(
+        "monto",
+        String(
+          pagoCapturado
+        )
+      );
+
+      formData.append(
+        "metodo",
+        metodoPago
+      );
+
+      formData.append(
+        "referencia",
+        referencia.trim()
+      );
+
+      formData.append(
+        "observaciones",
+        observaciones.trim()
+      );
+
+      if (comprobante) {
+        formData.append(
+          "comprobante",
+          comprobante
+        );
+      }
+
       const respuesta =
         await fetch(
           "/api/pagos",
           {
             method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify({
-              folio:
-                seleccionado.folio,
-
-              servicio:
-                servicio ||
-                seleccionado.opciones,
-
-              total:
-                totalSeleccionado,
-
-              monto:
-                pagoCapturado,
-
-              metodo:
-                metodoPago,
-
-              referencia:
-                referencia.trim(),
-
-              observaciones:
-                observaciones.trim(),
-            }),
+            body: formData,
           }
         );
 
@@ -375,9 +486,18 @@ export default function PagosPage() {
         );
       }
 
-      setSeleccionado(null);
+      setMensajePago(
+        "Pago guardado correctamente."
+      );
+
+      limpiarComprobante();
 
       await cargarPagos();
+
+      setTimeout(() => {
+        setSeleccionado(null);
+        setMensajePago("");
+      }, 900);
     } catch (err) {
       console.error(err);
 
@@ -575,8 +695,7 @@ export default function PagosPage() {
                         </td>
 
                         <td className="px-5 py-4 text-right font-bold text-slate-900">
-                          {pago.total >
-                          0
+                          {pago.total > 0
                             ? dinero(
                                 pago.total
                               )
@@ -590,8 +709,7 @@ export default function PagosPage() {
                         </td>
 
                         <td className="px-5 py-4 text-right font-black text-slate-900">
-                          {pago.total >
-                          0
+                          {pago.total > 0
                             ? dinero(
                                 pago.saldo
                               )
@@ -635,6 +753,8 @@ export default function PagosPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
           <div className="max-h-[95vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
 
+            {/* CABECERA MODAL */}
+
             <div className="flex items-start justify-between border-b border-slate-200 p-5">
               <div>
                 <p className="text-xs font-black uppercase tracking-wider text-blue-700">
@@ -659,13 +779,18 @@ export default function PagosPage() {
                 onClick={
                   cerrarPago
                 }
-                className="rounded-lg px-3 py-2 text-lg font-bold text-slate-500 hover:bg-slate-100"
+                disabled={
+                  guardando
+                }
+                className="rounded-lg px-3 py-2 text-lg font-bold text-slate-500 hover:bg-slate-100 disabled:opacity-50"
               >
                 ×
               </button>
             </div>
 
             <div className="space-y-5 p-5">
+
+              {/* CLIENTE */}
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-xl bg-slate-50 p-4">
@@ -693,6 +818,8 @@ export default function PagosPage() {
                 </div>
               </div>
 
+              {/* SERVICIO */}
+
               {Number(
                 seleccionado.totalAereo ||
                   0
@@ -707,6 +834,7 @@ export default function PagosPage() {
                   </label>
 
                   <div className="grid gap-3 sm:grid-cols-2">
+
                     {Number(
                       seleccionado.totalAereo ||
                         0
@@ -717,6 +845,9 @@ export default function PagosPage() {
                           setServicio(
                             "Aéreo"
                           )
+                        }
+                        disabled={
+                          guardando
                         }
                         className={`rounded-xl border p-4 text-left ${
                           servicio ===
@@ -750,6 +881,9 @@ export default function PagosPage() {
                             "Terrestre"
                           )
                         }
+                        disabled={
+                          guardando
+                        }
                         className={`rounded-xl border p-4 text-left ${
                           servicio ===
                           "Terrestre"
@@ -773,6 +907,8 @@ export default function PagosPage() {
                   </div>
                 </div>
               ) : null}
+
+              {/* TOTALES */}
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-xl border border-slate-200 p-4">
@@ -812,6 +948,8 @@ export default function PagosPage() {
                 </div>
               </div>
 
+              {/* MONTO */}
+
               <div>
                 <label className="mb-1 block text-sm font-bold text-slate-800">
                   Cantidad que paga ahora
@@ -824,15 +962,20 @@ export default function PagosPage() {
                   value={
                     montoPago
                   }
+                  disabled={
+                    guardando
+                  }
                   onChange={(e) =>
                     setMontoPago(
                       e.target.value
                     )
                   }
                   placeholder="0.00"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-lg font-bold outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-lg font-bold outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
                 />
               </div>
+
+              {/* MÉTODO */}
 
               <div>
                 <label className="mb-1 block text-sm font-bold text-slate-800">
@@ -843,35 +986,40 @@ export default function PagosPage() {
                   value={
                     metodoPago
                   }
+                  disabled={
+                    guardando
+                  }
                   onChange={(e) =>
                     setMetodoPago(
                       e.target
                         .value as MetodoPago
                     )
                   }
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-600"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-600 disabled:bg-slate-100"
                 >
-                  <option>
+                  <option value="Transferencia">
                     Transferencia
                   </option>
 
-                  <option>
+                  <option value="Efectivo">
                     Efectivo
                   </option>
 
-                  <option>
+                  <option value="Depósito">
                     Depósito
                   </option>
 
-                  <option>
+                  <option value="Tarjeta">
                     Tarjeta
                   </option>
 
-                  <option>
+                  <option value="Otro">
                     Otro
                   </option>
                 </select>
               </div>
+
+              {/* REFERENCIA */}
 
               <div>
                 <label className="mb-1 block text-sm font-bold text-slate-800">
@@ -882,15 +1030,136 @@ export default function PagosPage() {
                   value={
                     referencia
                   }
+                  disabled={
+                    guardando
+                  }
                   onChange={(e) =>
                     setReferencia(
                       e.target.value
                     )
                   }
                   placeholder="Ej. últimos 4 dígitos, folio bancario..."
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-600"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 disabled:bg-slate-100"
                 />
               </div>
+
+              {/* COMPROBANTE */}
+
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="block text-sm font-bold text-slate-800">
+                    Comprobante de pago
+                  </label>
+
+                  <span className="text-xs text-slate-500">
+                    Opcional
+                  </span>
+                </div>
+
+                {!previewComprobante ? (
+                  <div className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-5">
+                    <label className="flex cursor-pointer flex-col items-center justify-center text-center">
+                      <div className="mb-2 text-3xl">
+                        📷
+                      </div>
+
+                      <p className="font-bold text-slate-800">
+                        Tomar foto o seleccionar imagen
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-500">
+                        JPG, PNG o WEBP · Máximo 10 MB
+                      </p>
+
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        capture="environment"
+                        disabled={
+                          guardando
+                        }
+                        className="hidden"
+                        onChange={(e) => {
+                          seleccionarComprobante(
+                            e.target
+                              .files?.[0] ||
+                              null
+                          );
+
+                          e.target.value =
+                            "";
+                        }}
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+
+                    <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-800">
+                          Comprobante seleccionado
+                        </p>
+
+                        <p className="truncate text-xs text-slate-500">
+                          {
+                            comprobante?.name
+                          }
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={
+                          guardando
+                        }
+                        onClick={
+                          quitarComprobante
+                        }
+                        className="ml-3 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+
+                    <div className="flex justify-center bg-slate-100 p-4">
+                      <img
+                        src={
+                          previewComprobante
+                        }
+                        alt="Vista previa del comprobante"
+                        className="max-h-72 max-w-full rounded-lg object-contain shadow-sm"
+                      />
+                    </div>
+
+                    <label className="block cursor-pointer border-t border-slate-200 bg-white px-4 py-3 text-center text-sm font-bold text-blue-700 hover:bg-blue-50">
+                      Cambiar imagen
+
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        capture="environment"
+                        disabled={
+                          guardando
+                        }
+                        className="hidden"
+                        onChange={(e) => {
+                          seleccionarComprobante(
+                            e.target
+                              .files?.[0] ||
+                              null
+                          );
+
+                          e.target.value =
+                            "";
+                        }}
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* OBSERVACIONES */}
 
               <div>
                 <label className="mb-1 block text-sm font-bold text-slate-800">
@@ -901,6 +1170,9 @@ export default function PagosPage() {
                   value={
                     observaciones
                   }
+                  disabled={
+                    guardando
+                  }
                   onChange={(e) =>
                     setObservaciones(
                       e.target.value
@@ -908,16 +1180,26 @@ export default function PagosPage() {
                   }
                   placeholder="Opcional"
                   rows={3}
-                  className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-600"
+                  className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 disabled:bg-slate-100"
                 />
               </div>
+
+              {/* MENSAJES */}
 
               {errorPago && (
                 <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700">
                   {errorPago}
                 </div>
               )}
+
+              {mensajePago && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-700">
+                  {mensajePago}
+                </div>
+              )}
             </div>
+
+            {/* BOTONES */}
 
             <div className="flex flex-col-reverse gap-3 border-t border-slate-200 p-5 sm:flex-row sm:justify-end">
               <button
@@ -928,7 +1210,7 @@ export default function PagosPage() {
                 disabled={
                   guardando
                 }
-                className="rounded-xl border border-slate-300 bg-white px-5 py-3 font-bold text-slate-700"
+                className="rounded-xl border border-slate-300 bg-white px-5 py-3 font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancelar
               </button>
@@ -944,7 +1226,9 @@ export default function PagosPage() {
                 className="rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {guardando
-                  ? "Guardando..."
+                  ? comprobante
+                    ? "Subiendo comprobante..."
+                    : "Guardando pago..."
                   : "Guardar pago"}
               </button>
             </div>
