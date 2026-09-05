@@ -20,6 +20,28 @@ type PagoRow = {
   requiereSeleccionServicio?: boolean;
 };
 
+type HistorialPago = {
+  idPago: string;
+  fecha: string;
+  folio: string;
+  cliente: string;
+  whatsapp: string;
+  servicio: string;
+
+  total: number;
+  saldoAntes: number;
+  monto: number;
+  saldoDespues: number;
+
+  metodo: string;
+  referencia: string;
+
+  comprobante: string;
+  urlComprobante: string;
+
+  observaciones: string;
+};
+
 type MetodoPago =
   | "Transferencia"
   | "Efectivo"
@@ -56,34 +78,86 @@ function EstadoPago({
 }
 
 export default function PagosPage() {
-  const [pagos, setPagos] = useState<PagoRow[]>([]);
-  const [busqueda, setBusqueda] = useState("");
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState("");
+  const [pagos, setPagos] =
+    useState<PagoRow[]>([]);
+
+  const [busqueda, setBusqueda] =
+    useState("");
+
+  const [cargando, setCargando] =
+    useState(true);
+
+  const [error, setError] =
+    useState("");
 
   const [seleccionado, setSeleccionado] =
     useState<PagoRow | null>(null);
 
   const [servicio, setServicio] =
-    useState<"Aéreo" | "Terrestre" | "">("");
+    useState<
+      "Aéreo" | "Terrestre" | ""
+    >("");
 
-  const [montoPago, setMontoPago] = useState("");
-
-  const [metodoPago, setMetodoPago] =
-    useState<MetodoPago>("Transferencia");
-
-  const [referencia, setReferencia] = useState("");
-  const [observaciones, setObservaciones] = useState("");
-
-  const [comprobante, setComprobante] =
-    useState<File | null>(null);
-
-  const [previewComprobante, setPreviewComprobante] =
+  const [montoPago, setMontoPago] =
     useState("");
 
-  const [guardando, setGuardando] = useState(false);
-  const [errorPago, setErrorPago] = useState("");
-  const [mensajePago, setMensajePago] = useState("");
+  const [metodoPago, setMetodoPago] =
+    useState<MetodoPago>(
+      "Transferencia"
+    );
+
+  const [referencia, setReferencia] =
+    useState("");
+
+  const [
+    observaciones,
+    setObservaciones,
+  ] = useState("");
+
+  const [
+    comprobante,
+    setComprobante,
+  ] =
+    useState<File | null>(null);
+
+  const [
+    previewComprobante,
+    setPreviewComprobante,
+  ] = useState("");
+
+  const [guardando, setGuardando] =
+    useState(false);
+
+  const [errorPago, setErrorPago] =
+    useState("");
+
+  const [
+    mensajePago,
+    setMensajePago,
+  ] = useState("");
+
+  /* HISTORIAL */
+
+  const [
+    historial,
+    setHistorial,
+  ] =
+    useState<HistorialPago[]>([]);
+
+  const [
+    cargandoHistorial,
+    setCargandoHistorial,
+  ] = useState(false);
+
+  const [
+    errorHistorial,
+    setErrorHistorial,
+  ] = useState("");
+
+  const [
+    mostrarHistorial,
+    setMostrarHistorial,
+  ] = useState(true);
 
   useEffect(() => {
     cargarPagos();
@@ -91,8 +165,12 @@ export default function PagosPage() {
 
   useEffect(() => {
     return () => {
-      if (previewComprobante) {
-        URL.revokeObjectURL(previewComprobante);
+      if (
+        previewComprobante
+      ) {
+        URL.revokeObjectURL(
+          previewComprobante
+        );
       }
     };
   }, [previewComprobante]);
@@ -102,11 +180,16 @@ export default function PagosPage() {
       setCargando(true);
       setError("");
 
-      const respuesta = await fetch("/api/pagos", {
-        cache: "no-store",
-      });
+      const respuesta =
+        await fetch(
+          "/api/pagos",
+          {
+            cache: "no-store",
+          }
+        );
 
-      const data = await respuesta.json();
+      const data =
+        await respuesta.json();
 
       if (!respuesta.ok) {
         throw new Error(
@@ -135,53 +218,130 @@ export default function PagosPage() {
     }
   }
 
-  const filtrados = useMemo(() => {
-    const texto =
-      busqueda.trim().toLowerCase();
-
-    if (!texto) {
-      return pagos;
-    }
-
-    return pagos.filter((pago) => {
-      return (
-        pago.folio
-          ?.toLowerCase()
-          .includes(texto) ||
-        pago.cliente
-          ?.toLowerCase()
-          .includes(texto) ||
-        pago.whatsapp
-          ?.toLowerCase()
-          .includes(texto)
+  async function cargarHistorial(
+    folio: string
+  ) {
+    try {
+      setCargandoHistorial(
+        true
       );
-    });
-  }, [pagos, busqueda]);
 
-  const totales = useMemo(() => {
-    return pagos.reduce(
-      (acc, pago) => {
-        acc.cotizado +=
-          Number(pago.total || 0);
+      setErrorHistorial("");
 
-        acc.cobrado +=
-          Number(pago.pagado || 0);
+      const respuesta =
+        await fetch(
+          `/api/pagos/historial?folio=${encodeURIComponent(
+            folio
+          )}`,
+          {
+            cache: "no-store",
+          }
+        );
 
-        acc.pendiente +=
-          Number(pago.saldo || 0);
+      const data =
+        await respuesta.json();
 
-        return acc;
-      },
-      {
-        cotizado: 0,
-        cobrado: 0,
-        pendiente: 0,
+      if (!respuesta.ok) {
+        throw new Error(
+          data?.error ||
+            "No fue posible cargar el historial."
+        );
       }
-    );
-  }, [pagos]);
+
+      setHistorial(
+        Array.isArray(
+          data?.historial
+        )
+          ? data.historial
+          : []
+      );
+    } catch (err) {
+      console.error(err);
+
+      setErrorHistorial(
+        err instanceof Error
+          ? err.message
+          : "No fue posible cargar el historial."
+      );
+
+      setHistorial([]);
+    } finally {
+      setCargandoHistorial(
+        false
+      );
+    }
+  }
+
+  const filtrados =
+    useMemo(() => {
+      const texto =
+        busqueda
+          .trim()
+          .toLowerCase();
+
+      if (!texto) {
+        return pagos;
+      }
+
+      return pagos.filter(
+        (pago) => {
+          return (
+            pago.folio
+              ?.toLowerCase()
+              .includes(
+                texto
+              ) ||
+            pago.cliente
+              ?.toLowerCase()
+              .includes(
+                texto
+              ) ||
+            pago.whatsapp
+              ?.toLowerCase()
+              .includes(
+                texto
+              )
+          );
+        }
+      );
+    }, [
+      pagos,
+      busqueda,
+    ]);
+
+  const totales =
+    useMemo(() => {
+      return pagos.reduce(
+        (acc, pago) => {
+          acc.cotizado +=
+            Number(
+              pago.total || 0
+            );
+
+          acc.cobrado +=
+            Number(
+              pago.pagado || 0
+            );
+
+          acc.pendiente +=
+            Number(
+              pago.saldo || 0
+            );
+
+          return acc;
+        },
+        {
+          cotizado: 0,
+          cobrado: 0,
+          pendiente: 0,
+        }
+      );
+    }, [pagos]);
 
   function limpiarComprobante() {
-    if (previewComprobante) {
+    if (
+      previewComprobante
+    ) {
       URL.revokeObjectURL(
         previewComprobante
       );
@@ -191,37 +351,66 @@ export default function PagosPage() {
     setPreviewComprobante("");
   }
 
-  function abrirPago(pago: PagoRow) {
+  function abrirPago(
+    pago: PagoRow
+  ) {
     limpiarComprobante();
 
     setSeleccionado(pago);
+
     setMontoPago("");
     setReferencia("");
     setObservaciones("");
-    setMetodoPago("Transferencia");
+
+    setMetodoPago(
+      "Transferencia"
+    );
+
     setErrorPago("");
     setMensajePago("");
 
+    setHistorial([]);
+    setErrorHistorial("");
+
+    setMostrarHistorial(
+      true
+    );
+
+    cargarHistorial(
+      pago.folio
+    );
+
     const opciones =
-      pago.opciones?.toLowerCase() || "";
+      pago.opciones?.toLowerCase() ||
+      "";
 
     const tieneAereo =
-      opciones.includes("aéreo") ||
-      opciones.includes("aereo");
+      opciones.includes(
+        "aéreo"
+      ) ||
+      opciones.includes(
+        "aereo"
+      );
 
     const tieneTerrestre =
-      opciones.includes("terrestre");
+      opciones.includes(
+        "terrestre"
+      );
 
     if (
       tieneAereo &&
       !tieneTerrestre
     ) {
-      setServicio("Aéreo");
+      setServicio(
+        "Aéreo"
+      );
     } else if (
       tieneTerrestre &&
       !tieneAereo
     ) {
-      setServicio("Terrestre");
+      setServicio(
+        "Terrestre"
+      );
     } else {
       setServicio("");
     }
@@ -239,8 +428,12 @@ export default function PagosPage() {
     setMontoPago("");
     setReferencia("");
     setObservaciones("");
+
     setErrorPago("");
     setMensajePago("");
+
+    setHistorial([]);
+    setErrorHistorial("");
   }
 
   function seleccionarComprobante(
@@ -252,11 +445,12 @@ export default function PagosPage() {
 
     setErrorPago("");
 
-    const tiposPermitidos = [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-    ];
+    const tiposPermitidos =
+      [
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+      ];
 
     if (
       archivo.type &&
@@ -273,7 +467,9 @@ export default function PagosPage() {
 
     if (
       archivo.size >
-      10 * 1024 * 1024
+      10 *
+        1024 *
+        1024
     ) {
       setErrorPago(
         "La imagen no puede pesar más de 10 MB."
@@ -282,16 +478,22 @@ export default function PagosPage() {
       return;
     }
 
-    if (previewComprobante) {
+    if (
+      previewComprobante
+    ) {
       URL.revokeObjectURL(
         previewComprobante
       );
     }
 
-    setComprobante(archivo);
+    setComprobante(
+      archivo
+    );
 
     setPreviewComprobante(
-      URL.createObjectURL(archivo)
+      URL.createObjectURL(
+        archivo
+      )
     );
   }
 
@@ -306,24 +508,29 @@ export default function PagosPage() {
       }
 
       if (
-        seleccionado.total > 0
+        seleccionado.total >
+        0
       ) {
         return seleccionado.total;
       }
 
       if (
-        servicio === "Aéreo"
+        servicio ===
+        "Aéreo"
       ) {
         return Number(
-          seleccionado.totalAereo || 0
+          seleccionado.totalAereo ||
+            0
         );
       }
 
       if (
-        servicio === "Terrestre"
+        servicio ===
+        "Terrestre"
       ) {
         return Number(
-          seleccionado.totalTerrestre || 0
+          seleccionado.totalTerrestre ||
+            0
         );
       }
 
@@ -340,17 +547,20 @@ export default function PagosPage() {
       }
 
       if (
-        seleccionado.total > 0
+        seleccionado.total >
+        0
       ) {
         return Number(
-          seleccionado.saldo || 0
+          seleccionado.saldo ||
+            0
         );
       }
 
       return Math.max(
         totalSeleccionado -
           Number(
-            seleccionado.pagado || 0
+            seleccionado.pagado ||
+              0
           ),
         0
       );
@@ -360,7 +570,9 @@ export default function PagosPage() {
     ]);
 
   const pagoCapturado =
-    Number(montoPago || 0);
+    Number(
+      montoPago || 0
+    );
 
   const nuevoSaldo =
     Math.max(
@@ -378,7 +590,8 @@ export default function PagosPage() {
     setMensajePago("");
 
     if (
-      totalSeleccionado <= 0
+      totalSeleccionado <=
+      0
     ) {
       setErrorPago(
         "Selecciona si el cliente pagará Aéreo o Terrestre."
@@ -460,7 +673,9 @@ export default function PagosPage() {
         observaciones.trim()
       );
 
-      if (comprobante) {
+      if (
+        comprobante
+      ) {
         formData.append(
           "comprobante",
           comprobante
@@ -492,12 +707,65 @@ export default function PagosPage() {
 
       limpiarComprobante();
 
+      setMontoPago("");
+      setReferencia("");
+      setObservaciones("");
+
       await cargarPagos();
 
+      await cargarHistorial(
+        seleccionado.folio
+      );
+
+      /*
+       * Actualizamos localmente
+       * el registro seleccionado
+       * para no cerrar el modal.
+       */
+
+      setSeleccionado(
+        (actual) => {
+          if (!actual) {
+            return actual;
+          }
+
+          return {
+            ...actual,
+
+            total:
+              Number(
+                data?.total ||
+                  actual.total
+              ),
+
+            pagado:
+              Number(
+                data?.pagado ||
+                  actual.pagado
+              ),
+
+            saldo:
+              Number(
+                data?.saldo ??
+                  actual.saldo
+              ),
+
+            estado:
+              data?.estado ||
+              actual.estado,
+          };
+        }
+      );
+
+      /*
+       * Ya NO cerramos automáticamente.
+       * Así puedes ver el pago recién
+       * registrado dentro del historial.
+       */
+
       setTimeout(() => {
-        setSeleccionado(null);
         setMensajePago("");
-      }, 900);
+      }, 2500);
     } catch (err) {
       console.error(err);
 
@@ -536,6 +804,7 @@ export default function PagosPage() {
         {/* RESUMEN */}
 
         <div className="mb-5 grid gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-4">
+
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Total cotizado
@@ -573,14 +842,13 @@ export default function PagosPage() {
           </div>
         </div>
 
-        {/* COTIZACIONES Y PAGOS */}
+        {/* COTIZACIONES */}
 
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
 
-          {/* BUSCADOR */}
-
           <div className="border-b border-slate-200 p-4 md:p-5">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+
               <div>
                 <h2 className="font-black text-slate-950">
                   Cotizaciones y pagos
@@ -592,7 +860,9 @@ export default function PagosPage() {
               </div>
 
               <input
-                value={busqueda}
+                value={
+                  busqueda
+                }
                 onChange={(e) =>
                   setBusqueda(
                     e.target.value
@@ -614,7 +884,8 @@ export default function PagosPage() {
                 {error}
               </div>
             </div>
-          ) : filtrados.length === 0 ? (
+          ) : filtrados.length ===
+            0 ? (
             <div className="p-10 text-center">
               <p className="font-bold text-slate-800">
                 No hay registros para mostrar.
@@ -622,133 +893,140 @@ export default function PagosPage() {
             </div>
           ) : (
             <>
-              {/* =========================================
-                  CELULAR
-              ========================================== */}
+              {/* CELULAR */}
 
               <div className="divide-y divide-slate-200 md:hidden">
-                {filtrados.map((pago) => (
-                  <div
-                    key={pago.folio}
-                    className="p-4"
-                  >
-                    {/* FOLIO Y ESTADO */}
 
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                          Folio
-                        </p>
-
-                        <p className="mt-1 break-all text-sm font-black leading-snug text-blue-800">
-                          {pago.folio}
-                        </p>
-                      </div>
-
-                      <div className="shrink-0">
-                        <EstadoPago
-                          estado={pago.estado}
-                        />
-                      </div>
-                    </div>
-
-                    {/* CLIENTE */}
-
-                    <div className="mt-4">
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Cliente
-                      </p>
-
-                      <p className="mt-1 break-words text-base font-black leading-snug text-slate-950">
-                        {pago.cliente}
-                      </p>
-
-                      <p className="mt-1 break-all text-xs text-slate-500">
-                        {pago.whatsapp}
-                      </p>
-                    </div>
-
-                    {/* FECHA */}
-
-                    <div className="mt-4">
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Fecha
-                      </p>
-
-                      <p className="mt-1 text-sm font-medium text-slate-700">
-                        {pago.fecha}
-                      </p>
-                    </div>
-
-                    {/* CANTIDADES */}
-
-                    <div className="mt-4 grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
-                      <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                        <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">
-                          Total
-                        </p>
-
-                        <p className="mt-1 break-words text-sm font-black text-slate-950">
-                          {pago.total > 0
-                            ? dinero(
-                                pago.total
-                              )
-                            : "Por definir"}
-                        </p>
-                      </div>
-
-                      <div className="min-w-0 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                        <p className="text-[10px] font-black uppercase tracking-wide text-emerald-700">
-                          Pagado
-                        </p>
-
-                        <p className="mt-1 break-words text-sm font-black text-emerald-700">
-                          {dinero(
-                            pago.pagado
-                          )}
-                        </p>
-                      </div>
-
-                      <div className="min-w-0 rounded-xl border border-amber-200 bg-amber-50 p-3">
-                        <p className="text-[10px] font-black uppercase tracking-wide text-amber-700">
-                          Saldo
-                        </p>
-
-                        <p className="mt-1 break-words text-sm font-black text-amber-700">
-                          {pago.total > 0
-                            ? dinero(
-                                pago.saldo
-                              )
-                            : "—"}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* BOTÓN */}
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        abrirPago(
-                          pago
-                        )
+                {filtrados.map(
+                  (pago) => (
+                    <div
+                      key={
+                        pago.folio
                       }
-                      className="mt-4 w-full rounded-xl bg-blue-700 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-800"
+                      className="p-4"
                     >
-                      Ver / Abonar
-                    </button>
-                  </div>
-                ))}
+                      <div className="flex items-start justify-between gap-3">
+
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                            Folio
+                          </p>
+
+                          <p className="mt-1 break-all text-sm font-black leading-snug text-blue-800">
+                            {
+                              pago.folio
+                            }
+                          </p>
+                        </div>
+
+                        <div className="shrink-0">
+                          <EstadoPago
+                            estado={
+                              pago.estado
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-4">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                          Cliente
+                        </p>
+
+                        <p className="mt-1 break-words text-base font-black leading-snug text-slate-950">
+                          {
+                            pago.cliente
+                          }
+                        </p>
+
+                        <p className="mt-1 break-all text-xs text-slate-500">
+                          {
+                            pago.whatsapp
+                          }
+                        </p>
+                      </div>
+
+                      <div className="mt-4">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                          Fecha
+                        </p>
+
+                        <p className="mt-1 text-sm font-medium text-slate-700">
+                          {
+                            pago.fecha
+                          }
+                        </p>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
+
+                        <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                          <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                            Total
+                          </p>
+
+                          <p className="mt-1 break-words text-sm font-black text-slate-950">
+                            {pago.total >
+                            0
+                              ? dinero(
+                                  pago.total
+                                )
+                              : "Por definir"}
+                          </p>
+                        </div>
+
+                        <div className="min-w-0 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                          <p className="text-[10px] font-black uppercase tracking-wide text-emerald-700">
+                            Pagado
+                          </p>
+
+                          <p className="mt-1 break-words text-sm font-black text-emerald-700">
+                            {dinero(
+                              pago.pagado
+                            )}
+                          </p>
+                        </div>
+
+                        <div className="min-w-0 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                          <p className="text-[10px] font-black uppercase tracking-wide text-amber-700">
+                            Saldo
+                          </p>
+
+                          <p className="mt-1 break-words text-sm font-black text-amber-700">
+                            {pago.total >
+                            0
+                              ? dinero(
+                                  pago.saldo
+                                )
+                              : "—"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          abrirPago(
+                            pago
+                          )
+                        }
+                        className="mt-4 w-full rounded-xl bg-blue-700 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-800"
+                      >
+                        Ver / Abonar
+                      </button>
+                    </div>
+                  )
+                )}
               </div>
 
-              {/* =========================================
-                  TABLET / COMPUTADORA
-              ========================================== */}
+              {/* COMPUTADORA */}
 
               <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[900px]">
+
                   <thead className="bg-slate-50">
                     <tr className="border-b border-slate-200 text-left">
+
                       <th className="px-5 py-3 text-xs font-black uppercase text-slate-500">
                         Folio
                       </th>
@@ -819,7 +1097,8 @@ export default function PagosPage() {
                           </td>
 
                           <td className="px-5 py-4 text-right font-bold text-slate-900">
-                            {pago.total > 0
+                            {pago.total >
+                            0
                               ? dinero(
                                   pago.total
                                 )
@@ -833,7 +1112,8 @@ export default function PagosPage() {
                           </td>
 
                           <td className="px-5 py-4 text-right font-black text-slate-900">
-                            {pago.total > 0
+                            {pago.total >
+                            0
                               ? dinero(
                                   pago.saldo
                                 )
@@ -872,9 +1152,7 @@ export default function PagosPage() {
         </div>
       </div>
 
-      {/* =========================================
-          MODAL
-      ========================================== */}
+      {/* MODAL */}
 
       {seleccionado && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4">
@@ -883,10 +1161,11 @@ export default function PagosPage() {
 
             {/* CABECERA */}
 
-            <div className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-200 bg-white p-4 sm:p-5">
+            <div className="sticky top-0 z-20 flex items-start justify-between border-b border-slate-200 bg-white p-4 sm:p-5">
+
               <div className="min-w-0 pr-3">
                 <p className="text-xs font-black uppercase tracking-wider text-blue-700">
-                  Registrar pago
+                  Pagos del cliente
                 </p>
 
                 <h2 className="mt-1 break-words text-lg font-black text-slate-950 sm:text-xl">
@@ -918,9 +1197,10 @@ export default function PagosPage() {
 
             <div className="space-y-5 p-4 sm:p-5">
 
-              {/* CLIENTE */}
+              {/* RESUMEN */}
 
               <div className="grid gap-3 sm:grid-cols-2">
+
                 <div className="rounded-xl bg-slate-50 p-4">
                   <p className="text-xs font-bold uppercase text-slate-500">
                     WhatsApp
@@ -935,7 +1215,7 @@ export default function PagosPage() {
 
                 <div className="rounded-xl bg-slate-50 p-4">
                   <p className="text-xs font-bold uppercase text-slate-500">
-                    Pagado anteriormente
+                    Pagado
                   </p>
 
                   <p className="mt-1 font-black text-emerald-700">
@@ -944,6 +1224,243 @@ export default function PagosPage() {
                     )}
                   </p>
                 </div>
+              </div>
+
+              {/* =========================================
+                  HISTORIAL
+              ========================================== */}
+
+              <div className="overflow-hidden rounded-2xl border border-slate-200">
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMostrarHistorial(
+                      (actual) =>
+                        !actual
+                    )
+                  }
+                  className="flex w-full items-center justify-between bg-slate-50 px-4 py-4 text-left"
+                >
+                  <div>
+                    <p className="font-black text-slate-950">
+                      Historial de pagos
+                    </p>
+
+                    <p className="mt-1 text-xs text-slate-500">
+                      {historial.length ===
+                      1
+                        ? "1 pago registrado"
+                        : `${historial.length} pagos registrados`}
+                    </p>
+                  </div>
+
+                  <span className="text-xl font-bold text-slate-500">
+                    {mostrarHistorial
+                      ? "−"
+                      : "+"}
+                  </span>
+                </button>
+
+                {mostrarHistorial && (
+                  <div className="border-t border-slate-200">
+
+                    {cargandoHistorial ? (
+                      <div className="p-6 text-center text-sm text-slate-500">
+                        Cargando historial...
+                      </div>
+                    ) : errorHistorial ? (
+                      <div className="p-4">
+                        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                          {
+                            errorHistorial
+                          }
+                        </div>
+                      </div>
+                    ) : historial.length ===
+                      0 ? (
+                      <div className="p-6 text-center">
+                        <p className="font-bold text-slate-700">
+                          Aún no hay pagos registrados.
+                        </p>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                          El primer pago aparecerá aquí.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-200">
+
+                        {historial.map(
+                          (
+                            movimiento,
+                            indice
+                          ) => (
+                            <div
+                              key={
+                                movimiento.idPago ||
+                                `${movimiento.fecha}-${indice}`
+                              }
+                              className="p-4"
+                            >
+                              {/* FECHA */}
+
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+
+                                <div>
+                                  <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                                    Pago
+                                  </p>
+
+                                  <p className="mt-1 text-sm font-bold text-slate-700">
+                                    {
+                                      movimiento.fecha
+                                    }
+                                  </p>
+                                </div>
+
+                                <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-black text-emerald-700">
+                                  {dinero(
+                                    movimiento.monto
+                                  )}
+                                </span>
+                              </div>
+
+                              {/* DATOS */}
+
+                              <div className="mt-4 grid grid-cols-2 gap-2">
+
+                                <div className="rounded-xl bg-slate-50 p-3">
+                                  <p className="text-[10px] font-black uppercase text-slate-500">
+                                    Servicio
+                                  </p>
+
+                                  <p className="mt-1 text-sm font-bold text-slate-900">
+                                    {movimiento.servicio ||
+                                      "—"}
+                                  </p>
+                                </div>
+
+                                <div className="rounded-xl bg-slate-50 p-3">
+                                  <p className="text-[10px] font-black uppercase text-slate-500">
+                                    Método
+                                  </p>
+
+                                  <p className="mt-1 text-sm font-bold text-slate-900">
+                                    {movimiento.metodo ||
+                                      "—"}
+                                  </p>
+                                </div>
+
+                                <div className="rounded-xl bg-amber-50 p-3">
+                                  <p className="text-[10px] font-black uppercase text-amber-700">
+                                    Saldo antes
+                                  </p>
+
+                                  <p className="mt-1 text-sm font-black text-amber-700">
+                                    {dinero(
+                                      movimiento.saldoAntes
+                                    )}
+                                  </p>
+                                </div>
+
+                                <div className="rounded-xl bg-blue-50 p-3">
+                                  <p className="text-[10px] font-black uppercase text-blue-700">
+                                    Saldo después
+                                  </p>
+
+                                  <p className="mt-1 text-sm font-black text-blue-700">
+                                    {dinero(
+                                      movimiento.saldoDespues
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* REFERENCIA */}
+
+                              {movimiento.referencia && (
+                                <div className="mt-3 rounded-xl border border-slate-200 p-3">
+                                  <p className="text-[10px] font-black uppercase text-slate-500">
+                                    Referencia
+                                  </p>
+
+                                  <p className="mt-1 break-words text-sm font-medium text-slate-800">
+                                    {
+                                      movimiento.referencia
+                                    }
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* OBSERVACIONES */}
+
+                              {movimiento.observaciones && (
+                                <div className="mt-3 rounded-xl border border-slate-200 p-3">
+                                  <p className="text-[10px] font-black uppercase text-slate-500">
+                                    Observaciones
+                                  </p>
+
+                                  <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700">
+                                    {
+                                      movimiento.observaciones
+                                    }
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* COMPROBANTE */}
+
+                              {movimiento.urlComprobante ? (
+                                <a
+                                  href={
+                                    movimiento.urlComprobante
+                                  }
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-black text-blue-700 transition hover:bg-blue-100"
+                                >
+                                  <span>
+                                    📷
+                                  </span>
+
+                                  Ver comprobante
+                                </a>
+                              ) : movimiento.comprobante ? (
+                                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                  <p className="text-[10px] font-black uppercase text-slate-500">
+                                    Comprobante
+                                  </p>
+
+                                  <p className="mt-1 break-all text-xs text-slate-600">
+                                    {
+                                      movimiento.comprobante
+                                    }
+                                  </p>
+                                </div>
+                              ) : (
+                                <p className="mt-3 text-xs text-slate-400">
+                                  Sin comprobante adjunto
+                                </p>
+                              )}
+                            </div>
+                          )
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* =========================================
+                  NUEVO ABONO
+              ========================================== */}
+
+              <div className="border-t border-slate-200 pt-5">
+
+                <p className="text-xs font-black uppercase tracking-[0.15em] text-blue-700">
+                  Registrar nuevo abono
+                </p>
               </div>
 
               {/* SERVICIO */}
@@ -1039,6 +1556,7 @@ export default function PagosPage() {
               {/* TOTALES */}
 
               <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
+
                 <div className="rounded-xl border border-slate-200 p-3 sm:p-4">
                   <p className="text-[10px] font-bold uppercase text-slate-500 sm:text-xs">
                     Total
@@ -1176,6 +1694,7 @@ export default function PagosPage() {
 
               <div>
                 <div className="mb-1 flex items-center justify-between gap-2">
+
                   <label className="block text-sm font-bold text-slate-800">
                     Comprobante de pago
                   </label>
@@ -1187,7 +1706,9 @@ export default function PagosPage() {
 
                 {!previewComprobante ? (
                   <div className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-5">
+
                     <label className="flex cursor-pointer flex-col items-center justify-center text-center">
+
                       <div className="mb-2 text-3xl">
                         📷
                       </div>
@@ -1225,6 +1746,7 @@ export default function PagosPage() {
                   <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
 
                     <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+
                       <div className="min-w-0">
                         <p className="text-sm font-bold text-slate-800">
                           Comprobante seleccionado
@@ -1317,20 +1839,25 @@ export default function PagosPage() {
 
               {errorPago && (
                 <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700">
-                  {errorPago}
+                  {
+                    errorPago
+                  }
                 </div>
               )}
 
               {mensajePago && (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-700">
-                  {mensajePago}
+                  {
+                    mensajePago
+                  }
                 </div>
               )}
             </div>
 
             {/* BOTONES */}
 
-            <div className="sticky bottom-0 flex flex-col-reverse gap-3 border-t border-slate-200 bg-white p-4 sm:flex-row sm:justify-end sm:p-5">
+            <div className="sticky bottom-0 z-20 flex flex-col-reverse gap-3 border-t border-slate-200 bg-white p-4 sm:flex-row sm:justify-end sm:p-5">
+
               <button
                 type="button"
                 onClick={
@@ -1341,25 +1868,28 @@ export default function PagosPage() {
                 }
                 className="w-full rounded-xl border border-slate-300 bg-white px-5 py-3 font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
               >
-                Cancelar
+                Cerrar
               </button>
 
-              <button
-                type="button"
-                onClick={
-                  guardarPago
-                }
-                disabled={
-                  guardando
-                }
-                className="w-full rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-              >
-                {guardando
-                  ? comprobante
-                    ? "Subiendo comprobante..."
-                    : "Guardando pago..."
-                  : "Guardar pago"}
-              </button>
+              {saldoActual >
+                0 && (
+                <button
+                  type="button"
+                  onClick={
+                    guardarPago
+                  }
+                  disabled={
+                    guardando
+                  }
+                  className="w-full rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                >
+                  {guardando
+                    ? comprobante
+                      ? "Subiendo comprobante..."
+                      : "Guardando pago..."
+                    : "Guardar pago"}
+                </button>
+              )}
             </div>
           </div>
         </div>
