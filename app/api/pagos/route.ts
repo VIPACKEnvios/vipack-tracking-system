@@ -6,12 +6,17 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const RUTA_EXCEL = "Envios/control_cotizaciones.xlsx";
+const RUTA_EXCEL =
+  "Envios/control_cotizaciones.xlsx";
+
 const CARPETA_COMPROBANTES =
   "Envios/Comprobantes_Pagos";
 
-const HOJA_COTIZACIONES = "Cotizaciones";
-const HOJA_HISTORIAL = "Historial_Pagos";
+const HOJA_COTIZACIONES =
+  "Cotizaciones";
+
+const HOJA_HISTORIAL =
+  "Historial_Pagos";
 
 /* =========================================================
    CONEXIÓN ONEDRIVE
@@ -104,7 +109,9 @@ async function obtenerAccessToken() {
         },
 
         body: new URLSearchParams({
-          client_id: clientId,
+          client_id:
+            clientId,
+
           client_secret:
             clientSecret,
 
@@ -363,7 +370,8 @@ function timestampTijuana() {
     ) {
       valores[
         parte.type
-      ] = parte.value;
+      ] =
+        parte.value;
     }
   }
 
@@ -389,11 +397,8 @@ function limpiarNombreArchivo(
 function extensionArchivo(
   archivo: File
 ) {
-  const nombre =
-    archivo.name || "";
-
   const extension =
-    nombre
+    (archivo.name || "")
       .split(".")
       .pop()
       ?.toLowerCase();
@@ -574,11 +579,13 @@ function numero(
 function dineroRedondeado(
   valor: number
 ) {
-  return Math.round(
-    (valor +
-      Number.EPSILON) *
-      100
-  ) / 100;
+  return (
+    Math.round(
+      (valor +
+        Number.EPSILON) *
+        100
+    ) / 100
+  );
 }
 
 function valorCelda(
@@ -688,17 +695,46 @@ function buscarFilaPorFolio(
     rango.e.r + 1;
     fila += 1
   ) {
-    const actual =
+    if (
       texto(
         valorCelda(
           hoja,
           "A",
           fila
         )
-      );
+      ) === folio
+    ) {
+      return fila;
+    }
+  }
 
+  return 0;
+}
+
+function buscarFilaPago(
+  hoja: XLSX.WorkSheet,
+  idPago: string
+) {
+  const rango =
+    XLSX.utils.decode_range(
+      hoja["!ref"] ||
+        "A1:A1"
+    );
+
+  for (
+    let fila = 2;
+    fila <=
+    rango.e.r + 1;
+    fila += 1
+  ) {
     if (
-      actual === folio
+      texto(
+        valorCelda(
+          hoja,
+          "A",
+          fila
+        )
+      ) === idPago
     ) {
       return fila;
     }
@@ -740,20 +776,14 @@ function normalizarServicio(
       .toLowerCase();
 
   if (
-    limpio.includes(
-      "aéreo"
-    ) ||
-    limpio.includes(
-      "aereo"
-    )
+    limpio.includes("aéreo") ||
+    limpio.includes("aereo")
   ) {
     return "Aéreo";
   }
 
   if (
-    limpio.includes(
-      "terrestre"
-    )
+    limpio.includes("terrestre")
   ) {
     return "Terrestre";
   }
@@ -761,9 +791,83 @@ function normalizarServicio(
   return "";
 }
 
+function movimientoAnulado(
+  hoja: XLSX.WorkSheet,
+  fila: number
+) {
+  return (
+    texto(
+      valorCelda(
+        hoja,
+        "P",
+        fila
+      )
+    ).toLowerCase() ===
+    "anulado"
+  );
+}
+
 /* =========================================================
    HISTORIAL
 ========================================================= */
+
+function asegurarEncabezadosHistorial(
+  hoja: XLSX.WorkSheet
+) {
+  const encabezados = [
+    "ID Pago",
+    "Fecha",
+    "Folio",
+    "Cliente",
+    "WhatsApp",
+    "Servicio",
+    "Total",
+    "Saldo Antes",
+    "Monto Pagado",
+    "Saldo Después",
+    "Método",
+    "Referencia",
+    "Comprobante",
+    "URL Comprobante",
+    "Observaciones",
+    "Estado Movimiento",
+    "Motivo Anulación",
+    "Fecha Anulación",
+  ];
+
+  encabezados.forEach(
+    (
+      encabezado,
+      indice
+    ) => {
+      const direccion =
+        XLSX.utils.encode_cell({
+          r: 0,
+          c: indice,
+        });
+
+      if (
+        !texto(
+          hoja[
+            direccion
+          ]?.v
+        )
+      ) {
+        escribirCelda(
+          hoja,
+          direccion,
+          encabezado
+        );
+      }
+    }
+  );
+
+  asegurarRango(
+    hoja,
+    1,
+    17
+  );
+}
 
 function obtenerOCrearHistorial(
   workbook: XLSX.WorkBook
@@ -773,37 +877,21 @@ function obtenerOCrearHistorial(
       HOJA_HISTORIAL
     ];
 
-  if (hoja) {
-    return hoja;
+  if (!hoja) {
+    hoja =
+      XLSX.utils.aoa_to_sheet(
+        [[]]
+      );
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      hoja,
+      HOJA_HISTORIAL
+    );
   }
 
-  hoja =
-    XLSX.utils.aoa_to_sheet(
-      [
-        [
-          "ID Pago",
-          "Fecha",
-          "Folio",
-          "Cliente",
-          "WhatsApp",
-          "Servicio",
-          "Total",
-          "Saldo Antes",
-          "Monto Pagado",
-          "Saldo Después",
-          "Método",
-          "Referencia",
-          "Comprobante",
-          "URL Comprobante",
-          "Observaciones",
-        ],
-      ]
-    );
-
-  XLSX.utils.book_append_sheet(
-    workbook,
-    hoja,
-    HOJA_HISTORIAL
+  asegurarEncabezadosHistorial(
+    hoja
   );
 
   return hoja;
@@ -811,14 +899,19 @@ function obtenerOCrearHistorial(
 
 type ResumenHistorial = {
   pagado: number;
+
   total: number;
+
   servicio:
     | "Aéreo"
     | "Terrestre"
     | "";
+
   ultimaFecha: string;
   ultimoMetodo: string;
   ultimaReferencia: string;
+
+  movimientosActivos: number;
 };
 
 function resumenHistorialPorFolio(
@@ -832,9 +925,12 @@ function resumenHistorialPorFolio(
       pagado: 0,
       total: 0,
       servicio: "",
+
       ultimaFecha: "",
       ultimoMetodo: "",
       ultimaReferencia: "",
+
+      movimientosActivos: 0,
     };
 
   if (!hoja) {
@@ -844,7 +940,7 @@ function resumenHistorialPorFolio(
   const rango =
     XLSX.utils.decode_range(
       hoja["!ref"] ||
-        "A1:O1"
+        "A1:R1"
     );
 
   for (
@@ -869,6 +965,23 @@ function resumenHistorialPorFolio(
       continue;
     }
 
+    /*
+     * Filas antiguas con P vacío
+     * se consideran ACTIVAS.
+     */
+
+    if (
+      movimientoAnulado(
+        hoja,
+        fila
+      )
+    ) {
+      continue;
+    }
+
+    resumen.movimientosActivos +=
+      1;
+
     resumen.pagado =
       dineroRedondeado(
         resumen.pagado +
@@ -891,7 +1004,8 @@ function resumenHistorialPorFolio(
       );
 
     if (
-      totalMovimiento > 0
+      totalMovimiento >
+      0
     ) {
       resumen.total =
         totalMovimiento;
@@ -943,7 +1057,224 @@ function resumenHistorialPorFolio(
 }
 
 /* =========================================================
-   GET
+   ACTUALIZAR RESUMEN DE COTIZACIÓN
+========================================================= */
+
+function actualizarCotizacionDesdeHistorial(
+  hojaCotizaciones: XLSX.WorkSheet,
+  hojaHistorial: XLSX.WorkSheet,
+  folio: string
+) {
+  const fila =
+    buscarFilaPorFolio(
+      hojaCotizaciones,
+      folio
+    );
+
+  if (!fila) {
+    throw new Error(
+      "No se encontró la cotización relacionada."
+    );
+  }
+
+  const resumen =
+    resumenHistorialPorFolio(
+      hojaHistorial,
+      folio
+    );
+
+  const totalAereo =
+    numero(
+      valorCelda(
+        hojaCotizaciones,
+        "I",
+        fila
+      )
+    );
+
+  const totalTerrestre =
+    numero(
+      valorCelda(
+        hojaCotizaciones,
+        "J",
+        fila
+      )
+    );
+
+  let servicio =
+    normalizarServicio(
+      valorCelda(
+        hojaCotizaciones,
+        "L",
+        fila
+      )
+    );
+
+  if (
+    !servicio &&
+    resumen.servicio
+  ) {
+    servicio =
+      resumen.servicio;
+  }
+
+  let total =
+    numero(
+      valorCelda(
+        hojaCotizaciones,
+        "M",
+        fila
+      )
+    );
+
+  if (
+    total <= 0 &&
+    resumen.total > 0
+  ) {
+    total =
+      resumen.total;
+  }
+
+  if (
+    total <= 0 &&
+    servicio === "Aéreo"
+  ) {
+    total =
+      totalAereo;
+  }
+
+  if (
+    total <= 0 &&
+    servicio ===
+      "Terrestre"
+  ) {
+    total =
+      totalTerrestre;
+  }
+
+  total =
+    dineroRedondeado(
+      total
+    );
+
+  const pagado =
+    dineroRedondeado(
+      resumen.pagado
+    );
+
+  const saldo =
+    dineroRedondeado(
+      Math.max(
+        total -
+          pagado,
+        0
+      )
+    );
+
+  let estado:
+    | "Pendiente"
+    | "Parcial"
+    | "Pagado" =
+    "Pendiente";
+
+  if (
+    total > 0 &&
+    saldo <= 0
+  ) {
+    estado =
+      "Pagado";
+  } else if (
+    pagado > 0
+  ) {
+    estado =
+      "Parcial";
+  }
+
+  if (servicio) {
+    escribirCelda(
+      hojaCotizaciones,
+      `L${fila}`,
+      servicio
+    );
+  }
+
+  if (total > 0) {
+    escribirCelda(
+      hojaCotizaciones,
+      `M${fila}`,
+      total
+    );
+  }
+
+  escribirCelda(
+    hojaCotizaciones,
+    `N${fila}`,
+    estado
+  );
+
+  /*
+   * Si todavía existen pagos activos,
+   * mostramos datos del último.
+   */
+
+  if (
+    resumen.movimientosActivos >
+    0
+  ) {
+    escribirCelda(
+      hojaCotizaciones,
+      `O${fila}`,
+      resumen.ultimaFecha
+    );
+
+    escribirCelda(
+      hojaCotizaciones,
+      `P${fila}`,
+      resumen.ultimoMetodo
+    );
+
+    escribirCelda(
+      hojaCotizaciones,
+      `Q${fila}`,
+      resumen.ultimaReferencia
+    );
+  } else {
+    /*
+     * Si anulamos todos los pagos,
+     * queda Pendiente y limpiamos
+     * datos del último pago.
+     */
+
+    escribirCelda(
+      hojaCotizaciones,
+      `O${fila}`,
+      ""
+    );
+
+    escribirCelda(
+      hojaCotizaciones,
+      `P${fila}`,
+      ""
+    );
+
+    escribirCelda(
+      hojaCotizaciones,
+      `Q${fila}`,
+      ""
+    );
+  }
+
+  return {
+    total,
+    pagado,
+    saldo,
+    estado,
+    servicio,
+  };
+}
+
+/* =========================================================
+   GET - LISTADO DE PAGOS
 ========================================================= */
 
 export async function GET() {
@@ -1000,9 +1331,6 @@ export async function GET() {
       );
 
     const pagos = [];
-
-    let necesitaReparacion =
-      false;
 
     for (
       let fila = 2;
@@ -1077,18 +1405,6 @@ export async function GET() {
           )
         );
 
-      /*
-       * ESTRUCTURA REAL:
-       *
-       * L = Servicio elegido
-       * M = Precio final
-       * N = Estado de pago
-       * O = Fecha de pago
-       * P = Método de pago
-       * Q = Referencia
-       * R = Observaciones
-       */
-
       let servicioElegido =
         normalizarServicio(
           valorCelda(
@@ -1098,7 +1414,7 @@ export async function GET() {
           )
         );
 
-      let precioFinal =
+      let total =
         numero(
           valorCelda(
             hoja,
@@ -1113,119 +1429,13 @@ export async function GET() {
           folio
         );
 
-      /*
-       * REPARA EL ERROR DE LA VERSIÓN ANTERIOR.
-       *
-       * La versión anterior escribió:
-       * L = precio
-       * M = pagado
-       * O = servicio
-       *
-       * Si encontramos esa firma y existe historial,
-       * restauramos las columnas correctas.
-       */
-
-      const valorL =
-        valorCelda(
-          hoja,
-          "L",
-          fila
-        );
-
-      const servicioEnO =
-        normalizarServicio(
-          valorCelda(
-            hoja,
-            "O",
-            fila
-          )
-        );
-
-      const lEsNumero =
-        numero(valorL) >
-          0 &&
-        !normalizarServicio(
-          valorL
-        );
-
       if (
-        lEsNumero &&
-        servicioEnO &&
-        resumen.pagado > 0
+        !servicioElegido &&
+        resumen.servicio
       ) {
         servicioElegido =
-          resumen.servicio ||
-          servicioEnO;
-
-        precioFinal =
-          resumen.total ||
-          numero(valorL);
-
-        const saldoReparado =
-          dineroRedondeado(
-            Math.max(
-              precioFinal -
-                resumen.pagado,
-              0
-            )
-          );
-
-        const estadoReparado =
-          saldoReparado <= 0
-            ? "Pagado"
-            : "Parcial";
-
-        escribirCelda(
-          hoja,
-          `L${fila}`,
-          servicioElegido
-        );
-
-        escribirCelda(
-          hoja,
-          `M${fila}`,
-          precioFinal
-        );
-
-        escribirCelda(
-          hoja,
-          `N${fila}`,
-          estadoReparado
-        );
-
-        escribirCelda(
-          hoja,
-          `O${fila}`,
-          resumen.ultimaFecha ||
-            fechaTijuana()
-        );
-
-        if (
-          resumen.ultimoMetodo
-        ) {
-          escribirCelda(
-            hoja,
-            `P${fila}`,
-            resumen.ultimoMetodo
-          );
-        }
-
-        if (
-          resumen.ultimaReferencia
-        ) {
-          escribirCelda(
-            hoja,
-            `Q${fila}`,
-            resumen.ultimaReferencia
-          );
-        }
-
-        necesitaReparacion =
-          true;
+          resumen.servicio;
       }
-
-      let total =
-        precioFinal;
 
       if (
         total <= 0 &&
@@ -1233,14 +1443,6 @@ export async function GET() {
       ) {
         total =
           resumen.total;
-      }
-
-      if (
-        !servicioElegido &&
-        resumen.servicio
-      ) {
-        servicioElegido =
-          resumen.servicio;
       }
 
       if (
@@ -1295,35 +1497,14 @@ export async function GET() {
           totalTerrestre;
       }
 
-      let pagado =
-        resumen.pagado;
-
-      /*
-       * Compatibilidad con algún registro antiguo marcado
-       * como Pagado antes de existir Historial_Pagos.
-       */
-      const estadoExcel =
-        texto(
-          valorCelda(
-            hoja,
-            "N",
-            fila
-          )
+      total =
+        dineroRedondeado(
+          total
         );
 
-      if (
-        pagado <= 0 &&
-        estadoExcel.toLowerCase() ===
-          "pagado" &&
-        total > 0
-      ) {
-        pagado =
-          total;
-      }
-
-      pagado =
+      const pagado =
         dineroRedondeado(
-          pagado
+          resumen.pagado
         );
 
       const saldo =
@@ -1360,11 +1541,7 @@ export async function GET() {
         whatsapp,
         fecha,
 
-        total:
-          dineroRedondeado(
-            total
-          ),
-
+        total,
         pagado,
         saldo,
         estado,
@@ -1380,29 +1557,6 @@ export async function GET() {
           tieneAereo &&
           tieneTerrestre,
       });
-    }
-
-    /*
-     * Si detectamos la versión anterior equivocada,
-     * la corregimos una sola vez en el Excel de OneDrive.
-     */
-    if (
-      necesitaReparacion
-    ) {
-      const salida =
-        XLSX.write(
-          workbook,
-          {
-            type: "buffer",
-            bookType: "xlsx",
-            cellStyles: true,
-          }
-        );
-
-      await subirExcel(
-        accessToken,
-        salida
-      );
     }
 
     pagos.reverse();
@@ -1439,7 +1593,7 @@ export async function GET() {
 }
 
 /* =========================================================
-   POST
+   POST - REGISTRAR PAGO / ABONO
 ========================================================= */
 
 export async function POST(
@@ -1578,9 +1732,7 @@ export async function POST(
         monto
       );
 
-    if (
-      monto <= 0
-    ) {
+    if (monto <= 0) {
       return NextResponse.json(
         {
           success: false,
@@ -1715,41 +1867,16 @@ export async function POST(
         folio
       );
 
-    /*
-     * Si la fila todavía tiene el error de la versión
-     * anterior, primero recuperamos los datos correctos
-     * desde Historial_Pagos.
-     */
-
-    const valorL =
-      valorCelda(
-        hoja,
-        "L",
-        fila
-      );
-
-    const servicioViejoEnO =
+    let servicioFinal =
       normalizarServicio(
         valorCelda(
           hoja,
-          "O",
+          "L",
           fila
         )
       );
 
-    const lCorrupto =
-      numero(valorL) >
-        0 &&
-      !normalizarServicio(
-        valorL
-      );
-
-    let servicioGuardado =
-      normalizarServicio(
-        valorL
-      );
-
-    let totalGuardado =
+    let total =
       numero(
         valorCelda(
           hoja,
@@ -1758,101 +1885,70 @@ export async function POST(
         )
       );
 
-    if (
-      lCorrupto &&
-      servicioViejoEnO &&
-      resumen.pagado > 0
-    ) {
-      servicioGuardado =
-        resumen.servicio ||
-        servicioViejoEnO;
-
-      totalGuardado =
-        resumen.total ||
-        numero(valorL);
-    }
-
-    let servicioFinal =
-      servicioGuardado;
-
-    let total =
-      totalGuardado;
-
-    /*
-     * Una vez elegido un servicio en el primer pago,
-     * queda bloqueado para evitar que otro abono cambie
-     * de terrestre a aéreo accidentalmente.
-     */
-
     const solicitado =
       normalizarServicio(
         servicio
       );
 
     if (
-      servicioFinal
+      servicioFinal &&
+      solicitado &&
+      solicitado !==
+        servicioFinal
     ) {
-      if (
-        solicitado &&
-        solicitado !==
-          servicioFinal
-      ) {
-        return NextResponse.json(
-          {
-            success: false,
+      return NextResponse.json(
+        {
+          success: false,
 
-            error:
-              `Esta cotización ya tiene seleccionado el servicio ${servicioFinal}.`,
-          },
-          {
-            status: 400,
-          }
-        );
-      }
-    } else {
+          error:
+            `Esta cotización ya tiene seleccionado el servicio ${servicioFinal}.`,
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (!servicioFinal) {
       servicioFinal =
         solicitado;
+    }
+
+    if (!servicioFinal) {
+      const opcionesLower =
+        opciones.toLowerCase();
+
+      const tieneAereo =
+        opcionesLower.includes(
+          "aéreo"
+        ) ||
+        opcionesLower.includes(
+          "aereo"
+        );
+
+      const tieneTerrestre =
+        opcionesLower.includes(
+          "terrestre"
+        );
 
       if (
-        !servicioFinal
+        tieneAereo &&
+        !tieneTerrestre
       ) {
-        const opcionesLower =
-          opciones.toLowerCase();
+        servicioFinal =
+          "Aéreo";
+      }
 
-        const tieneAereo =
-          opcionesLower.includes(
-            "aéreo"
-          ) ||
-          opcionesLower.includes(
-            "aereo"
-          );
-
-        const tieneTerrestre =
-          opcionesLower.includes(
-            "terrestre"
-          );
-
-        if (
-          tieneAereo &&
-          !tieneTerrestre
-        ) {
-          servicioFinal =
-            "Aéreo";
-        }
-
-        if (
-          tieneTerrestre &&
-          !tieneAereo
-        ) {
-          servicioFinal =
-            "Terrestre";
-        }
+      if (
+        tieneTerrestre &&
+        !tieneAereo
+      ) {
+        servicioFinal =
+          "Terrestre";
       }
     }
 
-    if (
-      !servicioFinal
-    ) {
+    if (!servicioFinal) {
       return NextResponse.json(
         {
           success: false,
@@ -1866,9 +1962,7 @@ export async function POST(
       );
     }
 
-    if (
-      total <= 0
-    ) {
+    if (total <= 0) {
       total =
         servicioFinal ===
         "Aéreo"
@@ -1881,9 +1975,7 @@ export async function POST(
         total
       );
 
-    if (
-      total <= 0
-    ) {
+    if (total <= 0) {
       return NextResponse.json(
         {
           success: false,
@@ -1952,9 +2044,7 @@ export async function POST(
     let urlComprobante =
       "";
 
-    if (
-      comprobante
-    ) {
+    if (comprobante) {
       const resultado =
         await subirComprobante(
           accessToken,
@@ -1995,15 +2085,15 @@ export async function POST(
       fechaTijuana();
 
     /*
-     * COTIZACIONES - ESTRUCTURA CORRECTA
+     * COTIZACIONES
      *
-     * L Servicio elegido
+     * L Servicio
      * M Precio final
-     * N Estado de pago
-     * O Fecha de pago
-     * P Método de pago
-     * Q Referencia
-     * R Observaciones originales
+     * N Estado
+     * O Fecha último pago
+     * P Método último pago
+     * Q Referencia último pago
+     * R Observaciones cotización
      */
 
     escribirCelda(
@@ -2042,24 +2132,20 @@ export async function POST(
       referencia
     );
 
-    /*
-     * NO sobrescribimos R.
-     * Ahí permanecen las observaciones originales
-     * de la cotización.
-     *
-     * Las observaciones del pago se guardan
-     * en Historial_Pagos.
-     */
-
     asegurarRango(
       hoja,
       fila,
       17
     );
 
-    /* =====================================================
-       NUEVO MOVIMIENTO EN HISTORIAL
-    ===================================================== */
+    /*
+     * HISTORIAL
+     *
+     * A-O datos originales
+     * P Estado movimiento
+     * Q Motivo anulación
+     * R Fecha anulación
+     */
 
     const filaHistorial =
       siguienteFilaLibre(
@@ -2159,10 +2245,28 @@ export async function POST(
       observaciones
     );
 
+    escribirCelda(
+      historial,
+      `P${filaHistorial}`,
+      "Activo"
+    );
+
+    escribirCelda(
+      historial,
+      `Q${filaHistorial}`,
+      ""
+    );
+
+    escribirCelda(
+      historial,
+      `R${filaHistorial}`,
+      ""
+    );
+
     asegurarRango(
       historial,
       filaHistorial,
-      14
+      17
     );
 
     const salida =
@@ -2222,6 +2326,248 @@ export async function POST(
           error instanceof Error
             ? error.message
             : "Error desconocido registrando pago.",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+/* =========================================================
+   PATCH - ANULAR PAGO
+========================================================= */
+
+export async function PATCH(
+  request: Request
+) {
+  try {
+    const body =
+      await request.json();
+
+    const idPago =
+      texto(
+        body?.idPago
+      );
+
+    const motivo =
+      texto(
+        body?.motivo
+      );
+
+    if (!idPago) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          error:
+            "Falta el ID del pago.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      motivo.length < 3
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          error:
+            "Escribe el motivo de la anulación.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const accessToken =
+      await obtenerAccessToken();
+
+    const arrayBuffer =
+      await descargarExcel(
+        accessToken
+      );
+
+    const workbook =
+      XLSX.read(
+        Buffer.from(
+          arrayBuffer
+        ),
+        {
+          type: "buffer",
+          cellStyles: true,
+          cellFormula: true,
+        }
+      );
+
+    const hojaCotizaciones =
+      workbook.Sheets[
+        HOJA_COTIZACIONES
+      ];
+
+    if (!hojaCotizaciones) {
+      throw new Error(
+        'No existe la hoja "Cotizaciones".'
+      );
+    }
+
+    const historial =
+      obtenerOCrearHistorial(
+        workbook
+      );
+
+    const filaPago =
+      buscarFilaPago(
+        historial,
+        idPago
+      );
+
+    if (!filaPago) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          error:
+            "No se encontró el pago indicado.",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    if (
+      movimientoAnulado(
+        historial,
+        filaPago
+      )
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          error:
+            "Este pago ya está anulado.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const folio =
+      texto(
+        valorCelda(
+          historial,
+          "C",
+          filaPago
+        )
+      );
+
+    if (!folio) {
+      throw new Error(
+        "El movimiento no tiene folio asociado."
+      );
+    }
+
+    /*
+     * NO borramos:
+     * - monto
+     * - referencia
+     * - comprobante
+     * - imagen de OneDrive
+     *
+     * Solo marcamos el movimiento.
+     */
+
+    escribirCelda(
+      historial,
+      `P${filaPago}`,
+      "Anulado"
+    );
+
+    escribirCelda(
+      historial,
+      `Q${filaPago}`,
+      motivo
+    );
+
+    escribirCelda(
+      historial,
+      `R${filaPago}`,
+      fechaTijuana()
+    );
+
+    const resumen =
+      actualizarCotizacionDesdeHistorial(
+        hojaCotizaciones,
+        historial,
+        folio
+      );
+
+    asegurarRango(
+      historial,
+      filaPago,
+      17
+    );
+
+    const salida =
+      XLSX.write(
+        workbook,
+        {
+          type: "buffer",
+          bookType: "xlsx",
+          cellStyles: true,
+        }
+      );
+
+    await subirExcel(
+      accessToken,
+      salida
+    );
+
+    return NextResponse.json({
+      success: true,
+
+      idPago,
+      folio,
+
+      total:
+        resumen.total,
+
+      pagado:
+        resumen.pagado,
+
+      saldo:
+        resumen.saldo,
+
+      estado:
+        resumen.estado,
+
+      mensaje:
+        "Pago anulado correctamente.",
+    });
+  } catch (
+    error: unknown
+  ) {
+    console.error(
+      "Error anulando pago:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+
+        error:
+          error instanceof Error
+            ? error.message
+            : "Error desconocido anulando pago.",
       },
       {
         status: 500,

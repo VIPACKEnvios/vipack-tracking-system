@@ -253,6 +253,10 @@ function numero(
       .replace(/,/g, "")
       .trim();
 
+  if (!limpio) {
+    return 0;
+  }
+
   const n =
     Number(limpio);
 
@@ -301,6 +305,9 @@ L Referencia
 M Comprobante
 N URL Comprobante
 O Observaciones
+P Estado Movimiento
+Q Motivo Anulación
+R Fecha Anulación
 */
 
 export async function GET(
@@ -324,6 +331,7 @@ export async function GET(
         {
           success: false,
           historial: [],
+
           error:
             "El folio es obligatorio.",
         },
@@ -363,16 +371,22 @@ export async function GET(
         success: true,
         historial: [],
         total: 0,
+
+        activos: 0,
+        anulados: 0,
       });
     }
 
     const rango =
       XLSX.utils.decode_range(
         hoja["!ref"] ||
-          "A1:O1"
+          "A1:R1"
       );
 
     const historial = [];
+
+    let activos = 0;
+    let anulados = 0;
 
     for (
       let fila = 2;
@@ -394,6 +408,36 @@ export async function GET(
         folio
       ) {
         continue;
+      }
+
+      const estadoGuardado =
+        texto(
+          valorCelda(
+            hoja,
+            "P",
+            fila
+          )
+        );
+
+      /*
+       * Compatibilidad con pagos anteriores:
+       * si P está vacío, se considera ACTIVO.
+       */
+
+      const estadoMovimiento =
+        estadoGuardado
+          .toLowerCase() ===
+        "anulado"
+          ? "Anulado"
+          : "Activo";
+
+      if (
+        estadoMovimiento ===
+        "Anulado"
+      ) {
+        anulados += 1;
+      } else {
+        activos += 1;
       }
 
       historial.push({
@@ -533,6 +577,26 @@ export async function GET(
               fila
             )
           ),
+
+        estadoMovimiento,
+
+        motivoAnulacion:
+          texto(
+            valorCelda(
+              hoja,
+              "Q",
+              fila
+            )
+          ),
+
+        fechaAnulacion:
+          texto(
+            valorCelda(
+              hoja,
+              "R",
+              fila
+            )
+          ),
       });
     }
 
@@ -544,9 +608,14 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
+
       historial,
+
       total:
         historial.length,
+
+      activos,
+      anulados,
     });
   } catch (
     error: unknown

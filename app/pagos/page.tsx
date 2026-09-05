@@ -40,6 +40,10 @@ type HistorialPago = {
   urlComprobante: string;
 
   observaciones: string;
+
+  estadoMovimiento: "Activo" | "Anulado";
+  motivoAnulacion: string;
+  fechaAnulacion: string;
 };
 
 type MetodoPago =
@@ -161,6 +165,28 @@ export default function PagosPage() {
   const [
     errorVisor,
     setErrorVisor,
+  ] = useState("");
+
+  /* ANULACIÓN DE PAGO */
+
+  const [
+    pagoAAnular,
+    setPagoAAnular,
+  ] = useState<HistorialPago | null>(null);
+
+  const [
+    motivoAnulacion,
+    setMotivoAnulacion,
+  ] = useState("");
+
+  const [
+    anulando,
+    setAnulando,
+  ] = useState(false);
+
+  const [
+    errorAnulacion,
+    setErrorAnulacion,
   ] = useState("");
 
   useEffect(() => {
@@ -356,6 +382,10 @@ export default function PagosPage() {
     setVisorComprobante(null);
     setErrorVisor("");
 
+    setPagoAAnular(null);
+    setMotivoAnulacion("");
+    setErrorAnulacion("");
+
     cargarHistorial(
       pago.folio
     );
@@ -411,6 +441,10 @@ export default function PagosPage() {
 
     setVisorComprobante(null);
     setErrorVisor("");
+
+    setPagoAAnular(null);
+    setMotivoAnulacion("");
+    setErrorAnulacion("");
   }
 
   function abrirVisor(
@@ -437,6 +471,149 @@ export default function PagosPage() {
   function cerrarVisor() {
     setVisorComprobante(null);
     setErrorVisor("");
+  }
+
+  function abrirAnulacion(
+    movimiento: HistorialPago
+  ) {
+    if (
+      movimiento.estadoMovimiento ===
+      "Anulado"
+    ) {
+      return;
+    }
+
+    setErrorAnulacion("");
+    setMotivoAnulacion("");
+    setPagoAAnular(
+      movimiento
+    );
+  }
+
+  function cerrarAnulacion() {
+    if (anulando) {
+      return;
+    }
+
+    setPagoAAnular(null);
+    setMotivoAnulacion("");
+    setErrorAnulacion("");
+  }
+
+  async function confirmarAnulacion() {
+    if (
+      !pagoAAnular ||
+      !seleccionado
+    ) {
+      return;
+    }
+
+    const motivo =
+      motivoAnulacion.trim();
+
+    if (motivo.length < 3) {
+      setErrorAnulacion(
+        "Escribe el motivo de la anulación."
+      );
+      return;
+    }
+
+    try {
+      setAnulando(true);
+      setErrorAnulacion("");
+
+      const respuesta =
+        await fetch(
+          "/api/pagos",
+          {
+            method: "PATCH",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body: JSON.stringify({
+              idPago:
+                pagoAAnular.idPago,
+
+              motivo,
+            }),
+          }
+        );
+
+      const data =
+        await respuesta.json();
+
+      if (!respuesta.ok) {
+        throw new Error(
+          data?.error ||
+            "No fue posible anular el pago."
+        );
+      }
+
+      await cargarPagos();
+
+      await cargarHistorial(
+        seleccionado.folio
+      );
+
+      setSeleccionado(
+        (actual) => {
+          if (!actual) {
+            return actual;
+          }
+
+          return {
+            ...actual,
+
+            total:
+              Number(
+                data?.total ??
+                  actual.total
+              ),
+
+            pagado:
+              Number(
+                data?.pagado ??
+                  actual.pagado
+              ),
+
+            saldo:
+              Number(
+                data?.saldo ??
+                  actual.saldo
+              ),
+
+            estado:
+              data?.estado ||
+              actual.estado,
+          };
+        }
+      );
+
+      setPagoAAnular(null);
+      setMotivoAnulacion("");
+      setErrorAnulacion("");
+
+      setMensajePago(
+        "Pago anulado correctamente."
+      );
+
+      setTimeout(() => {
+        setMensajePago("");
+      }, 2500);
+    } catch (err) {
+      console.error(err);
+
+      setErrorAnulacion(
+        err instanceof Error
+          ? err.message
+          : "No fue posible anular el pago."
+      );
+    } finally {
+      setAnulando(false);
+    }
   }
 
   function seleccionarComprobante(
@@ -1255,7 +1432,12 @@ export default function PagosPage() {
                                 movimiento.idPago ||
                                 indice
                               }
-                              className="p-4"
+                              className={`p-4 ${
+                                movimiento.estadoMovimiento ===
+                                "Anulado"
+                                  ? "bg-red-50/60"
+                                  : ""
+                              }`}
                             >
                               <div className="flex items-start justify-between gap-2">
 
@@ -1271,11 +1453,33 @@ export default function PagosPage() {
                                   </p>
                                 </div>
 
-                                <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-black text-emerald-700">
-                                  {dinero(
-                                    movimiento.monto
-                                  )}
-                                </span>
+                                <div className="flex flex-col items-end gap-1">
+                                  <span
+                                    className={`rounded-full px-3 py-1 text-sm font-black ${
+                                      movimiento.estadoMovimiento ===
+                                      "Anulado"
+                                        ? "bg-red-100 text-red-700 line-through"
+                                        : "bg-emerald-100 text-emerald-700"
+                                    }`}
+                                  >
+                                    {dinero(
+                                      movimiento.monto
+                                    )}
+                                  </span>
+
+                                  <span
+                                    className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
+                                      movimiento.estadoMovimiento ===
+                                      "Anulado"
+                                        ? "bg-red-100 text-red-700"
+                                        : "bg-slate-100 text-slate-600"
+                                    }`}
+                                  >
+                                    {
+                                      movimiento.estadoMovimiento
+                                    }
+                                  </span>
+                                </div>
                               </div>
 
                               <div className="mt-4 grid grid-cols-2 gap-2">
@@ -1373,6 +1577,41 @@ export default function PagosPage() {
                                 <p className="mt-3 text-xs text-slate-400">
                                   Sin comprobante adjunto
                                 </p>
+                              )}
+
+                              {movimiento.estadoMovimiento ===
+                              "Anulado" ? (
+                                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3">
+                                  <p className="text-[10px] font-black uppercase text-red-700">
+                                    Pago anulado
+                                  </p>
+
+                                  <p className="mt-1 text-sm font-bold text-red-800">
+                                    {movimiento.motivoAnulacion ||
+                                      "Sin motivo registrado"}
+                                  </p>
+
+                                  {movimiento.fechaAnulacion && (
+                                    <p className="mt-1 text-xs text-red-600">
+                                      Anulado:{" "}
+                                      {
+                                        movimiento.fechaAnulacion
+                                      }
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    abrirAnulacion(
+                                      movimiento
+                                    )
+                                  }
+                                  className="mt-3 w-full rounded-xl border border-red-200 bg-white px-4 py-3 text-sm font-black text-red-600 transition hover:bg-red-50"
+                                >
+                                  Anular pago
+                                </button>
                               )}
                             </div>
                           )
@@ -1713,6 +1952,104 @@ export default function PagosPage() {
                     : "Guardar pago"}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =============================================
+          MODAL ANULAR PAGO
+      ============================================== */}
+
+      {pagoAAnular && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/70 p-4">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+
+            <div className="border-b border-red-100 bg-red-50 p-5">
+              <p className="text-xs font-black uppercase tracking-wider text-red-700">
+                Anular pago
+              </p>
+
+              <h3 className="mt-1 text-lg font-black text-slate-950">
+                {dinero(
+                  pagoAAnular.monto
+                )}
+              </h3>
+
+              <p className="mt-1 text-xs text-slate-600">
+                {
+                  pagoAAnular.fecha
+                }
+              </p>
+            </div>
+
+            <div className="space-y-4 p-5">
+
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                El movimiento no se borrará. Quedará marcado como
+                anulado y el comprobante seguirá guardado como evidencia.
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-bold text-slate-800">
+                  Motivo de la anulación
+                </label>
+
+                <textarea
+                  value={
+                    motivoAnulacion
+                  }
+                  onChange={(e) =>
+                    setMotivoAnulacion(
+                      e.target.value
+                    )
+                  }
+                  disabled={
+                    anulando
+                  }
+                  rows={4}
+                  placeholder="Ej. monto capturado incorrectamente..."
+                  className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 disabled:bg-slate-100"
+                />
+              </div>
+
+              {errorAnulacion && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">
+                  {
+                    errorAnulacion
+                  }
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 border-t bg-white p-4 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={
+                  cerrarAnulacion
+                }
+                disabled={
+                  anulando
+                }
+                className="rounded-xl border border-slate-300 px-5 py-3 font-bold text-slate-700 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={
+                  confirmarAnulacion
+                }
+                disabled={
+                  anulando
+                }
+                className="rounded-xl bg-red-600 px-5 py-3 font-black text-white hover:bg-red-700 disabled:opacity-60"
+              >
+                {anulando
+                  ? "Anulando..."
+                  : "Confirmar anulación"}
+              </button>
             </div>
           </div>
         </div>
