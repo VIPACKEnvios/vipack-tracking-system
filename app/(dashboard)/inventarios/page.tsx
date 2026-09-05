@@ -249,6 +249,9 @@ export default function InventariosAdminPage() {
   const [mensajeSincronizacion, setMensajeSincronizacion] =
     useState("");
 
+  const [creandoCarpeta, setCreandoCarpeta] =
+    useState(false);
+
   const inputArchivos =
     useRef<HTMLInputElement | null>(null);
 
@@ -436,6 +439,87 @@ export default function InventariosAdminPage() {
       );
     } finally {
       setSincronizando(false);
+    }
+  }
+
+  async function recrearCarpetaCliente() {
+    if (!clienteSeleccionado) {
+      setMensaje(
+        "Selecciona un cliente."
+      );
+      return;
+    }
+
+    try {
+      setCreandoCarpeta(true);
+      setMensaje("");
+
+      const response = await fetch(
+        "/api/onedrive/crear-carpeta-cliente",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            id_cliente:
+              clienteSeleccionado.id_cliente,
+          }),
+          cache: "no-store",
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        let detalle = "";
+
+        if (
+          typeof data.detalle ===
+          "string"
+        ) {
+          detalle =
+            data.detalle;
+        } else if (
+          data.detalle
+        ) {
+          try {
+            detalle =
+              JSON.stringify(
+                data.detalle
+              );
+          } catch {
+            detalle = "";
+          }
+        }
+
+        throw new Error(
+          detalle
+            ? `${data.error || "No se pudo crear la carpeta."} — ${detalle}`
+            : data.error ||
+                "No se pudo crear la carpeta."
+        );
+      }
+
+      setMensaje(
+        data.mensaje ||
+          "Carpeta creada y vinculada correctamente."
+      );
+
+      await cargarClientes();
+    } catch (err) {
+      setMensaje(
+        err instanceof Error
+          ? err.message
+          : "No se pudo crear la carpeta."
+      );
+    } finally {
+      setCreandoCarpeta(false);
     }
   }
 
@@ -1218,6 +1302,23 @@ Tu mercancía, siempre más cerca de ti.`;
                         ? "Vinculada"
                         : "Sin vincular"}
                     </p>
+
+                    {!clienteSeleccionado.onedrive_folder_id && (
+                      <button
+                        type="button"
+                        onClick={
+                          recrearCarpetaCliente
+                        }
+                        disabled={
+                          creandoCarpeta
+                        }
+                        className="mt-3 w-full rounded-xl bg-amber-500 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {creandoCarpeta
+                          ? "Creando carpeta..."
+                          : "📁 Recrear carpeta"}
+                      </button>
+                    )}
                   </div>
 
                   <div className="min-w-0 overflow-hidden rounded-2xl bg-slate-50 p-3 sm:p-4">
