@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type PagoRow = {
   folio: string;
@@ -70,13 +71,15 @@ function dinero(valor: number) {
 function EstadoPago({
   estado,
 }: {
-  estado: PagoRow["estado"];
+  estado: PagoRow["estado"] | "Por definir";
 }) {
   const estilos =
     estado === "Pagado"
       ? "border-emerald-200 bg-emerald-100 text-emerald-700"
       : estado === "Parcial"
       ? "border-blue-200 bg-blue-100 text-blue-700"
+      : estado === "Por definir"
+      ? "border-violet-200 bg-violet-100 text-violet-700"
       : "border-amber-200 bg-amber-100 text-amber-700";
 
   return (
@@ -89,11 +92,16 @@ function EstadoPago({
 }
 
 export default function PagosPage() {
+  const router = useRouter();
+
   const [pagos, setPagos] =
     useState<PagoRow[]>([]);
 
   const [busqueda, setBusqueda] =
     useState("");
+
+  const [filtroEstado, setFiltroEstado] =
+    useState<"Todos" | "Por definir" | "Pendiente" | "Parcial" | "Pagado">("Todos");
 
   const [cargando, setCargando] =
     useState(true);
@@ -293,30 +301,41 @@ export default function PagosPage() {
     }
   }
 
+  function obtenerEstadoVisual(pago: PagoRow) {
+    if (Number(pago.total || 0) <= 0) {
+      return "Por definir" as const;
+    }
+
+    return pago.estado;
+  }
+
   const filtrados =
     useMemo(() => {
-      const texto =
+      const textoBusqueda =
         busqueda
           .trim()
           .toLowerCase();
 
-      if (!texto) {
-        return pagos;
-      }
-
-      return pagos.filter(
-        (pago) =>
+      return pagos.filter((pago) => {
+        const coincideBusqueda =
+          !textoBusqueda ||
           pago.folio
             ?.toLowerCase()
-            .includes(texto) ||
+            .includes(textoBusqueda) ||
           pago.cliente
             ?.toLowerCase()
-            .includes(texto) ||
+            .includes(textoBusqueda) ||
           pago.whatsapp
             ?.toLowerCase()
-            .includes(texto)
-      );
-    }, [pagos, busqueda]);
+            .includes(textoBusqueda);
+
+        const coincideEstado =
+          filtroEstado === "Todos" ||
+          obtenerEstadoVisual(pago) === filtroEstado;
+
+        return coincideBusqueda && coincideEstado;
+      });
+    }, [pagos, busqueda, filtroEstado]);
 
   const totales =
     useMemo(() => {
@@ -411,9 +430,7 @@ export default function PagosPage() {
       opciones.includes("aereo");
 
     const tieneTerrestre =
-      opciones.includes(
-        "terrestre"
-      );
+      opciones.includes("terrestre");
 
     if (
       tieneAereo &&
@@ -424,9 +441,7 @@ export default function PagosPage() {
       tieneTerrestre &&
       !tieneAereo
     ) {
-      setServicio(
-        "Terrestre"
-      );
+      setServicio("Terrestre");
     } else {
       setServicio("");
     }
@@ -957,6 +972,14 @@ export default function PagosPage() {
         {/* ENCABEZADO */}
 
         <div className="mb-5">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+          >
+            ← Regresar
+          </button>
+
           <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-700">
             Ventas y cobranza
           </p>
@@ -1040,6 +1063,29 @@ export default function PagosPage() {
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 md:max-w-md"
               />
             </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {([
+                "Todos",
+                "Por definir",
+                "Pendiente",
+                "Parcial",
+                "Pagado",
+              ] as const).map((estado) => (
+                <button
+                  key={estado}
+                  type="button"
+                  onClick={() => setFiltroEstado(estado)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${
+                    filtroEstado === estado
+                      ? "border-blue-700 bg-blue-700 text-white"
+                      : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {estado}
+                </button>
+              ))}
+            </div>
           </div>
 
           {cargando ? (
@@ -1087,7 +1133,7 @@ export default function PagosPage() {
 
                         <EstadoPago
                           estado={
-                            pago.estado
+                            obtenerEstadoVisual(pago)
                           }
                         />
                       </div>
@@ -1112,6 +1158,15 @@ export default function PagosPage() {
 
                       <div className="mt-4 text-sm text-slate-700">
                         {pago.fecha}
+                      </div>
+
+                      <div className="mt-3 rounded-xl bg-slate-50 p-3">
+                        <p className="text-[10px] font-black uppercase text-slate-500">
+                          Servicio
+                        </p>
+                        <p className="mt-1 text-sm font-black text-slate-800">
+                          {pago.servicioElegido || "Por definir"}
+                        </p>
                       </div>
 
                       <div className="mt-4 grid grid-cols-3 gap-2">
@@ -1168,7 +1223,11 @@ export default function PagosPage() {
                         }
                         className="mt-4 w-full rounded-xl bg-blue-700 px-4 py-3 text-sm font-black text-white"
                       >
-                        Ver / Abonar
+                        {pago.estado === "Pagado"
+                          ? "Ver pagos"
+                          : pago.total <= 0
+                          ? "Definir / Abonar"
+                          : "Ver / Abonar"}
                       </button>
                     </div>
                   )
@@ -1179,7 +1238,7 @@ export default function PagosPage() {
 
               <div className="hidden overflow-x-auto md:block">
 
-                <table className="w-full min-w-[900px]">
+                <table className="w-full min-w-[1020px]">
 
                   <thead className="bg-slate-50">
                     <tr>
@@ -1193,6 +1252,10 @@ export default function PagosPage() {
 
                       <th className="px-5 py-3 text-left text-xs font-black uppercase text-slate-500">
                         Fecha
+                      </th>
+
+                      <th className="px-5 py-3 text-left text-xs font-black uppercase text-slate-500">
+                        Servicio
                       </th>
 
                       <th className="px-5 py-3 text-right text-xs font-black uppercase text-slate-500">
@@ -1250,6 +1313,10 @@ export default function PagosPage() {
                             }
                           </td>
 
+                          <td className="px-5 py-4 text-sm font-bold text-slate-700">
+                            {pago.servicioElegido || "Por definir"}
+                          </td>
+
                           <td className="px-5 py-4 text-right font-bold">
                             {pago.total >
                             0
@@ -1277,7 +1344,7 @@ export default function PagosPage() {
                           <td className="px-5 py-4">
                             <EstadoPago
                               estado={
-                                pago.estado
+                                obtenerEstadoVisual(pago)
                               }
                             />
                           </td>
@@ -1293,7 +1360,11 @@ export default function PagosPage() {
                               }
                               className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold"
                             >
-                              Ver / Abonar
+                              {pago.estado === "Pagado"
+                                ? "Ver pagos"
+                                : pago.total <= 0
+                                ? "Definir / Abonar"
+                                : "Ver / Abonar"}
                             </button>
                           </td>
                         </tr>
