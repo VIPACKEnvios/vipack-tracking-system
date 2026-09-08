@@ -17,6 +17,7 @@ type PagoRow = {
   totalAereo?: number;
   totalTerrestre?: number;
   opciones?: string;
+  servicioElegido?: "Aéreo" | "Terrestre" | "";
   requiereSeleccionServicio?: boolean;
 };
 
@@ -389,6 +390,17 @@ export default function PagosPage() {
     cargarHistorial(
       pago.folio
     );
+
+    const servicioGuardado =
+      pago.servicioElegido || "";
+
+    if (
+      servicioGuardado === "Aéreo" ||
+      servicioGuardado === "Terrestre"
+    ) {
+      setServicio(servicioGuardado);
+      return;
+    }
 
     const opciones =
       pago.opciones
@@ -812,7 +824,7 @@ export default function PagosPage() {
       formData.append(
         "servicio",
         servicio ||
-          seleccionado.opciones ||
+          seleccionado.servicioElegido ||
           ""
       );
 
