@@ -35,15 +35,55 @@ function crearSupabase() {
 
 function limpiarFolio(
   valor: unknown
-) {
-  return String(
-    valor ?? ""
-  )
+): string {
+  return String(valor ?? "")
     .trim()
     .replace(
       /[^A-Za-z0-9-_]/g,
       ""
-    );
+    )
+    .slice(0, 100);
+}
+
+async function leerBody(
+  request: Request
+): Promise<{
+  folio?: unknown;
+}> {
+  try {
+    const body =
+      (await request.json()) as unknown;
+
+    if (
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body)
+    ) {
+      return {};
+    }
+
+    return body as {
+      folio?: unknown;
+    };
+  } catch {
+    return {};
+  }
+}
+
+function respuesta(
+  data: Record<string, unknown>,
+  status = 200
+) {
+  return NextResponse.json(
+    data,
+    {
+      status,
+      headers: {
+        "Cache-Control":
+          "private, no-store, max-age=0",
+      },
+    }
+  );
 }
 
 export async function GET() {
@@ -61,12 +101,6 @@ export async function GET() {
         )
         .select(
           "folio"
-        )
-        .order(
-          "created_at",
-          {
-            ascending: false,
-          }
         );
 
     if (error) {
@@ -76,18 +110,27 @@ export async function GET() {
     }
 
     const folios =
-      (data ?? [])
-        .map(
-          (item) =>
-            limpiarFolio(
-              item.folio
+      Array.from(
+        new Set(
+          (data ?? [])
+            .map(
+              (item: {
+                folio?: unknown;
+              }) =>
+                limpiarFolio(
+                  item.folio
+                )
+            )
+            .filter(
+              (
+                folio
+              ): folio is string =>
+                Boolean(folio)
             )
         )
-        .filter(
-          Boolean
-        );
+      );
 
-    return NextResponse.json({
+    return respuesta({
       success: true,
       folios,
     });
@@ -99,7 +142,7 @@ export async function GET() {
       error
     );
 
-    return NextResponse.json(
+    return respuesta(
       {
         success: false,
         error:
@@ -107,9 +150,7 @@ export async function GET() {
             ? error.message
             : "Error desconocido.",
       },
-      {
-        status: 500,
-      }
+      500
     );
   }
 }
@@ -119,9 +160,9 @@ export async function POST(
 ) {
   try {
     const body =
-      (await request.json()) as {
-        folio?: string;
-      };
+      await leerBody(
+        request
+      );
 
     const folio =
       limpiarFolio(
@@ -129,15 +170,13 @@ export async function POST(
       );
 
     if (!folio) {
-      return NextResponse.json(
+      return respuesta(
         {
           success: false,
           error:
             "El folio es obligatorio.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
@@ -156,7 +195,8 @@ export async function POST(
             folio,
           },
           {
-            onConflict: "folio",
+            onConflict:
+              "folio",
           }
         );
 
@@ -166,7 +206,7 @@ export async function POST(
       );
     }
 
-    return NextResponse.json({
+    return respuesta({
       success: true,
       mensaje:
         "Recolección eliminada de la vista sin modificar el Excel.",
@@ -180,7 +220,7 @@ export async function POST(
       error
     );
 
-    return NextResponse.json(
+    return respuesta(
       {
         success: false,
         error:
@@ -188,9 +228,7 @@ export async function POST(
             ? error.message
             : "Error desconocido.",
       },
-      {
-        status: 500,
-      }
+      500
     );
   }
 }
@@ -200,9 +238,9 @@ export async function DELETE(
 ) {
   try {
     const body =
-      (await request.json()) as {
-        folio?: string;
-      };
+      await leerBody(
+        request
+      );
 
     const folio =
       limpiarFolio(
@@ -210,15 +248,13 @@ export async function DELETE(
       );
 
     if (!folio) {
-      return NextResponse.json(
+      return respuesta(
         {
           success: false,
           error:
             "El folio es obligatorio.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
@@ -244,7 +280,7 @@ export async function DELETE(
       );
     }
 
-    return NextResponse.json({
+    return respuesta({
       success: true,
       mensaje:
         "Recolección restaurada correctamente.",
@@ -258,7 +294,7 @@ export async function DELETE(
       error
     );
 
-    return NextResponse.json(
+    return respuesta(
       {
         success: false,
         error:
@@ -266,9 +302,7 @@ export async function DELETE(
             ? error.message
             : "Error desconocido.",
       },
-      {
-        status: 500,
-      }
+      500
     );
   }
 }

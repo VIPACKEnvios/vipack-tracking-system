@@ -18,6 +18,16 @@ const RUTA_EXCEL =
 const HOJA_SOLICITUDES =
   "Solicitudes";
 
+// Protección de memoria y cargas móviles.
+const MAX_ARCHIVO_BYTES =
+  8 * 1024 * 1024;
+
+const MAX_ARCHIVOS_POR_SOLICITUD =
+  5;
+
+const MAX_REQUEST_BYTES =
+  45 * 1024 * 1024;
+
 type TipoEvidencia =
   | "nota"
   | "foto";
@@ -1061,10 +1071,12 @@ async function subirArchivo(
       `${ruta}/${nombreFinal}`
     )}:/content`;
 
-  const buffer =
-    Buffer.from(
-      await archivo.arrayBuffer()
-    );
+  /*
+   * Evitamos crear Buffer + Uint8Array del mismo archivo.
+   * Eso duplicaba temporalmente la memoria usada durante la subida.
+   */
+  const contenido =
+    await archivo.arrayBuffer();
 
   const response =
     await fetch(
@@ -1082,9 +1094,7 @@ async function subirArchivo(
         },
 
         body:
-          new Uint8Array(
-            buffer
-          ),
+          contenido,
 
         cache:
           "no-store",
@@ -1202,17 +1212,18 @@ export async function GET(
           archivoId
         );
 
-      const buffer =
-        await archivoResponse.arrayBuffer();
-
       const contentType =
         archivoResponse.headers.get(
           "content-type"
         ) ||
         "application/octet-stream";
 
+      /*
+       * Transmitimos el archivo como stream.
+       * Evita cargar la evidencia completa otra vez en memoria del servidor.
+       */
       return new Response(
-        buffer,
+        archivoResponse.body,
         {
           status: 200,
 
@@ -1341,6 +1352,32 @@ export async function POST(
       );
     }
 
+    const contentLength =
+      Number(
+        request.headers.get(
+          "content-length"
+        ) || "0"
+      );
+
+    if (
+      Number.isFinite(
+        contentLength
+      ) &&
+      contentLength >
+        MAX_REQUEST_BYTES
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "La carga es demasiado grande. Sube menos imágenes o vuelve a intentarlo.",
+        },
+        {
+          status: 413,
+        }
+      );
+    }
+
     const formData =
       await request.formData();
 
@@ -1401,6 +1438,57 @@ export async function POST(
       );
     }
 
+    if (
+      archivos.length >
+      MAX_ARCHIVOS_POR_SOLICITUD
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            `Puedes subir máximo ${MAX_ARCHIVOS_POR_SOLICITUD} imágenes por solicitud.`,
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    for (const archivo of archivos) {
+      if (
+        !archivo.type
+          .toLowerCase()
+          .startsWith("image/")
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              `${archivo.name} no es una imagen válida.`,
+          },
+          {
+            status: 415,
+          }
+        );
+      }
+
+      if (
+        archivo.size >
+        MAX_ARCHIVO_BYTES
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              `${archivo.name} supera el límite de 8 MB. La app debe reducir la imagen antes de subirla.`,
+          },
+          {
+            status: 413,
+          }
+        );
+      }
+    }
+
     const accessToken =
       await obtenerAccessToken();
 
@@ -1434,16 +1522,16 @@ export async function POST(
         destino.carpeta;
     }
 
+    /*
+     * Ya resolvimos la carpeta del cliente arriba.
+     * Para fotos leemos directamente esa carpeta en vez de volver a
+     * descargar el Excel y resolver el cliente una segunda vez.
+     */
     const existentes =
-      tipo === "nota"
-        ? await listarArchivosCarpeta(
-            accessToken,
-            RUTA_NOTAS
-          )
-        : await buscarFotosPorFolio(
-            accessToken,
-            folio
-          );
+      await listarArchivosCarpeta(
+        accessToken,
+        ruta
+      );
 
     const delFolio =
       existentes.filter(

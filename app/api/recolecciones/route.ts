@@ -47,11 +47,25 @@ const ESTADOS_VALIDOS = new Set([
   "Cancelada",
 ]);
 
-async function leerJsonSeguro(
+type TokenOneDrive = {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  error?: string;
+  error_description?: string;
+};
+
+let tokenCache: {
+  accessToken: string;
+  expiraEn: number;
+} | null = null;
+
+
+async function leerJsonSeguro<T = unknown>(
   response: Response
-) {
+): Promise<T | null> {
   try {
-    return await response.json();
+    return (await response.json()) as T;
   } catch {
     return null;
   }
@@ -124,7 +138,7 @@ async function renovarTokenOneDrive(
     );
 
   const tokenData =
-    await leerJsonSeguro(
+    await leerJsonSeguro<TokenOneDrive>(
       tokenResponse
     );
 
@@ -138,6 +152,18 @@ async function renovarTokenOneDrive(
 }
 
 async function obtenerAccessToken() {
+  if (
+    tokenCache &&
+    tokenCache.expiraEn >
+      Date.now() + 60_000
+  ) {
+    return {
+      accessToken:
+        tokenCache.accessToken,
+      conexion: null as ConexionOneDrive | null,
+    };
+  }
+
   const clientId =
     process.env.ONEDRIVE_CLIENT_ID;
 
@@ -260,6 +286,23 @@ async function obtenerAccessToken() {
     }
   }
 
+  const expiresIn =
+    Number(
+      tokenData?.expires_in ||
+        3600
+    );
+
+  tokenCache = {
+    accessToken,
+    expiraEn:
+      Date.now() +
+      Math.max(
+        300,
+        expiresIn - 120
+      ) *
+        1000,
+  };
+
   return {
     accessToken,
     conexion:
@@ -306,7 +349,7 @@ async function descargarExcel(
 
 async function subirExcel(
   accessToken: string,
-  buffer: Buffer
+  buffer: ArrayBuffer
 ) {
   const excelUrl =
     `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
@@ -327,9 +370,10 @@ async function subirExcel(
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         },
 
-        body: new Uint8Array(
-          buffer
-        ),
+        body:
+          new Uint8Array(
+            buffer
+          ),
 
         cache:
           "no-store",
@@ -549,11 +593,11 @@ export async function GET() {
 
     const workbook =
       XLSX.read(
-        Buffer.from(
+        new Uint8Array(
           arrayBuffer
         ),
         {
-          type: "buffer",
+          type: "array",
         }
       );
 
@@ -757,11 +801,11 @@ export async function POST(
 
     const workbook =
       XLSX.read(
-        Buffer.from(
+        new Uint8Array(
           arrayBuffer
         ),
         {
-          type: "buffer",
+          type: "array",
         }
       );
 
@@ -800,7 +844,7 @@ export async function POST(
         );
 
     const foliosExistentes =
-      new Set(
+      new Set<string>(
         filas.map(
           (fila) =>
             String(
@@ -914,7 +958,7 @@ export async function POST(
       XLSX.write(
         workbook,
         {
-          type: "buffer",
+          type: "array",
           bookType: "xlsx",
         }
       );
@@ -1147,11 +1191,11 @@ export async function PATCH(
 
     const workbook =
       XLSX.read(
-        Buffer.from(
+        new Uint8Array(
           arrayBuffer
         ),
         {
-          type: "buffer",
+          type: "array",
         }
       );
 
@@ -1330,7 +1374,7 @@ export async function PATCH(
       XLSX.write(
         workbook,
         {
-          type: "buffer",
+          type: "array",
           bookType:
             "xlsx",
         }

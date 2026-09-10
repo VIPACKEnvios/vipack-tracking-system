@@ -650,7 +650,7 @@ export default function RecoleccionesPage() {
   }, []);
 
   // Límites de render para proteger especialmente Chrome móvil.
-  const [limiteMovil, setLimiteMovil] = useState(24);
+  const [limiteMovil, setLimiteMovil] = useState(16);
   const [limiteDesktop, setLimiteDesktop] = useState(120);
 
   const [
@@ -1152,7 +1152,7 @@ export default function RecoleccionesPage() {
   );
 
   useEffect(() => {
-    setLimiteMovil(24);
+    setLimiteMovil(16);
   }, [busqueda, filtroMovil, vistaMovil]);
 
   useEffect(() => {
@@ -1169,7 +1169,7 @@ export default function RecoleccionesPage() {
         ? movilMostrado
         : desktopMostrado
     )
-      .slice(0, 12)
+      .slice(0, 6)
       .filter(
         (item) =>
           Boolean(item.folio) &&
@@ -1182,7 +1182,7 @@ export default function RecoleccionesPage() {
     let cancelado = false;
 
     async function cargarResumenes() {
-      const lote = 2;
+      const lote = 1;
       const acumulados: Array<{
         folio: string;
         notas: number;
@@ -2140,10 +2140,10 @@ export default function RecoleccionesPage() {
             {movilMostrado.length < movil.length && (
               <button
                 type="button"
-                onClick={() => setLimiteMovil((actual) => actual + 40)}
+                onClick={() => setLimiteMovil((actual) => actual + 20)}
                 className="mt-4 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm"
               >
-                Mostrar 40 más
+                Mostrar 20 más
               </button>
             )}
 
@@ -3759,6 +3759,201 @@ function TarjetaMovil({
   );
 }
 
+async function optimizarImagenEvidencia(
+  archivo: File
+): Promise<File> {
+  if (
+    !archivo.type.startsWith("image/")
+  ) {
+    return archivo;
+  }
+
+  /*
+   * Evita decodificar archivos que ya son pequeños.
+   * Esto reduce todavía más el consumo de memoria
+   * en teléfonos con pocos recursos.
+   */
+  if (
+    archivo.size <= 1_200_000 &&
+    (
+      archivo.type === "image/jpeg" ||
+      archivo.type === "image/webp"
+    )
+  ) {
+    return archivo;
+  }
+
+  const MAX_LADO = 1600;
+  const CALIDAD = 0.8;
+  const url =
+    URL.createObjectURL(
+      archivo
+    );
+
+  try {
+    const imagen =
+      await new Promise<HTMLImageElement>(
+        (resolve, reject) => {
+          const img =
+            new Image();
+
+          img.onload = () =>
+            resolve(img);
+
+          img.onerror = () =>
+            reject(
+              new Error(
+                `No se pudo procesar ${archivo.name}`
+              )
+            );
+
+          img.src = url;
+        }
+      );
+
+    const anchoOriginal =
+      imagen.naturalWidth;
+
+    const altoOriginal =
+      imagen.naturalHeight;
+
+    if (
+      !anchoOriginal ||
+      !altoOriginal
+    ) {
+      return archivo;
+    }
+
+    const escala =
+      Math.min(
+        1,
+        MAX_LADO /
+          Math.max(
+            anchoOriginal,
+            altoOriginal
+          )
+      );
+
+    const ancho =
+      Math.max(
+        1,
+        Math.round(
+          anchoOriginal * escala
+        )
+      );
+
+    const alto =
+      Math.max(
+        1,
+        Math.round(
+          altoOriginal * escala
+        )
+      );
+
+    const canvas =
+      document.createElement(
+        "canvas"
+      );
+
+    canvas.width = ancho;
+    canvas.height = alto;
+
+    const contexto =
+      canvas.getContext(
+        "2d",
+        {
+          alpha: false,
+        }
+      );
+
+    if (!contexto) {
+      return archivo;
+    }
+
+    /*
+     * Fondo blanco para PNG/WebP con transparencia
+     * antes de convertir a JPEG.
+     */
+    contexto.fillStyle =
+      "#ffffff";
+
+    contexto.fillRect(
+      0,
+      0,
+      ancho,
+      alto
+    );
+
+    contexto.drawImage(
+      imagen,
+      0,
+      0,
+      ancho,
+      alto
+    );
+
+    const blob =
+      await new Promise<Blob | null>(
+        (resolve) => {
+          canvas.toBlob(
+            resolve,
+            "image/jpeg",
+            CALIDAD
+          );
+        }
+      );
+
+    /*
+     * Libera cuanto antes la memoria gráfica
+     * utilizada por el canvas.
+     */
+    canvas.width = 1;
+    canvas.height = 1;
+
+    if (!blob) {
+      return archivo;
+    }
+
+    const nombreBase =
+      archivo.name
+        .replace(
+          /\.[^.]+$/,
+          ""
+        )
+        .trim() ||
+      "foto";
+
+    return new File(
+      [blob],
+      `${nombreBase}.jpg`,
+      {
+        type:
+          "image/jpeg",
+        lastModified:
+          Date.now(),
+      }
+    );
+  } catch (error) {
+    /*
+     * Algunos Android/Chrome no pueden decodificar
+     * HEIC/HEIF en el navegador. En ese caso
+     * se conserva el original para no bloquear
+     * la captura.
+     */
+    console.warn(
+      "VIPACK: no se pudo optimizar la imagen; se usará el original.",
+      archivo.name,
+      error
+    );
+
+    return archivo;
+  } finally {
+    URL.revokeObjectURL(
+      url
+    );
+  }
+}
+
 function Detalle({
   item,
   cerrar,
@@ -3949,43 +4144,74 @@ function Detalle({
       return;
     }
 
+    const originales =
+      Array.from(
+        archivos
+      );
+
     try {
       setSubiendoTipo(tipo);
       setErrorEvidencias("");
-      setMensajeEvidencias("");
-
-      const formData =
-        new FormData();
-
-      formData.append(
-        "tipo",
-        tipo
+      setMensajeEvidencias(
+        originales.length === 1
+          ? "Preparando imagen..."
+          : `Preparando ${originales.length} imágenes...`
       );
 
-      Array.from(
-        archivos
-      ).forEach(
-        (archivo: File) => {
-          formData.append(
-            "archivos",
-            archivo
-          );
-        }
-      );
+      const nuevos:
+        EvidenciaArchivo[] = [];
 
-      const response =
-        await fetch(
-          `/api/recolecciones/${encodeURIComponent(
-            item.folio
-          )}/evidencias`,
-          {
-            method: "POST",
-            body: formData,
-          }
+      let agregadosTotal = 0;
+      let clienteDestino = "";
+
+      /*
+       * IMPORTANTE:
+       * Se procesa y se sube UNA imagen a la vez.
+       * No guardamos todas las fotos optimizadas
+       * simultáneamente en memoria.
+       */
+      for (
+        let indice = 0;
+        indice < originales.length;
+        indice += 1
+      ) {
+        const original =
+          originales[indice];
+
+        setMensajeEvidencias(
+          `Procesando ${indice + 1} de ${originales.length}...`
         );
 
-      const data =
-        (await response.json()) as {
+        const archivo =
+          await optimizarImagenEvidencia(
+            original
+          );
+
+        const formData =
+          new FormData();
+
+        formData.append(
+          "tipo",
+          tipo
+        );
+
+        formData.append(
+          "archivos",
+          archivo
+        );
+
+        const response =
+          await fetch(
+            `/api/recolecciones/${encodeURIComponent(
+              item.folio
+            )}/evidencias`,
+            {
+              method: "POST",
+              body: formData,
+            }
+          );
+
+        type RespuestaSubidaEvidencia = {
           success?: boolean;
           error?: string;
           agregados?: number;
@@ -4002,64 +4228,101 @@ function Detalle({
           };
         };
 
-      if (
-        !response.ok ||
-        !data.success
-      ) {
-        throw new Error(
-          data.error ||
-            "No se pudieron subir los archivos."
+        let data: RespuestaSubidaEvidencia | null = null;
+
+        try {
+          data =
+            (await response.json()) as RespuestaSubidaEvidencia;
+        } catch {
+          data = null;
+        }
+
+        if (
+          !response.ok ||
+          !data ||
+          !data.success
+        ) {
+          throw new Error(
+            data?.error ||
+              `No se pudo subir ${original.name}.`
+          );
+        }
+
+        agregadosTotal +=
+          data.agregados ?? 1;
+
+        if (
+          data.destino?.cliente
+        ) {
+          clienteDestino =
+            data.destino.cliente;
+        }
+
+        const recibidos =
+          Array.isArray(
+            data.archivos
+          )
+            ? data.archivos
+                .filter(
+                  (archivoApi) =>
+                    Boolean(
+                      archivoApi?.id &&
+                      archivoApi?.nombre
+                    )
+                )
+                .map(
+                  (archivoApi) => ({
+                    id:
+                      String(
+                        archivoApi.id
+                      ),
+
+                    nombre:
+                      String(
+                        archivoApi.nombre
+                      ),
+
+                    tamaño:
+                      Number(
+                        archivoApi.tamaño ||
+                        0
+                      ),
+
+                    webUrl:
+                      archivoApi.webUrl
+                        ? String(
+                            archivoApi.webUrl
+                          )
+                        : null,
+
+                    modificado:
+                      new Date()
+                        .toISOString(),
+                  })
+                )
+            : [];
+
+        nuevos.push(
+          ...recibidos
+        );
+
+        /*
+         * Da oportunidad al navegador de liberar
+         * memoria entre una fotografía y la siguiente.
+         */
+        await new Promise<void>(
+          (resolve) => {
+            window.setTimeout(
+              resolve,
+              30
+            );
+          }
         );
       }
 
-      const nuevos:
-        EvidenciaArchivo[] =
-        Array.isArray(
-          data.archivos
-        )
-          ? data.archivos
-              .filter(
-                (archivo) =>
-                  Boolean(
-                    archivo?.id &&
-                    archivo?.nombre
-                  )
-              )
-              .map(
-                (archivo) => ({
-                  id:
-                    String(
-                      archivo.id
-                    ),
-
-                  nombre:
-                    String(
-                      archivo.nombre
-                    ),
-
-                  tamaño:
-                    Number(
-                      archivo.tamaño ||
-                      0
-                    ),
-
-                  webUrl:
-                    archivo.webUrl
-                      ? String(
-                          archivo.webUrl
-                        )
-                      : null,
-
-                  modificado:
-                    new Date()
-                      .toISOString(),
-                })
-              )
-          : [];
-
       /*
        * Mostrar de inmediato sin esperar
-       * a volver a consultar OneDrive.
+       * una nueva consulta completa a OneDrive.
        */
       if (
         tipo === "nota"
@@ -4094,8 +4357,9 @@ function Detalle({
       }
 
       const cantidad =
-        data.agregados ??
-        nuevos.length;
+        agregadosTotal ||
+        nuevos.length ||
+        originales.length;
 
       setMensajeEvidencias(
         tipo === "nota"
@@ -4109,16 +4373,15 @@ function Detalle({
                 ? "Foto subida correctamente"
                 : `${cantidad} fotos subidas correctamente`
             }${
-              data.destino?.cliente
-                ? ` en la carpeta de ${data.destino.cliente}.`
+              clienteDestino
+                ? ` en la carpeta de ${clienteDestino}.`
                 : "."
             }`
       );
 
       /*
-       * Verificación secundaria. El backend
-       * ya consulta primero la carpeta exacta,
-       * así que el contador debe mantenerse.
+       * Una sola verificación al final,
+       * no una consulta extra por cada fotografía.
        */
       window.setTimeout(
         () => {
@@ -5098,6 +5361,12 @@ function CamaraEvidencia({
                   ideal:
                     "environment",
                 },
+                width: {
+                  ideal: 1920,
+                },
+                height: {
+                  ideal: 1080,
+                },
               },
               audio:
                 false,
@@ -5167,21 +5436,49 @@ function CamaraEvidencia({
       return;
     }
 
-    const ancho =
+    const anchoOriginal =
       video.videoWidth;
 
-    const alto =
+    const altoOriginal =
       video.videoHeight;
 
     if (
-      !ancho ||
-      !alto
+      !anchoOriginal ||
+      !altoOriginal
     ) {
       setErrorCamara(
         "La cámara todavía no está lista."
       );
       return;
     }
+
+    const MAX_LADO = 1600;
+
+    const escala =
+      Math.min(
+        1,
+        MAX_LADO /
+          Math.max(
+            anchoOriginal,
+            altoOriginal
+          )
+      );
+
+    const ancho =
+      Math.max(
+        1,
+        Math.round(
+          anchoOriginal * escala
+        )
+      );
+
+    const alto =
+      Math.max(
+        1,
+        Math.round(
+          altoOriginal * escala
+        )
+      );
 
     canvas.width =
       ancho;
@@ -5191,7 +5488,10 @@ function CamaraEvidencia({
 
     const contexto =
       canvas.getContext(
-        "2d"
+        "2d",
+        {
+          alpha: false,
+        }
       );
 
     if (!contexto) {
@@ -5200,6 +5500,16 @@ function CamaraEvidencia({
       );
       return;
     }
+
+    contexto.fillStyle =
+      "#ffffff";
+
+    contexto.fillRect(
+      0,
+      0,
+      ancho,
+      alto
+    );
 
     contexto.drawImage(
       video,
@@ -5248,7 +5558,7 @@ function CamaraEvidencia({
         );
       },
       "image/jpeg",
-      0.92
+      0.8
     );
   }
 
