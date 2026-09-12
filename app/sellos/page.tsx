@@ -81,6 +81,9 @@ export default function SellosPage() {
   const [pagosSellos, setPagosSellos] =
     useState<PagoSellos[]>([]);
 
+  const [saldoAtrasadoSellos, setSaldoAtrasadoSellos] =
+    useState(0);
+
   const [cargandoSellos, setCargandoSellos] =
     useState(true);
 
@@ -110,6 +113,9 @@ export default function SellosPage() {
 
   const [mostrarPagoSellos, setMostrarPagoSellos] =
     useState(false);
+
+  const [fechaPagoSellos, setFechaPagoSellos] =
+    useState("");
 
   const [montoPagoSellos, setMontoPagoSellos] =
     useState("");
@@ -152,11 +158,19 @@ export default function SellosPage() {
           ? data.pagos
           : []
       );
+
+      setSaldoAtrasadoSellos(
+        Number(
+          data?.resumenAcumulado?.saldoAtrasado ||
+            0
+        )
+      );
     } catch (err) {
       console.error(err);
 
       setSellosDias([]);
       setPagosSellos([]);
+      setSaldoAtrasadoSellos(0);
 
       setErrorSellos(
         err instanceof Error
@@ -176,7 +190,8 @@ export default function SellosPage() {
     setErrorSellos("");
     setMensajeSellos("");
 
-    setFechaSello(semanaSellos);
+    // La fecha queda vacía para seleccionarla manualmente.
+    setFechaSello("");
     setCantidadG("");
     setCantidadC("");
     setCantidadM("");
@@ -224,19 +239,6 @@ export default function SellosPage() {
       return;
     }
 
-    if (
-      obtenerLunesSemana(
-        new Date(
-          `${fechaSello}T12:00:00`
-        )
-      ) !== semanaSellos
-    ) {
-      setErrorSellos(
-        "La fecha seleccionada no pertenece a la semana que estás viendo."
-      );
-      return;
-    }
-
     try {
       setGuardandoSellos(true);
       setErrorSellos("");
@@ -279,11 +281,27 @@ export default function SellosPage() {
       setCantidadC("");
       setCantidadM("");
 
+      const semanaDeLaFecha =
+        obtenerLunesSemana(
+          new Date(
+            `${fechaSello}T12:00:00`
+          )
+        );
+
       setMensajeSellos(
         "Día de sellos guardado correctamente."
       );
 
-      await cargarSellos();
+      if (
+        semanaDeLaFecha !==
+        semanaSellos
+      ) {
+        setSemanaSellos(
+          semanaDeLaFecha
+        );
+      } else {
+        await cargarSellos();
+      }
 
       setTimeout(() => {
         setMensajeSellos("");
@@ -439,6 +457,10 @@ export default function SellosPage() {
       0
     );
 
+  const saldoTotalPendienteSellos =
+    saldoAtrasadoSellos +
+    saldoSellos;
+
   const estadoSellos =
     totalSemanalSellos > 0 &&
     saldoSellos <= 0
@@ -448,6 +470,13 @@ export default function SellosPage() {
       : "PENDIENTE";
 
   async function guardarPagoSellos() {
+    if (!fechaPagoSellos) {
+      setErrorSellos(
+        "Selecciona la fecha real del pago."
+      );
+      return;
+    }
+
     const monto = Number(
       montoPagoSellos || 0
     );
@@ -490,6 +519,7 @@ export default function SellosPage() {
 
             body: JSON.stringify({
               tipo: "pago",
+              fecha: fechaPagoSellos,
               semana: semanaSellos,
               monto,
 
@@ -512,6 +542,7 @@ export default function SellosPage() {
         );
       }
 
+      setFechaPagoSellos("");
       setMontoPagoSellos("");
       setReferenciaPagoSellos("");
       setObservacionesPagoSellos("");
@@ -666,13 +697,19 @@ ${dias}
 *TOTAL SEMANAL: ${dinero(
       totalSemanalSellos
     )}*
-Pagado: ${dinero(
+Pagado esta semana: ${dinero(
       totalPagadoSellos
     )}
-*Saldo pendiente: ${dinero(
+Pendiente esta semana: ${dinero(
       saldoSellos
+    )}
+Saldo atrasado: ${dinero(
+      saldoAtrasadoSellos
+    )}
+*PENDIENTE TOTAL: ${dinero(
+      saldoTotalPendienteSellos
     )}*
-Estado: *${estadoSellos}*`;
+Estado de esta semana: *${estadoSellos}*`;
   }
 
   function copiarMensajeSemanalSellos() {
@@ -798,7 +835,7 @@ Estado: *${estadoSellos}*`;
             </div>
           </div>
 
-          <div className="grid gap-3 border-b border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-4 md:p-5">
+          <div className="grid gap-3 border-b border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-6 md:p-5">
             <div className="rounded-xl bg-slate-50 p-4">
               <p className="text-[10px] font-black uppercase text-slate-500">
                 Total semana
@@ -813,7 +850,7 @@ Estado: *${estadoSellos}*`;
 
             <div className="rounded-xl bg-emerald-50 p-4">
               <p className="text-[10px] font-black uppercase text-emerald-700">
-                Pagado
+                Pagado semana
               </p>
 
               <p className="mt-1 text-xl font-black text-emerald-700">
@@ -825,13 +862,45 @@ Estado: *${estadoSellos}*`;
 
             <div className="rounded-xl bg-amber-50 p-4">
               <p className="text-[10px] font-black uppercase text-amber-700">
-                Pendiente
+                Pendiente semana
               </p>
 
               <p className="mt-1 text-xl font-black text-amber-700">
                 {dinero(
                   saldoSellos
                 )}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-orange-50 p-4">
+              <p className="text-[10px] font-black uppercase text-orange-700">
+                Saldo atrasado
+              </p>
+
+              <p className="mt-1 text-xl font-black text-orange-700">
+                {dinero(
+                  saldoAtrasadoSellos
+                )}
+              </p>
+
+              <p className="mt-1 text-[10px] text-orange-600">
+                Semanas anteriores
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-red-50 p-4">
+              <p className="text-[10px] font-black uppercase text-red-700">
+                Pendiente total
+              </p>
+
+              <p className="mt-1 text-xl font-black text-red-700">
+                {dinero(
+                  saldoTotalPendienteSellos
+                )}
+              </p>
+
+              <p className="mt-1 text-[10px] text-red-600">
+                Semana actual + atrasado
               </p>
             </div>
 
@@ -847,7 +916,7 @@ Estado: *${estadoSellos}*`;
               }`}
             >
               <p className="text-[10px] font-black uppercase text-slate-500">
-                Estado
+                Estado semana
               </p>
 
               <p
@@ -1109,6 +1178,10 @@ Estado: *${estadoSellos}*`;
                       ""
                     );
 
+                    setFechaPagoSellos(
+                      ""
+                    );
+
                     setMontoPagoSellos(
                       ""
                     );
@@ -1188,11 +1261,24 @@ Estado: *${estadoSellos}*`;
                   value={
                     fechaSello
                   }
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const nuevaFecha =
+                      e.target.value;
+
                     setFechaSello(
-                      e.target.value
-                    )
-                  }
+                      nuevaFecha
+                    );
+
+                    if (nuevaFecha) {
+                      setSemanaSellos(
+                        obtenerLunesSemana(
+                          new Date(
+                            `${nuevaFecha}T12:00:00`
+                          )
+                        )
+                      );
+                    }
+                  }}
                   disabled={
                     guardandoSellos
                   }
@@ -1365,6 +1451,32 @@ Estado: *${estadoSellos}*`;
                   {dinero(
                     saldoSellos
                   )}
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-bold">
+                  Fecha real del pago
+                </label>
+
+                <input
+                  type="date"
+                  value={
+                    fechaPagoSellos
+                  }
+                  onChange={(e) =>
+                    setFechaPagoSellos(
+                      e.target.value
+                    )
+                  }
+                  disabled={
+                    guardandoSellos
+                  }
+                  className="w-full rounded-xl border px-4 py-3 disabled:bg-slate-100"
+                />
+
+                <p className="mt-1 text-xs text-slate-500">
+                  Puedes seleccionar una fecha anterior. Este pago seguirá perteneciendo a la semana de sellos mostrada arriba.
                 </p>
               </div>
 

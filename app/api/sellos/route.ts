@@ -979,12 +979,100 @@ export async function GET(
         pagos
       );
 
+    const todosLosDias =
+      leerSellos(
+        hojaSellos
+      );
+
+    const todosLosPagos =
+      leerPagosSellos(
+        hojaPagos
+      );
+
+    const semanasAnteriores =
+      Array.from(
+        new Set(
+          todosLosDias
+            .map(
+              (dia) =>
+                dia.semana ||
+                lunesDeSemana(
+                  dia.fecha
+                )
+            )
+            .filter(
+              (semanaDia) =>
+                Boolean(
+                  semanaDia
+                ) &&
+                (
+                  !semana ||
+                  semanaDia <
+                    semana
+                )
+            )
+        )
+      ).sort();
+
+    let saldoAtrasado = 0;
+
+    for (
+      const semanaAnterior
+      of semanasAnteriores
+    ) {
+      const diasSemana =
+        todosLosDias.filter(
+          (dia) =>
+            (
+              dia.semana ||
+              lunesDeSemana(
+                dia.fecha
+              )
+            ) ===
+            semanaAnterior
+        );
+
+      const pagosSemana =
+        todosLosPagos.filter(
+          (pago) =>
+            pago.semana ===
+            semanaAnterior
+        );
+
+      const resumenAnterior =
+        resumenSemana(
+          diasSemana,
+          pagosSemana
+        );
+
+      saldoAtrasado +=
+        resumenAnterior.saldo;
+    }
+
+    saldoAtrasado =
+      redondear(
+        saldoAtrasado
+      );
+
+    const saldoPendienteTotal =
+      redondear(
+        saldoAtrasado +
+        resumen.saldo
+      );
+
     return NextResponse.json({
       success: true,
       semana,
       dias,
       pagos,
       resumen,
+
+      resumenAcumulado: {
+        saldoAtrasado,
+        saldoSemana:
+          resumen.saldo,
+        saldoPendienteTotal,
+      },
     });
   } catch (
     error: unknown
@@ -1421,7 +1509,25 @@ export async function POST(
       `PSEL-${Date.now()}`;
 
     const fecha =
-      fechaHoraMexico();
+      texto(
+        body?.fecha
+      );
+
+    if (
+      !fecha ||
+      !esFechaISO(fecha)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Selecciona una fecha válida para el pago.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
 
     const referencia =
       texto(
