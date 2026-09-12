@@ -3,63 +3,36 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-type PagoRow = {
-  folio: string;
-  cliente: string;
-  whatsapp: string;
+type SelloDia = {
+  id: string;
   fecha: string;
-
-  total: number;
-  pagado: number;
-  saldo: number;
-
-  estado: "Pendiente" | "Parcial" | "Pagado";
-
-  totalAereo?: number;
-  totalTerrestre?: number;
-  opciones?: string;
-  servicioElegido?: "Aéreo" | "Terrestre" | "";
-  requiereSeleccionServicio?: boolean;
+  semana: string;
+  g: number;
+  c: number;
+  m: number;
+  precioG?: number;
+  precioC?: number;
+  precioM?: number;
+  cajas?: number;
+  total?: number;
+  fechaRegistro?: string;
 };
 
-type HistorialPago = {
+type PagoSellos = {
   idPago: string;
   fecha: string;
-  folio: string;
-  cliente: string;
-  whatsapp: string;
-  servicio: string;
-
-  total: number;
-  saldoAntes: number;
+  semana: string;
   monto: number;
-  saldoDespues: number;
-
-  metodo: string;
   referencia: string;
-
-  comprobante: string;
-  urlComprobante: string;
-
-  observaciones: string;
-
-  estadoMovimiento: "Activo" | "Anulado";
-  motivoAnulacion: string;
-  fechaAnulacion: string;
+  observaciones?: string;
+  estadoMovimiento?: "Activo" | "Anulado";
+  motivoAnulacion?: string;
+  fechaAnulacion?: string;
 };
 
-type MetodoPago =
-  | "Transferencia"
-  | "Efectivo"
-  | "Depósito"
-  | "Tarjeta"
-  | "Otro";
-
-type VisorComprobante = {
-  ruta: string;
-  fecha: string;
-  monto: number;
-} | null;
+const PRECIO_G = 650;
+const PRECIO_C = 350;
+const PRECIO_M = 550;
 
 function dinero(valor: number) {
   return new Intl.NumberFormat("es-MX", {
@@ -68,492 +41,212 @@ function dinero(valor: number) {
   }).format(valor || 0);
 }
 
-function EstadoPago({
-  estado,
-}: {
-  estado: PagoRow["estado"] | "Por definir";
-}) {
-  const estilos =
-    estado === "Pagado"
-      ? "border-emerald-200 bg-emerald-100 text-emerald-700"
-      : estado === "Parcial"
-      ? "border-blue-200 bg-blue-100 text-blue-700"
-      : estado === "Por definir"
-      ? "border-violet-200 bg-violet-100 text-violet-700"
-      : "border-amber-200 bg-amber-100 text-amber-700";
+function obtenerLunesSemana(fecha = new Date()) {
+  const copia = new Date(fecha);
+  const dia = copia.getDay();
+  const diferencia = dia === 0 ? -6 : 1 - dia;
 
-  return (
-    <span
-      className={`inline-flex whitespace-nowrap rounded-full border px-3 py-1 text-xs font-bold ${estilos}`}
-    >
-      {estado}
-    </span>
-  );
+  copia.setHours(12, 0, 0, 0);
+  copia.setDate(copia.getDate() + diferencia);
+
+  const year = copia.getFullYear();
+  const month = String(copia.getMonth() + 1).padStart(2, "0");
+  const day = String(copia.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }
 
-export default function PagosPage() {
+function moverFechaISO(fechaISO: string, dias: number) {
+  const [year, month, day] = fechaISO.split("-").map(Number);
+  const fecha = new Date(year, month - 1, day, 12, 0, 0);
+
+  fecha.setDate(fecha.getDate() + dias);
+
+  const yyyy = fecha.getFullYear();
+  const mm = String(fecha.getMonth() + 1).padStart(2, "0");
+  const dd = String(fecha.getDate()).padStart(2, "0");
+
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+export default function SellosPage() {
   const router = useRouter();
 
-  const [pagos, setPagos] =
-    useState<PagoRow[]>([]);
+  const [semanaSellos, setSemanaSellos] =
+    useState(() => obtenerLunesSemana());
 
-  const [busqueda, setBusqueda] =
-    useState("");
+  const [sellosDias, setSellosDias] =
+    useState<SelloDia[]>([]);
 
-  const [filtroEstado, setFiltroEstado] =
-    useState<"Todos" | "Por definir" | "Pendiente" | "Parcial" | "Pagado">("Todos");
+  const [pagosSellos, setPagosSellos] =
+    useState<PagoSellos[]>([]);
 
-  const [cargando, setCargando] =
+  const [cargandoSellos, setCargandoSellos] =
     useState(true);
 
-  const [error, setError] =
-    useState("");
-
-  const [seleccionado, setSeleccionado] =
-    useState<PagoRow | null>(null);
-
-  const [servicio, setServicio] =
-    useState<"Aéreo" | "Terrestre" | "">("");
-
-  const [montoPago, setMontoPago] =
-    useState("");
-
-  const [metodoPago, setMetodoPago] =
-    useState<MetodoPago>("Transferencia");
-
-  const [referencia, setReferencia] =
-    useState("");
-
-  const [observaciones, setObservaciones] =
-    useState("");
-
-  const [comprobante, setComprobante] =
-    useState<File | null>(null);
-
-  const [
-    previewComprobante,
-    setPreviewComprobante,
-  ] = useState("");
-
-  const [guardando, setGuardando] =
+  const [guardandoSellos, setGuardandoSellos] =
     useState(false);
 
-  const [errorPago, setErrorPago] =
+  const [errorSellos, setErrorSellos] =
     useState("");
 
-  const [mensajePago, setMensajePago] =
+  const [mensajeSellos, setMensajeSellos] =
     useState("");
 
-  /* HISTORIAL */
+  const [mostrarNuevoDia, setMostrarNuevoDia] =
+    useState(false);
 
-  const [historial, setHistorial] =
-    useState<HistorialPago[]>([]);
+  const [fechaSello, setFechaSello] =
+    useState("");
 
-  const [
-    cargandoHistorial,
-    setCargandoHistorial,
-  ] = useState(false);
+  const [cantidadG, setCantidadG] =
+    useState("");
 
-  const [
-    errorHistorial,
-    setErrorHistorial,
-  ] = useState("");
+  const [cantidadC, setCantidadC] =
+    useState("");
 
-  const [
-    mostrarHistorial,
-    setMostrarHistorial,
-  ] = useState(true);
+  const [cantidadM, setCantidadM] =
+    useState("");
 
-  /* VISOR COMPROBANTE */
+  const [mostrarPagoSellos, setMostrarPagoSellos] =
+    useState(false);
 
-  const [
-    visorComprobante,
-    setVisorComprobante,
-  ] = useState<VisorComprobante>(null);
+  const [montoPagoSellos, setMontoPagoSellos] =
+    useState("");
 
-  const [
-    errorVisor,
-    setErrorVisor,
-  ] = useState("");
+  const [referenciaPagoSellos, setReferenciaPagoSellos] =
+    useState("");
 
-  /* ANULACIÓN DE PAGO */
+  const [observacionesPagoSellos, setObservacionesPagoSellos] =
+    useState("");
 
-  const [
-    pagoAAnular,
-    setPagoAAnular,
-  ] = useState<HistorialPago | null>(null);
-
-  const [
-    motivoAnulacion,
-    setMotivoAnulacion,
-  ] = useState("");
-
-  const [
-    anulando,
-    setAnulando,
-  ] = useState(false);
-
-  const [
-    errorAnulacion,
-    setErrorAnulacion,
-  ] = useState("");
-
-  useEffect(() => {
-    cargarPagos();
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (previewComprobante) {
-        URL.revokeObjectURL(
-          previewComprobante
-        );
-      }
-    };
-  }, [previewComprobante]);
-
-  async function cargarPagos() {
+  async function cargarSellos() {
     try {
-      setCargando(true);
-      setError("");
+      setCargandoSellos(true);
+      setErrorSellos("");
 
-      const respuesta =
-        await fetch("/api/pagos", {
+      const respuesta = await fetch(
+        `/api/sellos?semana=${encodeURIComponent(semanaSellos)}`,
+        {
           cache: "no-store",
-        });
+        }
+      );
 
-      const data =
-        await respuesta.json();
+      const data = await respuesta.json();
 
       if (!respuesta.ok) {
         throw new Error(
           data?.error ||
-            "No fue posible cargar los pagos."
+            "No fue posible cargar los sellos."
         );
       }
 
-      setPagos(
-        Array.isArray(data)
-          ? data
-          : data.pagos || []
-      );
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "No fue posible cargar los pagos."
+      setSellosDias(
+        Array.isArray(data?.dias)
+          ? data.dias
+          : []
       );
 
-      setPagos([]);
-    } finally {
-      setCargando(false);
-    }
-  }
-
-  async function cargarHistorial(
-    folio: string
-  ) {
-    try {
-      setCargandoHistorial(true);
-      setErrorHistorial("");
-
-      const respuesta =
-        await fetch(
-          `/api/pagos/historial?folio=${encodeURIComponent(
-            folio
-          )}`,
-          {
-            cache: "no-store",
-          }
-        );
-
-      const data =
-        await respuesta.json();
-
-      if (!respuesta.ok) {
-        throw new Error(
-          data?.error ||
-            "No fue posible cargar el historial."
-        );
-      }
-
-      setHistorial(
-        Array.isArray(
-          data?.historial
-        )
-          ? data.historial
+      setPagosSellos(
+        Array.isArray(data?.pagos)
+          ? data.pagos
           : []
       );
     } catch (err) {
       console.error(err);
 
-      setErrorHistorial(
+      setSellosDias([]);
+      setPagosSellos([]);
+
+      setErrorSellos(
         err instanceof Error
           ? err.message
-          : "No fue posible cargar el historial."
+          : "No fue posible cargar los sellos."
       );
-
-      setHistorial([]);
     } finally {
-      setCargandoHistorial(false);
+      setCargandoSellos(false);
     }
   }
 
-  function obtenerEstadoVisual(pago: PagoRow) {
-    if (Number(pago.total || 0) <= 0) {
-      return "Por definir" as const;
-    }
+  useEffect(() => {
+    cargarSellos();
+  }, [semanaSellos]);
 
-    return pago.estado;
+  function abrirNuevoDiaSellos() {
+    setErrorSellos("");
+    setMensajeSellos("");
+
+    // La fecha queda vacía para seleccionarla manualmente.
+    setFechaSello("");
+    setCantidadG("");
+    setCantidadC("");
+    setCantidadM("");
+
+    setMostrarNuevoDia(true);
   }
 
-  const filtrados =
-    useMemo(() => {
-      const textoBusqueda =
-        busqueda
-          .trim()
-          .toLowerCase();
-
-      return pagos.filter((pago) => {
-        const coincideBusqueda =
-          !textoBusqueda ||
-          pago.folio
-            ?.toLowerCase()
-            .includes(textoBusqueda) ||
-          pago.cliente
-            ?.toLowerCase()
-            .includes(textoBusqueda) ||
-          pago.whatsapp
-            ?.toLowerCase()
-            .includes(textoBusqueda);
-
-        const coincideEstado =
-          filtroEstado === "Todos" ||
-          obtenerEstadoVisual(pago) === filtroEstado;
-
-        return coincideBusqueda && coincideEstado;
-      });
-    }, [pagos, busqueda, filtroEstado]);
-
-  const totales =
-    useMemo(() => {
-      return pagos.reduce(
-        (acc, pago) => {
-          acc.cotizado +=
-            Number(
-              pago.total || 0
-            );
-
-          acc.cobrado +=
-            Number(
-              pago.pagado || 0
-            );
-
-          acc.pendiente +=
-            Number(
-              pago.saldo || 0
-            );
-
-          return acc;
-        },
-        {
-          cotizado: 0,
-          cobrado: 0,
-          pendiente: 0,
-        }
+  async function guardarDiaSellos() {
+    if (!fechaSello) {
+      setErrorSellos(
+        "Selecciona la fecha."
       );
-    }, [pagos]);
+      return;
+    }
 
-  function limpiarComprobante() {
-    if (previewComprobante) {
-      URL.revokeObjectURL(
-        previewComprobante
+    const g = Number(
+      cantidadG || 0
+    );
+
+    const c = Number(
+      cantidadC || 0
+    );
+
+    const m = Number(
+      cantidadM || 0
+    );
+
+    if (
+      ![g, c, m].every(
+        (n) =>
+          Number.isFinite(n) &&
+          n >= 0
+      )
+    ) {
+      setErrorSellos(
+        "Las cantidades deben ser números válidos."
       );
+      return;
     }
 
-    setComprobante(null);
-    setPreviewComprobante("");
-  }
-
-  function abrirPago(
-    pago: PagoRow
-  ) {
-    limpiarComprobante();
-
-    setSeleccionado(pago);
-
-    setMontoPago("");
-    setReferencia("");
-    setObservaciones("");
-
-    setMetodoPago(
-      "Transferencia"
-    );
-
-    setErrorPago("");
-    setMensajePago("");
-
-    setHistorial([]);
-    setErrorHistorial("");
-
-    setMostrarHistorial(true);
-    setVisorComprobante(null);
-    setErrorVisor("");
-
-    setPagoAAnular(null);
-    setMotivoAnulacion("");
-    setErrorAnulacion("");
-
-    cargarHistorial(
-      pago.folio
-    );
-
-    const servicioGuardado =
-      pago.servicioElegido || "";
+    if (g + c + m <= 0) {
+      setErrorSellos(
+        "Captura al menos una caja."
+      );
+      return;
+    }
 
     if (
-      servicioGuardado === "Aéreo" ||
-      servicioGuardado === "Terrestre"
+      obtenerLunesSemana(
+        new Date(
+          `${fechaSello}T12:00:00`
+        )
+      ) !== semanaSellos
     ) {
-      setServicio(servicioGuardado);
-      return;
-    }
-
-    const opciones =
-      pago.opciones
-        ?.toLowerCase() || "";
-
-    const tieneAereo =
-      opciones.includes("aéreo") ||
-      opciones.includes("aereo");
-
-    const tieneTerrestre =
-      opciones.includes("terrestre");
-
-    if (
-      tieneAereo &&
-      !tieneTerrestre
-    ) {
-      setServicio("Aéreo");
-    } else if (
-      tieneTerrestre &&
-      !tieneAereo
-    ) {
-      setServicio("Terrestre");
-    } else {
-      setServicio("");
-    }
-  }
-
-  function cerrarPago() {
-    if (guardando) {
-      return;
-    }
-
-    limpiarComprobante();
-
-    setSeleccionado(null);
-    setServicio("");
-    setMontoPago("");
-    setReferencia("");
-    setObservaciones("");
-
-    setErrorPago("");
-    setMensajePago("");
-
-    setHistorial([]);
-    setErrorHistorial("");
-
-    setVisorComprobante(null);
-    setErrorVisor("");
-
-    setPagoAAnular(null);
-    setMotivoAnulacion("");
-    setErrorAnulacion("");
-  }
-
-  function abrirVisor(
-    movimiento: HistorialPago
-  ) {
-    if (!movimiento.comprobante) {
-      return;
-    }
-
-    setErrorVisor("");
-
-    setVisorComprobante({
-      ruta:
-        movimiento.comprobante,
-
-      fecha:
-        movimiento.fecha,
-
-      monto:
-        movimiento.monto,
-    });
-  }
-
-  function cerrarVisor() {
-    setVisorComprobante(null);
-    setErrorVisor("");
-  }
-
-  function abrirAnulacion(
-    movimiento: HistorialPago
-  ) {
-    if (
-      movimiento.estadoMovimiento ===
-      "Anulado"
-    ) {
-      return;
-    }
-
-    setErrorAnulacion("");
-    setMotivoAnulacion("");
-    setPagoAAnular(
-      movimiento
-    );
-  }
-
-  function cerrarAnulacion() {
-    if (anulando) {
-      return;
-    }
-
-    setPagoAAnular(null);
-    setMotivoAnulacion("");
-    setErrorAnulacion("");
-  }
-
-  async function confirmarAnulacion() {
-    if (
-      !pagoAAnular ||
-      !seleccionado
-    ) {
-      return;
-    }
-
-    const motivo =
-      motivoAnulacion.trim();
-
-    if (motivo.length < 3) {
-      setErrorAnulacion(
-        "Escribe el motivo de la anulación."
+      setErrorSellos(
+        "La fecha seleccionada no pertenece a la semana que estás viendo."
       );
       return;
     }
 
     try {
-      setAnulando(true);
-      setErrorAnulacion("");
+      setGuardandoSellos(true);
+      setErrorSellos("");
 
       const respuesta =
         await fetch(
-          "/api/pagos",
+          "/api/sellos",
           {
-            method: "PATCH",
+            method: "POST",
 
             headers: {
               "Content-Type":
@@ -561,10 +254,11 @@ export default function PagosPage() {
             },
 
             body: JSON.stringify({
-              idPago:
-                pagoAAnular.idPago,
-
-              motivo,
+              tipo: "dia",
+              fecha: fechaSello,
+              g,
+              c,
+              m,
             }),
           }
         );
@@ -575,316 +269,237 @@ export default function PagosPage() {
       if (!respuesta.ok) {
         throw new Error(
           data?.error ||
-            "No fue posible anular el pago."
+            "No fue posible guardar el día."
         );
       }
 
-      await cargarPagos();
+      setMostrarNuevoDia(false);
 
-      await cargarHistorial(
-        seleccionado.folio
+      setFechaSello("");
+      setCantidadG("");
+      setCantidadC("");
+      setCantidadM("");
+
+      setMensajeSellos(
+        "Día de sellos guardado correctamente."
       );
 
-      setSeleccionado(
-        (actual) => {
-          if (!actual) {
-            return actual;
-          }
-
-          return {
-            ...actual,
-
-            total:
-              Number(
-                data?.total ??
-                  actual.total
-              ),
-
-            pagado:
-              Number(
-                data?.pagado ??
-                  actual.pagado
-              ),
-
-            saldo:
-              Number(
-                data?.saldo ??
-                  actual.saldo
-              ),
-
-            estado:
-              data?.estado ||
-              actual.estado,
-          };
-        }
-      );
-
-      setPagoAAnular(null);
-      setMotivoAnulacion("");
-      setErrorAnulacion("");
-
-      setMensajePago(
-        "Pago anulado correctamente."
-      );
+      await cargarSellos();
 
       setTimeout(() => {
-        setMensajePago("");
+        setMensajeSellos("");
       }, 2500);
     } catch (err) {
       console.error(err);
 
-      setErrorAnulacion(
+      setErrorSellos(
         err instanceof Error
           ? err.message
-          : "No fue posible anular el pago."
+          : "No fue posible guardar el día."
       );
     } finally {
-      setAnulando(false);
+      setGuardandoSellos(false);
     }
   }
 
-  function seleccionarComprobante(
-    archivo: File | null
+  async function eliminarDiaSellos(
+    id: string
   ) {
-    if (!archivo) {
-      return;
-    }
-
-    setErrorPago("");
-
-    const tiposPermitidos = [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-    ];
-
     if (
-      archivo.type &&
-      !tiposPermitidos.includes(
-        archivo.type
+      !confirm(
+        "¿Eliminar este registro de sellos?"
       )
     ) {
-      setErrorPago(
-        "El comprobante debe ser una imagen JPG, PNG o WEBP."
-      );
-
-      return;
-    }
-
-    if (
-      archivo.size >
-      10 * 1024 * 1024
-    ) {
-      setErrorPago(
-        "La imagen no puede pesar más de 10 MB."
-      );
-
-      return;
-    }
-
-    if (previewComprobante) {
-      URL.revokeObjectURL(
-        previewComprobante
-      );
-    }
-
-    setComprobante(
-      archivo
-    );
-
-    setPreviewComprobante(
-      URL.createObjectURL(
-        archivo
-      )
-    );
-  }
-
-  function quitarComprobante() {
-    limpiarComprobante();
-  }
-
-  const totalSeleccionado =
-    useMemo(() => {
-      if (!seleccionado) {
-        return 0;
-      }
-
-      if (
-        seleccionado.total > 0
-      ) {
-        return seleccionado.total;
-      }
-
-      if (
-        servicio === "Aéreo"
-      ) {
-        return Number(
-          seleccionado.totalAereo ||
-            0
-        );
-      }
-
-      if (
-        servicio ===
-        "Terrestre"
-      ) {
-        return Number(
-          seleccionado.totalTerrestre ||
-            0
-        );
-      }
-
-      return 0;
-    }, [
-      seleccionado,
-      servicio,
-    ]);
-
-  const saldoActual =
-    useMemo(() => {
-      if (!seleccionado) {
-        return 0;
-      }
-
-      if (
-        seleccionado.total >
-        0
-      ) {
-        return Number(
-          seleccionado.saldo ||
-            0
-        );
-      }
-
-      return Math.max(
-        totalSeleccionado -
-          Number(
-            seleccionado.pagado ||
-              0
-          ),
-        0
-      );
-    }, [
-      seleccionado,
-      totalSeleccionado,
-    ]);
-
-  const pagoCapturado =
-    Number(
-      montoPago || 0
-    );
-
-  const nuevoSaldo =
-    Math.max(
-      saldoActual -
-        pagoCapturado,
-      0
-    );
-
-  async function guardarPago() {
-    if (!seleccionado) {
-      return;
-    }
-
-    setErrorPago("");
-    setMensajePago("");
-
-    if (
-      totalSeleccionado <= 0
-    ) {
-      setErrorPago(
-        "Selecciona si el cliente pagará Aéreo o Terrestre."
-      );
-
-      return;
-    }
-
-    if (
-      !Number.isFinite(
-        pagoCapturado
-      ) ||
-      pagoCapturado <= 0
-    ) {
-      setErrorPago(
-        "Captura un monto de pago válido."
-      );
-
-      return;
-    }
-
-    if (
-      pagoCapturado >
-      saldoActual
-    ) {
-      setErrorPago(
-        `El pago no puede ser mayor al saldo pendiente de ${dinero(
-          saldoActual
-        )}.`
-      );
-
       return;
     }
 
     try {
-      setGuardando(true);
-
-      const formData =
-        new FormData();
-
-      formData.append(
-        "folio",
-        seleccionado.folio
-      );
-
-      formData.append(
-        "servicio",
-        servicio ||
-          seleccionado.servicioElegido ||
-          ""
-      );
-
-      formData.append(
-        "total",
-        String(
-          totalSeleccionado
-        )
-      );
-
-      formData.append(
-        "monto",
-        String(
-          pagoCapturado
-        )
-      );
-
-      formData.append(
-        "metodo",
-        metodoPago
-      );
-
-      formData.append(
-        "referencia",
-        referencia.trim()
-      );
-
-      formData.append(
-        "observaciones",
-        observaciones.trim()
-      );
-
-      if (comprobante) {
-        formData.append(
-          "comprobante",
-          comprobante
-        );
-      }
+      setGuardandoSellos(true);
+      setErrorSellos("");
 
       const respuesta =
         await fetch(
-          "/api/pagos",
+          `/api/sellos?id=${encodeURIComponent(
+            id
+          )}`,
+          {
+            method: "DELETE",
+          }
+        );
+
+      const data =
+        await respuesta.json();
+
+      if (!respuesta.ok) {
+        throw new Error(
+          data?.error ||
+            "No fue posible eliminar el registro."
+        );
+      }
+
+      setMensajeSellos(
+        "Registro eliminado correctamente."
+      );
+
+      await cargarSellos();
+
+      setTimeout(() => {
+        setMensajeSellos("");
+      }, 2500);
+    } catch (err) {
+      console.error(err);
+
+      setErrorSellos(
+        err instanceof Error
+          ? err.message
+          : "No fue posible eliminar el registro."
+      );
+    } finally {
+      setGuardandoSellos(false);
+    }
+  }
+
+  function totalDiaSellos(
+    dia: SelloDia
+  ) {
+    if (
+      Number.isFinite(
+        Number(dia.total)
+      )
+    ) {
+      return Number(
+        dia.total || 0
+      );
+    }
+
+    return (
+      dia.g * PRECIO_G +
+      dia.c * PRECIO_C +
+      dia.m * PRECIO_M
+    );
+  }
+
+  function cajasDiaSellos(
+    dia: SelloDia
+  ) {
+    if (
+      Number.isFinite(
+        Number(dia.cajas)
+      ) &&
+      Number(dia.cajas) > 0
+    ) {
+      return Number(
+        dia.cajas
+      );
+    }
+
+    return (
+      dia.g +
+      dia.c +
+      dia.m
+    );
+  }
+
+  const totalSemanalSellos =
+    useMemo(() => {
+      return sellosDias.reduce(
+        (total, dia) =>
+          total +
+          totalDiaSellos(dia),
+        0
+      );
+    }, [sellosDias]);
+
+  const pagosSellosActivos =
+    useMemo(() => {
+      return pagosSellos.filter(
+        (pago) =>
+          (
+            pago.estadoMovimiento ||
+            "Activo"
+          ) !== "Anulado"
+      );
+    }, [pagosSellos]);
+
+  const totalPagadoSellos =
+    useMemo(() => {
+      return pagosSellosActivos.reduce(
+        (total, pago) =>
+          total +
+          Number(
+            pago.monto || 0
+          ),
+        0
+      );
+    }, [pagosSellosActivos]);
+
+  const saldoSellos =
+    Math.max(
+      totalSemanalSellos -
+        totalPagadoSellos,
+      0
+    );
+
+  const estadoSellos =
+    totalSemanalSellos > 0 &&
+    saldoSellos <= 0
+      ? "LIQUIDADO"
+      : totalPagadoSellos > 0
+      ? "PARCIAL"
+      : "PENDIENTE";
+
+  async function guardarPagoSellos() {
+    const monto = Number(
+      montoPagoSellos || 0
+    );
+
+    if (
+      !Number.isFinite(monto) ||
+      monto <= 0
+    ) {
+      setErrorSellos(
+        "Captura un monto válido."
+      );
+      return;
+    }
+
+    if (
+      monto > saldoSellos
+    ) {
+      setErrorSellos(
+        `El pago no puede ser mayor al saldo de ${dinero(
+          saldoSellos
+        )}.`
+      );
+      return;
+    }
+
+    try {
+      setGuardandoSellos(true);
+      setErrorSellos("");
+
+      const respuesta =
+        await fetch(
+          "/api/sellos",
           {
             method: "POST",
-            body: formData,
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body: JSON.stringify({
+              tipo: "pago",
+              semana: semanaSellos,
+              monto,
+
+              referencia:
+                referenciaPagoSellos.trim(),
+
+              observaciones:
+                observacionesPagoSellos.trim(),
+            }),
           }
         );
 
@@ -898,1014 +513,885 @@ export default function PagosPage() {
         );
       }
 
-      setMensajePago(
-        "Pago guardado correctamente."
+      setMontoPagoSellos("");
+      setReferenciaPagoSellos("");
+      setObservacionesPagoSellos("");
+
+      setMostrarPagoSellos(false);
+
+      setMensajeSellos(
+        "Pago de sellos guardado correctamente."
       );
 
-      limpiarComprobante();
-
-      setMontoPago("");
-      setReferencia("");
-      setObservaciones("");
-
-      await cargarPagos();
-
-      await cargarHistorial(
-        seleccionado.folio
-      );
-
-      setSeleccionado(
-        (actual) => {
-          if (!actual) {
-            return actual;
-          }
-
-          return {
-            ...actual,
-
-            total:
-              Number(
-                data?.total ??
-                  actual.total
-              ),
-
-            pagado:
-              Number(
-                data?.pagado ??
-                  actual.pagado
-              ),
-
-            saldo:
-              Number(
-                data?.saldo ??
-                  actual.saldo
-              ),
-
-            estado:
-              data?.estado ||
-              actual.estado,
-          };
-        }
-      );
+      await cargarSellos();
 
       setTimeout(() => {
-        setMensajePago("");
+        setMensajeSellos("");
       }, 2500);
     } catch (err) {
       console.error(err);
 
-      setErrorPago(
+      setErrorSellos(
         err instanceof Error
           ? err.message
           : "No fue posible guardar el pago."
       );
     } finally {
-      setGuardando(false);
+      setGuardandoSellos(false);
     }
+  }
+
+  function fechaBonitaSellos(
+    fecha: string
+  ) {
+    if (!fecha) {
+      return "";
+    }
+
+    const [
+      year,
+      month,
+      day,
+    ] =
+      fecha
+        .split("-")
+        .map(Number);
+
+    return new Intl.DateTimeFormat(
+      "es-MX",
+      {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      }
+    ).format(
+      new Date(
+        year,
+        month - 1,
+        day
+      )
+    );
+  }
+
+  function rangoSemanaSellos() {
+    const domingo =
+      moverFechaISO(
+        semanaSellos,
+        6
+      );
+
+    return `${fechaBonitaSellos(
+      semanaSellos
+    )} al ${fechaBonitaSellos(
+      domingo
+    )}`;
+  }
+
+  function mensajeDiaSellos(
+    dia: SelloDia
+  ) {
+    const total =
+      totalDiaSellos(dia);
+
+    const cajas =
+      cajasDiaSellos(dia);
+
+    return `*SELLOS — ${fechaBonitaSellos(
+      dia.fecha
+    ).toUpperCase()}*
+
+G: ${dia.g} × $${PRECIO_G.toLocaleString(
+      "es-MX"
+    )} = $${(
+      dia.g * PRECIO_G
+    ).toLocaleString("es-MX")}
+C: ${dia.c} × $${PRECIO_C.toLocaleString(
+      "es-MX"
+    )} = $${(
+      dia.c * PRECIO_C
+    ).toLocaleString("es-MX")}
+M: ${dia.m} × $${PRECIO_M.toLocaleString(
+      "es-MX"
+    )} = $${(
+      dia.m * PRECIO_M
+    ).toLocaleString("es-MX")}
+
+*${cajas} cajas*
+*TOTAL: $${total.toLocaleString(
+      "es-MX"
+    )}*`;
+  }
+
+  function abrirWhatsAppConMensaje(
+    mensaje: string
+  ) {
+    const url =
+      `https://wa.me/?text=${encodeURIComponent(
+        mensaje
+      )}`;
+
+    window.open(
+      url,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
+  function copiarMensajeDia(
+    dia: SelloDia
+  ) {
+    abrirWhatsAppConMensaje(
+      mensajeDiaSellos(dia)
+    );
+  }
+
+  function mensajeSemanalSellos() {
+    const dias =
+      sellosDias
+        .map(
+          (dia) =>
+            `${fechaBonitaSellos(
+              dia.fecha
+            )}: ${dinero(
+              totalDiaSellos(
+                dia
+              )
+            )}`
+        )
+        .join("\n");
+
+    return `*RESUMEN SEMANAL DE SELLOS*
+
+${dias}
+
+*TOTAL SEMANAL: ${dinero(
+      totalSemanalSellos
+    )}*
+Pagado: ${dinero(
+      totalPagadoSellos
+    )}
+*Saldo pendiente: ${dinero(
+      saldoSellos
+    )}*
+Estado: *${estadoSellos}*`;
+  }
+
+  function copiarMensajeSemanalSellos() {
+    abrirWhatsAppConMensaje(
+      mensajeSemanalSellos()
+    );
   }
 
   return (
     <main className="min-h-[calc(100vh-4rem)] overflow-x-hidden bg-slate-100 p-3 sm:p-4 md:p-6">
-
       <div className="mx-auto w-full max-w-7xl">
-
-        {/* ENCABEZADO */}
-
         <div className="mb-5">
           <div className="mb-4 flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => router.back()}
+              onClick={() =>
+                router.push(
+                  "/pagos"
+                )
+              }
               className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
-              ← Regresar
-            </button>
-
-            <button
-              type="button"
-              onClick={() => router.push("/sellos")}
-              className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-violet-800"
-            >
-              🏷️ Control de sellos
+              ← Regresar a pagos
             </button>
           </div>
 
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-700">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-700">
             Ventas y cobranza
           </p>
 
           <h1 className="mt-1 text-2xl font-black text-slate-950 sm:text-3xl">
-            Pagos
+            Control de sellos
           </h1>
 
           <p className="mt-1 text-sm text-slate-600">
-            Controla pagos, abonos y saldos pendientes de las cotizaciones.
+            Registra las cajas del día, los abonos y el saldo semanal.
           </p>
         </div>
 
-        {/* RESUMEN */}
-
-        <div className="mb-5 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase text-slate-500">
-              Total cotizado
-            </p>
-
-            <p className="mt-2 text-xl font-black text-slate-950 sm:text-2xl">
-              {dinero(
-                totales.cotizado
-              )}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase text-emerald-700">
-              Cobrado
-            </p>
-
-            <p className="mt-2 text-xl font-black text-emerald-700 sm:text-2xl">
-              {dinero(
-                totales.cobrado
-              )}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase text-amber-700">
-              Saldo pendiente
-            </p>
-
-            <p className="mt-2 text-xl font-black text-amber-700 sm:text-2xl">
-              {dinero(
-                totales.pendiente
-              )}
-            </p>
-          </div>
-        </div>
-
-        {/* COTIZACIONES */}
-
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-
           <div className="border-b border-slate-200 p-4 md:p-5">
-
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h2 className="font-black text-slate-950">
-                  Cotizaciones y pagos
+                <p className="text-xs font-black uppercase tracking-[0.15em] text-violet-700">
+                  Control interno
+                </p>
+
+                <h2 className="mt-1 text-lg font-black text-slate-950">
+                  🏷️ Sellos semanales
                 </h2>
 
-                <p className="mt-1 text-sm text-slate-500">
-                  Busca por folio, cliente o número de WhatsApp.
+                <p className="mt-1 text-sm capitalize text-slate-500">
+                  Semana:{" "}
+                  {rangoSemanaSellos()}
                 </p>
               </div>
 
-              <input
-                value={busqueda}
-                onChange={(e) =>
-                  setBusqueda(
-                    e.target.value
-                  )
-                }
-                placeholder="Buscar folio, cliente o teléfono..."
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 md:max-w-md"
-              />
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {([
-                "Todos",
-                "Por definir",
-                "Pendiente",
-                "Parcial",
-                "Pagado",
-              ] as const).map((estado) => (
+              <div className="flex flex-wrap gap-2">
                 <button
-                  key={estado}
                   type="button"
-                  onClick={() => setFiltroEstado(estado)}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${
-                    filtroEstado === estado
-                      ? "border-blue-700 bg-blue-700 text-white"
-                      : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-                  }`}
+                  onClick={() =>
+                    setSemanaSellos(
+                      moverFechaISO(
+                        semanaSellos,
+                        -7
+                      )
+                    )
+                  }
+                  disabled={
+                    guardandoSellos
+                  }
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-black text-slate-700 disabled:opacity-50"
                 >
-                  {estado}
+                  ← Semana anterior
                 </button>
-              ))}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSemanaSellos(
+                      obtenerLunesSemana()
+                    )
+                  }
+                  disabled={
+                    guardandoSellos
+                  }
+                  className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-black text-blue-700 disabled:opacity-50"
+                >
+                  Semana actual
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSemanaSellos(
+                      moverFechaISO(
+                        semanaSellos,
+                        7
+                      )
+                    )
+                  }
+                  disabled={
+                    guardandoSellos
+                  }
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-black text-slate-700 disabled:opacity-50"
+                >
+                  Semana siguiente →
+                </button>
+
+                <button
+                  type="button"
+                  onClick={
+                    abrirNuevoDiaSellos
+                  }
+                  disabled={
+                    guardandoSellos
+                  }
+                  className="rounded-xl bg-violet-700 px-4 py-2 text-sm font-black text-white transition hover:bg-violet-800 disabled:opacity-50"
+                >
+                  + Agregar día
+                </button>
+              </div>
             </div>
           </div>
 
-          {cargando ? (
-            <div className="p-10 text-center text-sm text-slate-500">
-              Cargando pagos...
+          <div className="grid gap-3 border-b border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-4 md:p-5">
+            <div className="rounded-xl bg-slate-50 p-4">
+              <p className="text-[10px] font-black uppercase text-slate-500">
+                Total semana
+              </p>
+
+              <p className="mt-1 text-xl font-black text-slate-950">
+                {dinero(
+                  totalSemanalSellos
+                )}
+              </p>
             </div>
-          ) : error ? (
-            <div className="p-4">
-              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                {error}
-              </div>
+
+            <div className="rounded-xl bg-emerald-50 p-4">
+              <p className="text-[10px] font-black uppercase text-emerald-700">
+                Pagado
+              </p>
+
+              <p className="mt-1 text-xl font-black text-emerald-700">
+                {dinero(
+                  totalPagadoSellos
+                )}
+              </p>
             </div>
-          ) : filtrados.length ===
+
+            <div className="rounded-xl bg-amber-50 p-4">
+              <p className="text-[10px] font-black uppercase text-amber-700">
+                Pendiente
+              </p>
+
+              <p className="mt-1 text-xl font-black text-amber-700">
+                {dinero(
+                  saldoSellos
+                )}
+              </p>
+            </div>
+
+            <div
+              className={`rounded-xl p-4 ${
+                estadoSellos ===
+                "LIQUIDADO"
+                  ? "bg-emerald-50"
+                  : estadoSellos ===
+                    "PARCIAL"
+                  ? "bg-blue-50"
+                  : "bg-amber-50"
+              }`}
+            >
+              <p className="text-[10px] font-black uppercase text-slate-500">
+                Estado
+              </p>
+
+              <p
+                className={`mt-1 text-lg font-black ${
+                  estadoSellos ===
+                  "LIQUIDADO"
+                    ? "text-emerald-700"
+                    : estadoSellos ===
+                      "PARCIAL"
+                    ? "text-blue-700"
+                    : "text-amber-700"
+                }`}
+              >
+                {estadoSellos}
+              </p>
+            </div>
+          </div>
+
+          {errorSellos && (
+            <div className="border-b border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">
+              {errorSellos}
+            </div>
+          )}
+
+          {mensajeSellos && (
+            <div className="border-b border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-700">
+              {mensajeSellos}
+            </div>
+          )}
+
+          {cargandoSellos ? (
+            <div className="p-8 text-center text-sm text-slate-500">
+              Cargando sellos...
+            </div>
+          ) : sellosDias.length ===
             0 ? (
-            <div className="p-10 text-center font-bold text-slate-700">
-              No hay registros para mostrar.
+            <div className="p-8 text-center">
+              <div className="text-4xl">
+                🏷️
+              </div>
+
+              <p className="mt-3 font-black text-slate-800">
+                Aún no hay días registrados
+              </p>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Agrega el primer día de envíos de esta semana.
+              </p>
             </div>
           ) : (
-            <>
-              {/* CELULAR */}
+            <div className="divide-y divide-slate-200">
+              {sellosDias.map(
+                (dia) => {
+                  const total =
+                    totalDiaSellos(
+                      dia
+                    );
 
-              <div className="divide-y divide-slate-200 md:hidden">
+                  const cajas =
+                    cajasDiaSellos(
+                      dia
+                    );
 
-                {filtrados.map(
-                  (pago) => (
+                  return (
                     <div
-                      key={
-                        pago.folio
-                      }
-                      className="p-4"
+                      key={dia.id}
+                      className="p-4 md:p-5"
                     >
-                      <div className="flex items-start justify-between gap-3">
-
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[10px] font-black uppercase text-slate-400">
-                            Folio
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="min-w-[170px]">
+                          <p className="font-black capitalize text-slate-950">
+                            {fechaBonitaSellos(
+                              dia.fecha
+                            )}
                           </p>
 
-                          <p className="mt-1 break-all text-sm font-black text-blue-800">
-                            {
-                              pago.folio
-                            }
+                          <p className="mt-1 text-xs text-slate-500">
+                            {cajas} cajas
                           </p>
                         </div>
 
-                        <EstadoPago
-                          estado={
-                            obtenerEstadoVisual(pago)
-                          }
-                        />
-                      </div>
+                        <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+                          <div className="rounded-xl bg-slate-50 px-4 py-2 text-center">
+                            <p className="text-[10px] font-black text-slate-500">
+                              G · $650
+                            </p>
 
-                      <div className="mt-4">
-                        <p className="text-[10px] font-black uppercase text-slate-400">
-                          Cliente
-                        </p>
+                            <p className="font-black">
+                              {dia.g}
+                            </p>
+                          </div>
 
-                        <p className="mt-1 font-black text-slate-950">
-                          {
-                            pago.cliente
-                          }
-                        </p>
+                          <div className="rounded-xl bg-slate-50 px-4 py-2 text-center">
+                            <p className="text-[10px] font-black text-slate-500">
+                              C · $350
+                            </p>
 
-                        <p className="mt-1 text-xs text-slate-500">
-                          {
-                            pago.whatsapp
-                          }
-                        </p>
-                      </div>
+                            <p className="font-black">
+                              {dia.c}
+                            </p>
+                          </div>
 
-                      <div className="mt-4 text-sm text-slate-700">
-                        {pago.fecha}
-                      </div>
+                          <div className="rounded-xl bg-slate-50 px-4 py-2 text-center">
+                            <p className="text-[10px] font-black text-slate-500">
+                              M · $550
+                            </p>
 
-                      <div className="mt-3 rounded-xl bg-slate-50 p-3">
-                        <p className="text-[10px] font-black uppercase text-slate-500">
-                          Servicio
-                        </p>
-                        <p className="mt-1 text-sm font-black text-slate-800">
-                          {pago.servicioElegido || "Por definir"}
-                        </p>
-                      </div>
+                            <p className="font-black">
+                              {dia.m}
+                            </p>
+                          </div>
+                        </div>
 
-                      <div className="mt-4 grid grid-cols-3 gap-2">
-
-                        <div className="rounded-xl bg-slate-50 p-3">
-                          <p className="text-[10px] font-black uppercase text-slate-500">
+                        <div className="min-w-[130px]">
+                          <p className="text-xs font-black uppercase text-slate-400">
                             Total
                           </p>
 
-                          <p className="mt-1 text-sm font-black">
-                            {pago.total >
-                            0
-                              ? dinero(
-                                  pago.total
-                                )
-                              : "Por definir"}
-                          </p>
-                        </div>
-
-                        <div className="rounded-xl bg-emerald-50 p-3">
-                          <p className="text-[10px] font-black uppercase text-emerald-700">
-                            Pagado
-                          </p>
-
-                          <p className="mt-1 text-sm font-black text-emerald-700">
+                          <p className="text-xl font-black text-violet-700">
                             {dinero(
-                              pago.pagado
+                              total
                             )}
                           </p>
                         </div>
 
-                        <div className="rounded-xl bg-amber-50 p-3">
-                          <p className="text-[10px] font-black uppercase text-amber-700">
-                            Saldo
-                          </p>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              copiarMensajeDia(
+                                dia
+                              )
+                            }
+                            className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white sm:flex-none"
+                          >
+                            WhatsApp del día
+                          </button>
 
-                          <p className="mt-1 text-sm font-black text-amber-700">
-                            {pago.total >
-                            0
-                              ? dinero(
-                                  pago.saldo
-                                )
-                              : "—"}
-                          </p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              eliminarDiaSellos(
+                                dia.id
+                              )
+                            }
+                            disabled={
+                              guardandoSellos ||
+                              pagosSellosActivos.length >
+                                0
+                            }
+                            title={
+                              pagosSellosActivos.length >
+                              0
+                                ? "No se puede eliminar porque la semana ya tiene pagos."
+                                : "Eliminar día"
+                            }
+                            className="rounded-xl border border-red-200 px-4 py-2.5 text-xs font-black text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Eliminar
+                          </button>
                         </div>
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          abrirPago(
-                            pago
-                          )
-                        }
-                        className="mt-4 w-full rounded-xl bg-blue-700 px-4 py-3 text-sm font-black text-white"
-                      >
-                        {pago.estado === "Pagado"
-                          ? "Ver pagos"
-                          : pago.total <= 0
-                          ? "Definir / Abonar"
-                          : "Ver / Abonar"}
-                      </button>
                     </div>
-                  )
-                )}
+                  );
+                }
+              )}
+            </div>
+          )}
+
+          {pagosSellos.length >
+            0 && (
+            <div className="border-t border-slate-200 p-4 md:p-5">
+              <div className="mb-3">
+                <h3 className="font-black text-slate-950">
+                  Historial de pagos de sellos
+                </h3>
+
+                <p className="text-xs text-slate-500">
+                  {pagosSellos.length} movimiento(s) registrado(s)
+                </p>
               </div>
 
-              {/* COMPUTADORA */}
-
-              <div className="hidden overflow-x-auto md:block">
-
-                <table className="w-full min-w-[1020px]">
-
-                  <thead className="bg-slate-50">
-                    <tr>
-                      <th className="px-5 py-3 text-left text-xs font-black uppercase text-slate-500">
-                        Folio
-                      </th>
-
-                      <th className="px-5 py-3 text-left text-xs font-black uppercase text-slate-500">
-                        Cliente
-                      </th>
-
-                      <th className="px-5 py-3 text-left text-xs font-black uppercase text-slate-500">
-                        Fecha
-                      </th>
-
-                      <th className="px-5 py-3 text-left text-xs font-black uppercase text-slate-500">
-                        Servicio
-                      </th>
-
-                      <th className="px-5 py-3 text-right text-xs font-black uppercase text-slate-500">
-                        Total
-                      </th>
-
-                      <th className="px-5 py-3 text-right text-xs font-black uppercase text-slate-500">
-                        Pagado
-                      </th>
-
-                      <th className="px-5 py-3 text-right text-xs font-black uppercase text-slate-500">
-                        Saldo
-                      </th>
-
-                      <th className="px-5 py-3 text-left text-xs font-black uppercase text-slate-500">
-                        Estado
-                      </th>
-
-                      <th></th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {filtrados.map(
-                      (pago) => (
-                        <tr
-                          key={
-                            pago.folio
-                          }
-                          className="border-t border-slate-100"
-                        >
-                          <td className="px-5 py-4 font-bold text-blue-800">
-                            {
-                              pago.folio
-                            }
-                          </td>
-
-                          <td className="px-5 py-4">
-                            <p className="font-bold text-slate-900">
-                              {
-                                pago.cliente
-                              }
-                            </p>
-
-                            <p className="text-xs text-slate-500">
-                              {
-                                pago.whatsapp
-                              }
-                            </p>
-                          </td>
-
-                          <td className="px-5 py-4 text-sm text-slate-600">
+              <div className="space-y-2">
+                {pagosSellos
+                  .slice()
+                  .reverse()
+                  .map(
+                    (pago) => (
+                      <div
+                        key={
+                          pago.idPago
+                        }
+                        className={`flex flex-col gap-2 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between ${
+                          pago.estadoMovimiento ===
+                          "Anulado"
+                            ? "border-red-200 bg-red-50"
+                            : "border-slate-200 bg-slate-50"
+                        }`}
+                      >
+                        <div>
+                          <p className="text-sm font-black text-slate-900">
                             {
                               pago.fecha
                             }
-                          </td>
+                          </p>
 
-                          <td className="px-5 py-4 text-sm font-bold text-slate-700">
-                            {pago.servicioElegido || "Por definir"}
-                          </td>
+                          <p className="text-xs text-slate-500">
+                            {pago.referencia
+                              ? `Ref: ${pago.referencia}`
+                              : "Sin referencia"}
+                          </p>
 
-                          <td className="px-5 py-4 text-right font-bold">
-                            {pago.total >
-                            0
-                              ? dinero(
-                                  pago.total
-                                )
-                              : "Por definir"}
-                          </td>
+                          {pago.observaciones && (
+                            <p className="mt-1 text-xs text-slate-500">
+                              {
+                                pago.observaciones
+                              }
+                            </p>
+                          )}
+                        </div>
 
-                          <td className="px-5 py-4 text-right font-bold text-emerald-700">
+                        <div className="text-left sm:text-right">
+                          <p
+                            className={`font-black ${
+                              pago.estadoMovimiento ===
+                              "Anulado"
+                                ? "text-red-600 line-through"
+                                : "text-emerald-700"
+                            }`}
+                          >
                             {dinero(
-                              pago.pagado
+                              Number(
+                                pago.monto ||
+                                  0
+                              )
                             )}
-                          </td>
+                          </p>
 
-                          <td className="px-5 py-4 text-right font-black">
-                            {pago.total >
-                            0
-                              ? dinero(
-                                  pago.saldo
-                                )
-                              : "—"}
-                          </td>
-
-                          <td className="px-5 py-4">
-                            <EstadoPago
-                              estado={
-                                obtenerEstadoVisual(pago)
-                              }
-                            />
-                          </td>
-
-                          <td className="px-5 py-4 text-right">
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                abrirPago(
-                                  pago
-                                )
-                              }
-                              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold"
-                            >
-                              {pago.estado === "Pagado"
-                                ? "Ver pagos"
-                                : pago.total <= 0
-                                ? "Definir / Abonar"
-                                : "Ver / Abonar"}
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    )}
-                  </tbody>
-                </table>
+                          <p className="text-[10px] font-black uppercase text-slate-500">
+                            {pago.estadoMovimiento ||
+                              "Activo"}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  )}
               </div>
-            </>
+            </div>
           )}
+
+          <div className="flex flex-col gap-3 border-t bg-slate-50 p-4 sm:flex-row sm:justify-end md:p-5">
+            {saldoSellos > 0 &&
+              sellosDias.length >
+                0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setErrorSellos(
+                      ""
+                    );
+
+                    setMontoPagoSellos(
+                      ""
+                    );
+
+                    setReferenciaPagoSellos(
+                      ""
+                    );
+
+                    setObservacionesPagoSellos(
+                      ""
+                    );
+
+                    setMostrarPagoSellos(
+                      true
+                    );
+                  }}
+                  className="rounded-xl border border-emerald-300 bg-white px-4 py-3 text-sm font-black text-emerald-700"
+                >
+                  + Agregar pago
+                </button>
+              )}
+
+            {sellosDias.length >
+              0 && (
+              <button
+                type="button"
+                onClick={
+                  copiarMensajeSemanalSellos
+                }
+                className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white"
+              >
+                WhatsApp semanal
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* MODAL PAGO */}
-
-      {seleccionado && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 sm:items-center sm:p-4">
-
-          <div className="max-h-[96vh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:max-w-2xl sm:rounded-2xl">
-
-            <div className="sticky top-0 z-20 flex items-start justify-between border-b bg-white p-4 sm:p-5">
-
+      {mostrarNuevoDia && (
+        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/60 sm:items-center sm:p-4">
+          <div className="w-full max-w-lg rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
+            <div className="flex items-center justify-between border-b p-4">
               <div>
-                <p className="text-xs font-black uppercase text-blue-700">
-                  Pagos del cliente
+                <p className="text-xs font-black uppercase text-violet-700">
+                  Sellos
                 </p>
 
-                <h2 className="mt-1 text-lg font-black">
-                  {
-                    seleccionado.cliente
-                  }
-                </h2>
-
-                <p className="text-xs text-slate-500">
-                  {
-                    seleccionado.folio
-                  }
-                </p>
+                <h3 className="text-lg font-black">
+                  Agregar día de envíos
+                </h3>
               </div>
 
               <button
                 type="button"
-                onClick={
-                  cerrarPago
+                onClick={() =>
+                  setMostrarNuevoDia(
+                    false
+                  )
                 }
-                className="text-xl font-bold text-slate-500"
+                disabled={
+                  guardandoSellos
+                }
+                className="text-2xl font-bold text-slate-400 disabled:opacity-50"
               >
                 ×
               </button>
             </div>
 
-            <div className="space-y-5 p-4 sm:p-5">
+            <div className="space-y-4 p-4">
+              <div>
+                <label className="mb-1 block text-sm font-bold">
+                  Fecha
+                </label>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-
-                <div className="rounded-xl bg-slate-50 p-4">
-                  <p className="text-xs font-bold uppercase text-slate-500">
-                    WhatsApp
-                  </p>
-
-                  <p className="mt-1 font-bold">
-                    {
-                      seleccionado.whatsapp
-                    }
-                  </p>
-                </div>
-
-                <div className="rounded-xl bg-slate-50 p-4">
-                  <p className="text-xs font-bold uppercase text-slate-500">
-                    Pagado
-                  </p>
-
-                  <p className="mt-1 font-black text-emerald-700">
-                    {dinero(
-                      seleccionado.pagado
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              {/* HISTORIAL */}
-
-              <div className="overflow-hidden rounded-2xl border">
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setMostrarHistorial(
-                      !mostrarHistorial
+                <input
+                  type="date"
+                  value={
+                    fechaSello
+                  }
+                  onChange={(e) =>
+                    setFechaSello(
+                      e.target.value
                     )
                   }
-                  className="flex w-full items-center justify-between bg-slate-50 p-4"
-                >
-                  <div className="text-left">
-                    <p className="font-black">
-                      Historial de pagos
-                    </p>
+                  disabled={
+                    guardandoSellos
+                  }
+                  className="w-full rounded-xl border px-4 py-3 disabled:bg-slate-100"
+                />
 
-                    <p className="text-xs text-slate-500">
-                      {historial.length} pago
-                      {historial.length ===
-                      1
-                        ? ""
-                        : "s"}{" "}
-                      registrado
-                      {historial.length ===
-                      1
-                        ? ""
-                        : "s"}
-                    </p>
-                  </div>
-
-                  <span>
-                    {mostrarHistorial
-                      ? "−"
-                      : "+"}
-                  </span>
-                </button>
-
-                {mostrarHistorial && (
-                  <div className="border-t">
-
-                    {cargandoHistorial ? (
-                      <div className="p-6 text-center text-sm text-slate-500">
-                        Cargando historial...
-                      </div>
-                    ) : errorHistorial ? (
-                      <div className="p-4 text-sm text-red-700">
-                        {
-                          errorHistorial
-                        }
-                      </div>
-                    ) : historial.length ===
-                      0 ? (
-                      <div className="p-6 text-center text-sm text-slate-500">
-                        Aún no hay pagos registrados.
-                      </div>
-                    ) : (
-                      <div className="divide-y">
-
-                        {historial.map(
-                          (
-                            movimiento,
-                            indice
-                          ) => (
-                            <div
-                              key={
-                                movimiento.idPago ||
-                                indice
-                              }
-                              className={`p-4 ${
-                                movimiento.estadoMovimiento ===
-                                "Anulado"
-                                  ? "bg-red-50/60"
-                                  : ""
-                              }`}
-                            >
-                              <div className="flex items-start justify-between gap-2">
-
-                                <div>
-                                  <p className="text-xs font-black uppercase text-slate-400">
-                                    Pago
-                                  </p>
-
-                                  <p className="mt-1 text-sm font-bold">
-                                    {
-                                      movimiento.fecha
-                                    }
-                                  </p>
-                                </div>
-
-                                <div className="flex flex-col items-end gap-1">
-                                  <span
-                                    className={`rounded-full px-3 py-1 text-sm font-black ${
-                                      movimiento.estadoMovimiento ===
-                                      "Anulado"
-                                        ? "bg-red-100 text-red-700 line-through"
-                                        : "bg-emerald-100 text-emerald-700"
-                                    }`}
-                                  >
-                                    {dinero(
-                                      movimiento.monto
-                                    )}
-                                  </span>
-
-                                  <span
-                                    className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
-                                      movimiento.estadoMovimiento ===
-                                      "Anulado"
-                                        ? "bg-red-100 text-red-700"
-                                        : "bg-slate-100 text-slate-600"
-                                    }`}
-                                  >
-                                    {
-                                      movimiento.estadoMovimiento
-                                    }
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="mt-4 grid grid-cols-2 gap-2">
-
-                                <div className="rounded-xl bg-slate-50 p-3">
-                                  <p className="text-[10px] font-black uppercase text-slate-500">
-                                    Servicio
-                                  </p>
-
-                                  <p className="mt-1 text-sm font-bold">
-                                    {movimiento.servicio ||
-                                      "—"}
-                                  </p>
-                                </div>
-
-                                <div className="rounded-xl bg-slate-50 p-3">
-                                  <p className="text-[10px] font-black uppercase text-slate-500">
-                                    Método
-                                  </p>
-
-                                  <p className="mt-1 text-sm font-bold">
-                                    {movimiento.metodo ||
-                                      "—"}
-                                  </p>
-                                </div>
-
-                                <div className="rounded-xl bg-amber-50 p-3">
-                                  <p className="text-[10px] font-black uppercase text-amber-700">
-                                    Saldo antes
-                                  </p>
-
-                                  <p className="mt-1 text-sm font-black text-amber-700">
-                                    {dinero(
-                                      movimiento.saldoAntes
-                                    )}
-                                  </p>
-                                </div>
-
-                                <div className="rounded-xl bg-blue-50 p-3">
-                                  <p className="text-[10px] font-black uppercase text-blue-700">
-                                    Saldo después
-                                  </p>
-
-                                  <p className="mt-1 text-sm font-black text-blue-700">
-                                    {dinero(
-                                      movimiento.saldoDespues
-                                    )}
-                                  </p>
-                                </div>
-                              </div>
-
-                              {movimiento.referencia && (
-                                <div className="mt-3 rounded-xl border p-3">
-                                  <p className="text-[10px] font-black uppercase text-slate-500">
-                                    Referencia
-                                  </p>
-
-                                  <p className="mt-1 text-sm">
-                                    {
-                                      movimiento.referencia
-                                    }
-                                  </p>
-                                </div>
-                              )}
-
-                              {movimiento.observaciones && (
-                                <div className="mt-3 rounded-xl border p-3">
-                                  <p className="text-[10px] font-black uppercase text-slate-500">
-                                    Observaciones
-                                  </p>
-
-                                  <p className="mt-1 text-sm">
-                                    {
-                                      movimiento.observaciones
-                                    }
-                                  </p>
-                                </div>
-                              )}
-
-                              {/* NUEVO VISOR INTERNO */}
-
-                              {movimiento.comprobante ? (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    abrirVisor(
-                                      movimiento
-                                    )
-                                  }
-                                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-black text-blue-700"
-                                >
-                                  📷 Ver comprobante
-                                </button>
-                              ) : (
-                                <p className="mt-3 text-xs text-slate-400">
-                                  Sin comprobante adjunto
-                                </p>
-                              )}
-
-                              {movimiento.estadoMovimiento ===
-                              "Anulado" ? (
-                                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3">
-                                  <p className="text-[10px] font-black uppercase text-red-700">
-                                    Pago anulado
-                                  </p>
-
-                                  <p className="mt-1 text-sm font-bold text-red-800">
-                                    {movimiento.motivoAnulacion ||
-                                      "Sin motivo registrado"}
-                                  </p>
-
-                                  {movimiento.fechaAnulacion && (
-                                    <p className="mt-1 text-xs text-red-600">
-                                      Anulado:{" "}
-                                      {
-                                        movimiento.fechaAnulacion
-                                      }
-                                    </p>
-                                  )}
-                                </div>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    abrirAnulacion(
-                                      movimiento
-                                    )
-                                  }
-                                  className="mt-3 w-full rounded-xl border border-red-200 bg-white px-4 py-3 text-sm font-black text-red-600 transition hover:bg-red-50"
-                                >
-                                  Anular pago
-                                </button>
-                              )}
-                            </div>
-                          )
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* NUEVO ABONO */}
-
-              <div className="border-t pt-5">
-                <p className="text-xs font-black uppercase tracking-[0.15em] text-blue-700">
-                  Registrar nuevo abono
+                <p className="mt-1 text-xs capitalize text-slate-500">
+                  Semana:{" "}
+                  {rangoSemanaSellos()}
                 </p>
               </div>
 
-              {(Number(
-                seleccionado.totalAereo ||
-                  0
-              ) >
-                0 ||
-                Number(
-                  seleccionado.totalTerrestre ||
-                    0
-                ) >
-                  0) && (
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-
-                  <label className="mb-2 block text-sm font-bold">
-                    Servicio elegido por el cliente
+                  <label className="mb-1 block text-sm font-black">
+                    G
                   </label>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <p className="mb-1 text-xs text-slate-500">
+                    $650
+                  </p>
 
-                    {Number(
-                      seleccionado.totalAereo ||
-                        0
-                    ) >
-                      0 && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setServicio(
-                            "Aéreo"
-                          )
-                        }
-                        className={`rounded-xl border p-4 text-left ${
-                          servicio ===
-                          "Aéreo"
-                            ? "border-blue-600 bg-blue-50 ring-2 ring-blue-100"
-                            : ""
-                        }`}
-                      >
-                        ✈{" "}
-                        <strong>
-                          Aéreo
-                        </strong>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={
+                      cantidadG
+                    }
+                    onChange={(e) =>
+                      setCantidadG(
+                        e.target
+                          .value
+                      )
+                    }
+                    disabled={
+                      guardandoSellos
+                    }
+                    className="w-full rounded-xl border px-3 py-3 disabled:bg-slate-100"
+                  />
+                </div>
 
-                        <p className="mt-1 text-xl font-black text-blue-800">
-                          {dinero(
-                            Number(
-                              seleccionado.totalAereo
-                            )
-                          )}
-                        </p>
-                      </button>
-                    )}
+                <div>
+                  <label className="mb-1 block text-sm font-black">
+                    C
+                  </label>
 
-                    {Number(
-                      seleccionado.totalTerrestre ||
-                        0
-                    ) >
-                      0 && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setServicio(
-                            "Terrestre"
-                          )
-                        }
-                        className={`rounded-xl border p-4 text-left ${
-                          servicio ===
-                          "Terrestre"
-                            ? "border-amber-500 bg-amber-50 ring-2 ring-amber-100"
-                            : ""
-                        }`}
-                      >
-                        🚚{" "}
-                        <strong>
-                          Terrestre
-                        </strong>
+                  <p className="mb-1 text-xs text-slate-500">
+                    $350
+                  </p>
 
-                        <p className="mt-1 text-xl font-black text-amber-700">
-                          {dinero(
-                            Number(
-                              seleccionado.totalTerrestre
-                            )
-                          )}
-                        </p>
-                      </button>
-                    )}
-                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={
+                      cantidadC
+                    }
+                    onChange={(e) =>
+                      setCantidadC(
+                        e.target
+                          .value
+                      )
+                    }
+                    disabled={
+                      guardandoSellos
+                    }
+                    className="w-full rounded-xl border px-3 py-3 disabled:bg-slate-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-black">
+                    M
+                  </label>
+
+                  <p className="mb-1 text-xs text-slate-500">
+                    $550
+                  </p>
+
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={
+                      cantidadM
+                    }
+                    onChange={(e) =>
+                      setCantidadM(
+                        e.target
+                          .value
+                      )
+                    }
+                    disabled={
+                      guardandoSellos
+                    }
+                    className="w-full rounded-xl border px-3 py-3 disabled:bg-slate-100"
+                  />
+                </div>
+              </div>
+
+              {errorSellos && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">
+                  {
+                    errorSellos
+                  }
                 </div>
               )}
+            </div>
 
-              <div className="grid grid-cols-3 gap-2">
+            <div className="flex gap-3 border-t p-4">
+              <button
+                type="button"
+                onClick={() =>
+                  setMostrarNuevoDia(
+                    false
+                  )
+                }
+                disabled={
+                  guardandoSellos
+                }
+                className="flex-1 rounded-xl border px-4 py-3 font-bold disabled:opacity-50"
+              >
+                Cancelar
+              </button>
 
-                <div className="rounded-xl border p-3">
-                  <p className="text-[10px] font-bold uppercase text-slate-500">
-                    Total
-                  </p>
+              <button
+                type="button"
+                onClick={
+                  guardarDiaSellos
+                }
+                disabled={
+                  guardandoSellos
+                }
+                className="flex-1 rounded-xl bg-violet-700 px-4 py-3 font-black text-white disabled:opacity-60"
+              >
+                {guardandoSellos
+                  ? "Guardando..."
+                  : "Guardar día"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-                  <p className="mt-1 font-black">
-                    {dinero(
-                      totalSeleccionado
-                    )}
-                  </p>
-                </div>
+      {mostrarPagoSellos && (
+        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/60 sm:items-center sm:p-4">
+          <div className="w-full max-w-md rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
+            <div className="border-b p-4">
+              <p className="text-xs font-black uppercase text-emerald-700">
+                Pago de sellos
+              </p>
 
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-                  <p className="text-[10px] font-bold uppercase text-amber-700">
-                    Saldo actual
-                  </p>
+              <h3 className="mt-1 text-lg font-black">
+                Registrar abono
+              </h3>
 
-                  <p className="mt-1 font-black text-amber-700">
-                    {dinero(
-                      saldoActual
-                    )}
-                  </p>
-                </div>
+              <p className="mt-1 text-xs capitalize text-slate-500">
+                {rangoSemanaSellos()}
+              </p>
+            </div>
 
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                  <p className="text-[10px] font-bold uppercase text-emerald-700">
-                    Nuevo saldo
-                  </p>
+            <div className="space-y-4 p-4">
+              <div className="rounded-xl bg-amber-50 p-4">
+                <p className="text-xs font-black uppercase text-amber-700">
+                  Saldo pendiente
+                </p>
 
-                  <p className="mt-1 font-black text-emerald-700">
-                    {dinero(
-                      nuevoSaldo
-                    )}
-                  </p>
-                </div>
+                <p className="mt-1 text-2xl font-black text-amber-700">
+                  {dinero(
+                    saldoSellos
+                  )}
+                </p>
               </div>
 
               <div>
                 <label className="mb-1 block text-sm font-bold">
-                  Cantidad que paga ahora
+                  Cantidad pagada
                 </label>
 
                 <input
                   type="number"
                   min="0"
                   step="0.01"
-                  inputMode="decimal"
-                  value={montoPago}
-                  onChange={(e) =>
-                    setMontoPago(
-                      e.target.value
-                    )
+                  value={
+                    montoPagoSellos
                   }
-                  className="w-full rounded-xl border px-4 py-3 text-lg font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-bold">
-                  Método de pago
-                </label>
-
-                <select
-                  value={metodoPago}
                   onChange={(e) =>
-                    setMetodoPago(
+                    setMontoPagoSellos(
                       e.target
-                        .value as MetodoPago
+                        .value
                     )
                   }
-                  className="w-full rounded-xl border bg-white px-4 py-3"
-                >
-                  <option>
-                    Transferencia
-                  </option>
-
-                  <option>
-                    Efectivo
-                  </option>
-
-                  <option>
-                    Depósito
-                  </option>
-
-                  <option>
-                    Tarjeta
-                  </option>
-
-                  <option>
-                    Otro
-                  </option>
-                </select>
+                  disabled={
+                    guardandoSellos
+                  }
+                  className="w-full rounded-xl border px-4 py-3 text-lg font-black disabled:bg-slate-100"
+                />
               </div>
 
               <div>
@@ -1914,74 +1400,21 @@ export default function PagosPage() {
                 </label>
 
                 <input
-                  value={referencia}
+                  value={
+                    referenciaPagoSellos
+                  }
                   onChange={(e) =>
-                    setReferencia(
-                      e.target.value
+                    setReferenciaPagoSellos(
+                      e.target
+                        .value
                     )
                   }
-                  className="w-full rounded-xl border px-4 py-3"
+                  disabled={
+                    guardandoSellos
+                  }
+                  placeholder="Opcional"
+                  className="w-full rounded-xl border px-4 py-3 disabled:bg-slate-100"
                 />
-              </div>
-
-              {/* SUBIR FOTO */}
-
-              <div>
-                <label className="mb-2 block text-sm font-bold">
-                  Comprobante de pago
-                </label>
-
-                {!previewComprobante ? (
-                  <label className="flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed bg-slate-50 p-5 text-center">
-
-                    <div className="text-3xl">
-                      📷
-                    </div>
-
-                    <p className="mt-2 font-bold">
-                      Tomar foto o seleccionar imagen
-                    </p>
-
-                    <p className="text-xs text-slate-500">
-                      JPG, PNG o WEBP · Máximo 10 MB
-                    </p>
-
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      capture="environment"
-                      className="hidden"
-                      onChange={(e) =>
-                        seleccionarComprobante(
-                          e.target
-                            .files?.[0] ||
-                            null
-                        )
-                      }
-                    />
-                  </label>
-                ) : (
-                  <div className="overflow-hidden rounded-xl border">
-
-                    <img
-                      src={
-                        previewComprobante
-                      }
-                      alt="Vista previa"
-                      className="max-h-72 w-full object-contain"
-                    />
-
-                    <button
-                      type="button"
-                      onClick={
-                        quitarComprobante
-                      }
-                      className="w-full border-t px-4 py-3 font-bold text-red-600"
-                    >
-                      Quitar imagen
-                    </button>
-                  </div>
-                )}
               </div>
 
               <div>
@@ -1991,140 +1424,44 @@ export default function PagosPage() {
 
                 <textarea
                   value={
-                    observaciones
+                    observacionesPagoSellos
                   }
                   onChange={(e) =>
-                    setObservaciones(
-                      e.target.value
+                    setObservacionesPagoSellos(
+                      e.target
+                        .value
                     )
+                  }
+                  disabled={
+                    guardandoSellos
                   }
                   rows={3}
-                  className="w-full rounded-xl border px-4 py-3"
+                  placeholder="Opcional"
+                  className="w-full resize-none rounded-xl border px-4 py-3 disabled:bg-slate-100"
                 />
               </div>
 
-              {errorPago && (
-                <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
-                  {errorPago}
-                </div>
-              )}
-
-              {mensajePago && (
-                <div className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700">
-                  {mensajePago}
-                </div>
-              )}
-            </div>
-
-            <div className="sticky bottom-0 z-20 flex gap-3 border-t bg-white p-4 sm:justify-end">
-
-              <button
-                type="button"
-                onClick={
-                  cerrarPago
-                }
-                className="flex-1 rounded-xl border px-5 py-3 font-bold sm:flex-none"
-              >
-                Cerrar
-              </button>
-
-              {saldoActual >
-                0 && (
-                <button
-                  type="button"
-                  onClick={
-                    guardarPago
-                  }
-                  disabled={
-                    guardando
-                  }
-                  className="flex-1 rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white disabled:opacity-60 sm:flex-none"
-                >
-                  {guardando
-                    ? "Guardando..."
-                    : "Guardar pago"}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* =============================================
-          MODAL ANULAR PAGO
-      ============================================== */}
-
-      {pagoAAnular && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/70 p-4">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
-
-            <div className="border-b border-red-100 bg-red-50 p-5">
-              <p className="text-xs font-black uppercase tracking-wider text-red-700">
-                Anular pago
-              </p>
-
-              <h3 className="mt-1 text-lg font-black text-slate-950">
-                {dinero(
-                  pagoAAnular.monto
-                )}
-              </h3>
-
-              <p className="mt-1 text-xs text-slate-600">
-                {
-                  pagoAAnular.fecha
-                }
-              </p>
-            </div>
-
-            <div className="space-y-4 p-5">
-
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                El movimiento no se borrará. Quedará marcado como
-                anulado y el comprobante seguirá guardado como evidencia.
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-bold text-slate-800">
-                  Motivo de la anulación
-                </label>
-
-                <textarea
-                  value={
-                    motivoAnulacion
-                  }
-                  onChange={(e) =>
-                    setMotivoAnulacion(
-                      e.target.value
-                    )
-                  }
-                  disabled={
-                    anulando
-                  }
-                  rows={4}
-                  placeholder="Ej. monto capturado incorrectamente..."
-                  className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 disabled:bg-slate-100"
-                />
-              </div>
-
-              {errorAnulacion && (
+              {errorSellos && (
                 <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">
                   {
-                    errorAnulacion
+                    errorSellos
                   }
                 </div>
               )}
             </div>
 
-            <div className="flex flex-col-reverse gap-3 border-t bg-white p-4 sm:flex-row sm:justify-end">
+            <div className="flex gap-3 border-t p-4">
               <button
                 type="button"
-                onClick={
-                  cerrarAnulacion
+                onClick={() =>
+                  setMostrarPagoSellos(
+                    false
+                  )
                 }
                 disabled={
-                  anulando
+                  guardandoSellos
                 }
-                className="rounded-xl border border-slate-300 px-5 py-3 font-bold text-slate-700 disabled:opacity-50"
+                className="flex-1 rounded-xl border px-4 py-3 font-bold disabled:opacity-50"
               >
                 Cancelar
               </button>
@@ -2132,97 +1469,16 @@ export default function PagosPage() {
               <button
                 type="button"
                 onClick={
-                  confirmarAnulacion
+                  guardarPagoSellos
                 }
                 disabled={
-                  anulando
+                  guardandoSellos
                 }
-                className="rounded-xl bg-red-600 px-5 py-3 font-black text-white hover:bg-red-700 disabled:opacity-60"
+                className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 font-black text-white disabled:opacity-60"
               >
-                {anulando
-                  ? "Anulando..."
-                  : "Confirmar anulación"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* =============================================
-          VISOR INTERNO DEL COMPROBANTE
-      ============================================== */}
-
-      {visorComprobante && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/85 p-3 sm:p-6">
-
-          <div className="flex max-h-[96vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-
-            <div className="flex items-center justify-between gap-3 border-b bg-white px-4 py-3 sm:px-5 sm:py-4">
-
-              <div className="min-w-0">
-                <p className="text-xs font-black uppercase tracking-wider text-blue-700">
-                  Comprobante de pago
-                </p>
-
-                <p className="mt-1 text-lg font-black text-emerald-700">
-                  {dinero(
-                    visorComprobante.monto
-                  )}
-                </p>
-
-                <p className="text-xs text-slate-500">
-                  {
-                    visorComprobante.fecha
-                  }
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={
-                  cerrarVisor
-                }
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-2xl font-bold text-slate-600 hover:bg-slate-200"
-                aria-label="Cerrar comprobante"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="flex min-h-[300px] flex-1 items-center justify-center overflow-auto bg-slate-100 p-3 sm:p-5">
-
-              <img
-                src={`/api/pagos/comprobante?ruta=${encodeURIComponent(
-                  visorComprobante.ruta
-                )}`}
-                alt="Comprobante de pago"
-                onError={() =>
-                  setErrorVisor(
-                    "No fue posible mostrar el comprobante."
-                  )
-                }
-                className="max-h-[75vh] max-w-full rounded-lg bg-white object-contain shadow"
-              />
-            </div>
-
-            {errorVisor && (
-              <div className="border-t border-red-200 bg-red-50 p-3 text-center text-sm font-bold text-red-700">
-                {
-                  errorVisor
-                }
-              </div>
-            )}
-
-            <div className="border-t bg-white p-3 sm:p-4">
-
-              <button
-                type="button"
-                onClick={
-                  cerrarVisor
-                }
-                className="w-full rounded-xl bg-blue-700 px-5 py-3 font-black text-white hover:bg-blue-800 sm:mx-auto sm:block sm:w-auto sm:min-w-48"
-              >
-                Cerrar comprobante
+                {guardandoSellos
+                  ? "Guardando..."
+                  : "Guardar pago"}
               </button>
             </div>
           </div>
