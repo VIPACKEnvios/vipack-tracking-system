@@ -143,15 +143,19 @@ export default function SellosPage() {
   const [observacionesPagoSellos, setObservacionesPagoSellos] =
     useState("");
 
-  async function cargarSellos() {
+  async function cargarSellos(
+    semanaObjetivo: string,
+    signal?: AbortSignal
+  ) {
     try {
       setCargandoSellos(true);
       setErrorSellos("");
 
       const respuesta = await fetch(
-        `/api/sellos?semana=${encodeURIComponent(semanaSellos)}`,
+        `/api/sellos?semana=${encodeURIComponent(semanaObjetivo)}`,
         {
           cache: "no-store",
+          signal,
         }
       );
 
@@ -162,6 +166,16 @@ export default function SellosPage() {
           data?.error ||
             "No fue posible cargar los sellos."
         );
+      }
+
+      // Seguridad contra respuestas atrasadas:
+      // si el usuario cambió de semana mientras cargaba,
+      // una respuesta vieja NO puede reemplazar la semana actual.
+      if (
+        data?.semana &&
+        data.semana !== semanaObjetivo
+      ) {
+        return;
       }
 
       setSellosDias(
@@ -210,6 +224,13 @@ export default function SellosPage() {
           : [],
       });
     } catch (err) {
+      if (
+        err instanceof DOMException &&
+        err.name === "AbortError"
+      ) {
+        return;
+      }
+
       console.error(err);
 
       setSellosDias([]);
@@ -233,7 +254,17 @@ export default function SellosPage() {
   }
 
   useEffect(() => {
-    cargarSellos();
+    const controller =
+      new AbortController();
+
+    cargarSellos(
+      semanaSellos,
+      controller.signal
+    );
+
+    return () => {
+      controller.abort();
+    };
   }, [semanaSellos]);
 
   function abrirNuevoDiaSellos() {
@@ -350,7 +381,7 @@ export default function SellosPage() {
           semanaDeLaFecha
         );
       } else {
-        await cargarSellos();
+        await cargarSellos(semanaSellos);
       }
 
       setTimeout(() => {
@@ -408,7 +439,7 @@ export default function SellosPage() {
         "Registro eliminado correctamente."
       );
 
-      await cargarSellos();
+      await cargarSellos(semanaSellos);
 
       setTimeout(() => {
         setMensajeSellos("");
@@ -602,7 +633,7 @@ export default function SellosPage() {
         "Pago de sellos guardado correctamente."
       );
 
-      await cargarSellos();
+      await cargarSellos(semanaSellos);
 
       setTimeout(() => {
         setMensajeSellos("");
