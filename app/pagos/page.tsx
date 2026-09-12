@@ -225,19 +225,6 @@ export default function SellosPage() {
       return;
     }
 
-    if (
-      obtenerLunesSemana(
-        new Date(
-          `${fechaSello}T12:00:00`
-        )
-      ) !== semanaSellos
-    ) {
-      setErrorSellos(
-        "La fecha seleccionada no pertenece a la semana que estás viendo."
-      );
-      return;
-    }
-
     try {
       setGuardandoSellos(true);
       setErrorSellos("");
@@ -280,11 +267,27 @@ export default function SellosPage() {
       setCantidadC("");
       setCantidadM("");
 
+      const semanaDeLaFecha =
+        obtenerLunesSemana(
+          new Date(
+            `${fechaSello}T12:00:00`
+          )
+        );
+
       setMensajeSellos(
         "Día de sellos guardado correctamente."
       );
 
-      await cargarSellos();
+      if (
+        semanaDeLaFecha !==
+        semanaSellos
+      ) {
+        setSemanaSellos(
+          semanaDeLaFecha
+        );
+      } else {
+        await cargarSellos();
+      }
 
       setTimeout(() => {
         setMensajeSellos("");
@@ -1189,11 +1192,24 @@ Estado: *${estadoSellos}*`;
                   value={
                     fechaSello
                   }
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const nuevaFecha =
+                      e.target.value;
+
                     setFechaSello(
-                      e.target.value
-                    )
-                  }
+                      nuevaFecha
+                    );
+
+                    if (nuevaFecha) {
+                      setSemanaSellos(
+                        obtenerLunesSemana(
+                          new Date(
+                            `${nuevaFecha}T12:00:00`
+                          )
+                        )
+                      );
+                    }
+                  }}
                   disabled={
                     guardandoSellos
                   }
