@@ -1060,6 +1060,24 @@ export async function GET(
         resumen.saldo
       );
 
+    const diasParaPdf =
+      todosLosDias.filter(
+        (dia) =>
+          (
+            dia.semana ||
+            lunesDeSemana(
+              dia.fecha
+            )
+          ) <= semana
+      );
+
+    const pagosParaPdf =
+      todosLosPagos.filter(
+        (pago) =>
+          pago.semana <=
+          semana
+      );
+
     return NextResponse.json({
       success: true,
       semana,
@@ -1072,6 +1090,13 @@ export async function GET(
         saldoSemana:
           resumen.saldo,
         saldoPendienteTotal,
+      },
+
+      resumenPdf: {
+        dias:
+          diasParaPdf,
+        pagos:
+          pagosParaPdf,
       },
     });
   } catch (

@@ -30,6 +30,11 @@ type PagoSellos = {
   fechaAnulacion?: string;
 };
 
+type ResumenPdfSellos = {
+  dias: SelloDia[];
+  pagos: PagoSellos[];
+};
+
 const PRECIO_G = 650;
 const PRECIO_C = 350;
 const PRECIO_M = 550;
@@ -83,6 +88,12 @@ export default function SellosPage() {
 
   const [saldoAtrasadoSellos, setSaldoAtrasadoSellos] =
     useState(0);
+
+  const [resumenPdfSellos, setResumenPdfSellos] =
+    useState<ResumenPdfSellos>({
+      dias: [],
+      pagos: [],
+    });
 
   const [cargandoSellos, setCargandoSellos] =
     useState(true);
@@ -165,12 +176,29 @@ export default function SellosPage() {
             0
         )
       );
+
+      setResumenPdfSellos({
+        dias: Array.isArray(
+          data?.resumenPdf?.dias
+        )
+          ? data.resumenPdf.dias
+          : [],
+        pagos: Array.isArray(
+          data?.resumenPdf?.pagos
+        )
+          ? data.resumenPdf.pagos
+          : [],
+      });
     } catch (err) {
       console.error(err);
 
       setSellosDias([]);
       setPagosSellos([]);
       setSaldoAtrasadoSellos(0);
+      setResumenPdfSellos({
+        dias: [],
+        pagos: [],
+      });
 
       setErrorSellos(
         err instanceof Error
@@ -719,6 +747,488 @@ Estado de esta semana: *${estadoSellos}*`;
     );
   }
 
+  function crearPdfSellos() {
+    const dias =
+      resumenPdfSellos.dias || [];
+
+    const pagos =
+      resumenPdfSellos.pagos || [];
+
+    if (
+      dias.length === 0 &&
+      pagos.length === 0
+    ) {
+      setErrorSellos(
+        "Todavía no hay información para generar el PDF."
+      );
+      return;
+    }
+
+    const escaparHtml = (
+      valor: unknown
+    ) =>
+      String(valor ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+
+    const semanas =
+      Array.from(
+        new Set(
+          dias
+            .map(
+              (dia) =>
+                dia.semana
+            )
+            .filter(Boolean)
+        )
+      ).sort();
+
+    const filasSemanas =
+      semanas
+        .map((semana) => {
+          const diasSemana =
+            dias.filter(
+              (dia) =>
+                dia.semana ===
+                semana
+            );
+
+          const pagosSemana =
+            pagos.filter(
+              (pago) =>
+                pago.semana ===
+                  semana &&
+                pago.estadoMovimiento !==
+                  "Anulado"
+            );
+
+          const totalSemana =
+            diasSemana.reduce(
+              (acc, dia) =>
+                acc +
+                Number(
+                  dia.total ??
+                    (
+                      dia.g *
+                        PRECIO_G +
+                      dia.c *
+                        PRECIO_C +
+                      dia.m *
+                        PRECIO_M
+                    )
+                ),
+              0
+            );
+
+          const pagadoSemana =
+            pagosSemana.reduce(
+              (acc, pago) =>
+                acc +
+                Number(
+                  pago.monto || 0
+                ),
+              0
+            );
+
+          const saldoSemana =
+            Math.max(
+              totalSemana -
+                pagadoSemana,
+              0
+            );
+
+          const detalleDias =
+            diasSemana
+              .map((dia) => {
+                const total =
+                  Number(
+                    dia.total ??
+                      (
+                        dia.g *
+                          PRECIO_G +
+                        dia.c *
+                          PRECIO_C +
+                        dia.m *
+                          PRECIO_M
+                      )
+                  );
+
+                return `
+                  <tr>
+                    <td>${escaparHtml(
+                      fechaBonitaSellos(
+                        dia.fecha
+                      )
+                    )}</td>
+                    <td class="num">${dia.g}</td>
+                    <td class="num">${dia.c}</td>
+                    <td class="num">${dia.m}</td>
+                    <td class="num">$${total.toLocaleString(
+                      "es-MX"
+                    )}</td>
+                  </tr>
+                `;
+              })
+              .join("");
+
+          const detallePagos =
+            pagosSemana.length > 0
+              ? pagosSemana
+                  .map((pago) => `
+                    <tr>
+                      <td>${escaparHtml(
+                        pago.fecha
+                      )}</td>
+                      <td class="num"><strong>$${Number(
+                        pago.monto || 0
+                      ).toLocaleString(
+                        "es-MX"
+                      )}</strong></td>
+                      <td>${escaparHtml(
+                        pago.referencia ||
+                          "-"
+                      )}</td>
+                      <td>${escaparHtml(
+                        pago.observaciones ||
+                          "-"
+                      )}</td>
+                    </tr>
+                  `)
+                  .join("")
+              : `
+                <tr>
+                  <td colspan="4" class="vacio">
+                    Sin pagos capturados para esta semana
+                  </td>
+                </tr>
+              `;
+
+          return `
+            <section class="semana">
+              <h2>Semana ${escaparHtml(
+                semana
+              )}</h2>
+
+              <div class="resumen">
+                <div>
+                  <span>Total sellos</span>
+                  <strong>$${totalSemana.toLocaleString(
+                    "es-MX"
+                  )}</strong>
+                </div>
+
+                <div>
+                  <span>Pagos capturados</span>
+                  <strong>$${pagadoSemana.toLocaleString(
+                    "es-MX"
+                  )}</strong>
+                </div>
+
+                <div>
+                  <span>Saldo</span>
+                  <strong>$${saldoSemana.toLocaleString(
+                    "es-MX"
+                  )}</strong>
+                </div>
+              </div>
+
+              <h3>Detalle de sellos</h3>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>G</th>
+                    <th>C</th>
+                    <th>M</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${detalleDias}
+                </tbody>
+              </table>
+
+              <h3>Pagos capturados</h3>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha del pago</th>
+                    <th>Importe</th>
+                    <th>Referencia</th>
+                    <th>Observaciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${detallePagos}
+                </tbody>
+              </table>
+            </section>
+          `;
+        })
+        .join("");
+
+    const totalGeneral =
+      dias.reduce(
+        (acc, dia) =>
+          acc +
+          Number(
+            dia.total ??
+              (
+                dia.g *
+                  PRECIO_G +
+                dia.c *
+                  PRECIO_C +
+                dia.m *
+                  PRECIO_M
+              )
+          ),
+        0
+      );
+
+    const pagosActivos =
+      pagos.filter(
+        (pago) =>
+          pago.estadoMovimiento !==
+          "Anulado"
+      );
+
+    const totalPagadoGeneral =
+      pagosActivos.reduce(
+        (acc, pago) =>
+          acc +
+          Number(
+            pago.monto || 0
+          ),
+        0
+      );
+
+    const saldoGeneral =
+      Math.max(
+        totalGeneral -
+          totalPagadoGeneral,
+        0
+      );
+
+    const ventana =
+      window.open(
+        "",
+        "_blank",
+        "width=1000,height=800"
+      );
+
+    if (!ventana) {
+      setErrorSellos(
+        "El navegador bloqueó la ventana del PDF. Permite ventanas emergentes e inténtalo nuevamente."
+      );
+      return;
+    }
+
+    ventana.document.write(`
+      <!doctype html>
+      <html lang="es">
+        <head>
+          <meta charset="utf-8" />
+          <title>Resumen de pagos de sellos - VIPACK</title>
+
+          <style>
+            @page {
+              size: letter;
+              margin: 14mm;
+            }
+
+            * {
+              box-sizing: border-box;
+            }
+
+            body {
+              font-family: Arial, Helvetica, sans-serif;
+              color: #111827;
+              margin: 0;
+              font-size: 12px;
+            }
+
+            h1 {
+              margin: 0;
+              font-size: 24px;
+            }
+
+            .subtitulo {
+              color: #6b7280;
+              margin-top: 4px;
+              margin-bottom: 18px;
+            }
+
+            .general {
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 10px;
+              margin-bottom: 18px;
+            }
+
+            .general div,
+            .resumen div {
+              border: 1px solid #d1d5db;
+              border-radius: 8px;
+              padding: 10px;
+            }
+
+            .general span,
+            .resumen span {
+              display: block;
+              color: #6b7280;
+              font-size: 10px;
+              text-transform: uppercase;
+              margin-bottom: 4px;
+            }
+
+            .general strong {
+              font-size: 18px;
+            }
+
+            .semana {
+              margin-top: 18px;
+              padding-top: 12px;
+              border-top: 2px solid #111827;
+              break-inside: avoid;
+            }
+
+            h2 {
+              font-size: 16px;
+              margin: 0 0 10px 0;
+            }
+
+            h3 {
+              font-size: 12px;
+              margin: 14px 0 6px 0;
+            }
+
+            .resumen {
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 8px;
+              margin-bottom: 8px;
+            }
+
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 8px;
+            }
+
+            th,
+            td {
+              border: 1px solid #d1d5db;
+              padding: 6px 7px;
+              text-align: left;
+            }
+
+            th {
+              background: #f3f4f6;
+              font-size: 10px;
+              text-transform: uppercase;
+            }
+
+            .num {
+              text-align: right;
+            }
+
+            .vacio {
+              text-align: center;
+              color: #6b7280;
+              font-style: italic;
+            }
+
+            .nota {
+              margin-top: 18px;
+              border: 1px solid #f59e0b;
+              background: #fffbeb;
+              padding: 10px;
+              border-radius: 8px;
+              color: #92400e;
+            }
+
+            .acciones {
+              margin: 16px 0;
+            }
+
+            .acciones button {
+              border: 0;
+              background: #111827;
+              color: white;
+              font-weight: bold;
+              padding: 10px 16px;
+              border-radius: 8px;
+              cursor: pointer;
+            }
+
+            @media print {
+              .acciones {
+                display: none;
+              }
+            }
+          </style>
+        </head>
+
+        <body>
+          <h1>VIPACK Envíos</h1>
+
+          <div class="subtitulo">
+            Resumen detallado de sellos y pagos capturados
+          </div>
+
+          <div class="general">
+            <div>
+              <span>Total de sellos</span>
+              <strong>$${totalGeneral.toLocaleString(
+                "es-MX"
+              )}</strong>
+            </div>
+
+            <div>
+              <span>Total de pagos capturados</span>
+              <strong>$${totalPagadoGeneral.toLocaleString(
+                "es-MX"
+              )}</strong>
+            </div>
+
+            <div>
+              <span>Saldo según registros</span>
+              <strong>$${saldoGeneral.toLocaleString(
+                "es-MX"
+              )}</strong>
+            </div>
+          </div>
+
+          ${filasSemanas}
+
+          <div class="nota">
+            Este resumen se genera directamente con los cargos y pagos capturados en el sistema.
+            Los pagos anulados no se consideran dentro de los totales.
+          </div>
+
+          <div class="acciones">
+            <button onclick="window.print()">
+              Guardar / imprimir PDF
+            </button>
+          </div>
+
+          <script>
+            setTimeout(function () {
+              window.print();
+            }, 400);
+          </script>
+        </body>
+      </html>
+    `);
+
+    ventana.document.close();
+  }
+
   return (
     <main className="min-h-[calc(100vh-4rem)] overflow-x-hidden bg-slate-100 p-3 sm:p-4 md:p-6">
       <div className="mx-auto w-full max-w-7xl">
@@ -1201,6 +1711,19 @@ Estado de esta semana: *${estadoSellos}*`;
                   className="rounded-xl border border-emerald-300 bg-white px-4 py-3 text-sm font-black text-emerald-700"
                 >
                   + Agregar pago
+                </button>
+              )}
+
+            {resumenPdfSellos.dias.length >
+              0 && (
+                <button
+                  type="button"
+                  onClick={
+                    crearPdfSellos
+                  }
+                  className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white"
+                >
+                  📄 Crear PDF
                 </button>
               )}
 
