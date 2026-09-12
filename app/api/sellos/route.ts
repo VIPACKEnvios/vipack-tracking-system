@@ -1392,6 +1392,9 @@ export async function POST(
 
     /* =====================================================
        AGREGAR PAGO
+       El abono puede cubrir saldo atrasado + semana actual.
+       Se distribuye automáticamente de la semana más antigua
+       a la más reciente.
     ===================================================== */
 
     const semana =
@@ -1408,6 +1411,27 @@ export async function POST(
           success: false,
           error:
             "La semana es obligatoria.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const fecha =
+      texto(
+        body?.fecha
+      );
+
+    if (
+      !fecha ||
+      !esFechaISO(fecha)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Selecciona una fecha válida para el pago.",
         },
         {
           status: 400,
@@ -1438,97 +1462,6 @@ export async function POST(
       );
     }
 
-    const dias =
-      leerSellos(
-        hojaSellos,
-        semana
-      );
-
-    if (
-      dias.length === 0
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "No hay sellos registrados para esa semana.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    const pagosAnteriores =
-      leerPagosSellos(
-        hojaPagos,
-        semana
-      );
-
-    const resumenAntes =
-      resumenSemana(
-        dias,
-        pagosAnteriores
-      );
-
-    if (
-      resumenAntes.saldo <= 0
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "La semana ya está liquidada.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    if (
-      monto >
-      resumenAntes.saldo
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-
-          error:
-            `El pago no puede ser mayor al saldo pendiente de $${resumenAntes.saldo.toLocaleString(
-              "es-MX"
-            )}.`,
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    const idPago =
-      `PSEL-${Date.now()}`;
-
-    const fecha =
-      texto(
-        body?.fecha
-      );
-
-    if (
-      !fecha ||
-      !esFechaISO(fecha)
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Selecciona una fecha válida para el pago.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
     const referencia =
       texto(
         body?.referencia
@@ -1539,70 +1472,255 @@ export async function POST(
         body?.observaciones
       );
 
-    const fila =
-      siguienteFilaLibre(
+    const todosLosDias =
+      leerSellos(
+        hojaSellos
+      );
+
+    const todosLosPagos =
+      leerPagosSellos(
         hojaPagos
       );
 
-    escribirCelda(
-      hojaPagos,
-      `A${fila}`,
-      idPago
-    );
+    const semanasConSellos =
+      Array.from(
+        new Set(
+          todosLosDias
+            .map(
+              (dia) =>
+                dia.semana ||
+                lunesDeSemana(
+                  dia.fecha
+                )
+            )
+            .filter(
+              (semanaDia) =>
+                Boolean(
+                  semanaDia
+                ) &&
+                semanaDia <=
+                  semana
+            )
+        )
+      ).sort();
 
-    escribirCelda(
-      hojaPagos,
-      `B${fila}`,
-      fecha
-    );
+    const pendientesPorSemana:
+      Array<{
+        semana: string;
+        saldo: number;
+      }> = [];
 
-    escribirCelda(
-      hojaPagos,
-      `C${fila}`,
-      semana
-    );
+    for (
+      const semanaPendiente
+      of semanasConSellos
+    ) {
+      const diasSemana =
+        todosLosDias.filter(
+          (dia) =>
+            (
+              dia.semana ||
+              lunesDeSemana(
+                dia.fecha
+              )
+            ) ===
+            semanaPendiente
+        );
 
-    escribirCelda(
-      hojaPagos,
-      `D${fila}`,
-      monto
-    );
+      const pagosSemana =
+        todosLosPagos.filter(
+          (pago) =>
+            pago.semana ===
+            semanaPendiente
+        );
 
-    escribirCelda(
-      hojaPagos,
-      `E${fila}`,
-      referencia
-    );
+      const resumenPendiente =
+        resumenSemana(
+          diasSemana,
+          pagosSemana
+        );
 
-    escribirCelda(
-      hojaPagos,
-      `F${fila}`,
-      observaciones
-    );
+      if (
+        resumenPendiente.saldo >
+        0
+      ) {
+        pendientesPorSemana.push({
+          semana:
+            semanaPendiente,
+          saldo:
+            resumenPendiente.saldo,
+        });
+      }
+    }
 
-    escribirCelda(
-      hojaPagos,
-      `G${fila}`,
-      "Activo"
-    );
+    const pendienteTotal =
+      redondear(
+        pendientesPorSemana.reduce(
+          (
+            acumulado,
+            pendiente
+          ) =>
+            acumulado +
+            pendiente.saldo,
+          0
+        )
+      );
 
-    escribirCelda(
-      hojaPagos,
-      `H${fila}`,
-      ""
-    );
+    if (
+      pendienteTotal <= 0
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "No hay saldo pendiente para pagar hasta esta semana.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
 
-    escribirCelda(
-      hojaPagos,
-      `I${fila}`,
-      ""
-    );
+    if (
+      monto >
+      pendienteTotal
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            `El pago no puede ser mayor al pendiente total de $${pendienteTotal.toLocaleString(
+              "es-MX"
+            )}.`,
+        },
+        {
+          status: 400,
+        }
+      );
+    }
 
-    asegurarRango(
-      hojaPagos,
-      fila,
-      8
-    );
+    let restante =
+      monto;
+
+    const pagosCreados:
+      FilaPagoSello[] = [];
+
+    for (
+      let indice = 0;
+      indice <
+      pendientesPorSemana.length &&
+      restante > 0;
+      indice++
+    ) {
+      const pendiente =
+        pendientesPorSemana[
+          indice
+        ];
+
+      const aplicar =
+        redondear(
+          Math.min(
+            restante,
+            pendiente.saldo
+          )
+        );
+
+      if (
+        aplicar <= 0
+      ) {
+        continue;
+      }
+
+      const idPago =
+        `PSEL-${Date.now()}-${indice + 1}`;
+
+      const fila =
+        siguienteFilaLibre(
+          hojaPagos
+        );
+
+      escribirCelda(
+        hojaPagos,
+        `A${fila}`,
+        idPago
+      );
+
+      escribirCelda(
+        hojaPagos,
+        `B${fila}`,
+        fecha
+      );
+
+      escribirCelda(
+        hojaPagos,
+        `C${fila}`,
+        pendiente.semana
+      );
+
+      escribirCelda(
+        hojaPagos,
+        `D${fila}`,
+        aplicar
+      );
+
+      escribirCelda(
+        hojaPagos,
+        `E${fila}`,
+        referencia
+      );
+
+      escribirCelda(
+        hojaPagos,
+        `F${fila}`,
+        observaciones
+      );
+
+      escribirCelda(
+        hojaPagos,
+        `G${fila}`,
+        "Activo"
+      );
+
+      escribirCelda(
+        hojaPagos,
+        `H${fila}`,
+        ""
+      );
+
+      escribirCelda(
+        hojaPagos,
+        `I${fila}`,
+        ""
+      );
+
+      asegurarRango(
+        hojaPagos,
+        fila,
+        8
+      );
+
+      pagosCreados.push({
+        idPago,
+        fecha,
+        semana:
+          pendiente.semana,
+        monto:
+          aplicar,
+        referencia,
+        observaciones,
+        estadoMovimiento:
+          "Activo",
+        motivoAnulacion:
+          "",
+        fechaAnulacion:
+          "",
+      });
+
+      restante =
+        redondear(
+          restante -
+          aplicar
+        );
+    }
 
     const salida =
       XLSX.write(
@@ -1619,47 +1737,49 @@ export async function POST(
       salida
     );
 
-    const pagosNuevos = [
-      ...pagosAnteriores,
-      {
-        idPago,
-        fecha,
-        semana,
-        monto,
-        referencia,
-        observaciones,
-        estadoMovimiento:
-          "Activo" as const,
-        motivoAnulacion: "",
-        fechaAnulacion: "",
-      },
-    ];
+    const pagosActualizados =
+      leerPagosSellos(
+        hojaPagos,
+        semana
+      );
+
+    const diasSemanaActual =
+      leerSellos(
+        hojaSellos,
+        semana
+      );
 
     const resumen =
       resumenSemana(
-        dias,
-        pagosNuevos
+        diasSemanaActual,
+        pagosActualizados
       );
 
     return NextResponse.json({
       success: true,
 
       pago: {
-        idPago,
         fecha,
-        semana,
         monto,
         referencia,
         observaciones,
-        estadoMovimiento:
-          "Activo",
       },
+
+      pagosCreados,
+
+      aplicadoDesdeSemana:
+        pagosCreados[0]
+          ?.semana ||
+        semana,
 
       resumen,
 
       mensaje:
-        "Pago de sellos guardado correctamente.",
+        pagosCreados.length > 1
+          ? "Abono distribuido correctamente entre saldos atrasados y la semana actual."
+          : "Pago de sellos guardado correctamente.",
     });
+
   } catch (
     error: unknown
   ) {

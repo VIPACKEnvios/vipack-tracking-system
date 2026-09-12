@@ -492,11 +492,12 @@ export default function SellosPage() {
     }
 
     if (
-      monto > saldoSellos
+      monto >
+      saldoTotalPendienteSellos
     ) {
       setErrorSellos(
-        `El pago no puede ser mayor al saldo de ${dinero(
-          saldoSellos
+        `El pago no puede ser mayor al pendiente total de ${dinero(
+          saldoTotalPendienteSellos
         )}.`
       );
       return;
@@ -1168,9 +1169,8 @@ Estado de esta semana: *${estadoSellos}*`;
           )}
 
           <div className="flex flex-col gap-3 border-t bg-slate-50 p-4 sm:flex-row sm:justify-end md:p-5">
-            {saldoSellos > 0 &&
-              sellosDias.length >
-                0 && (
+            {saldoTotalPendienteSellos >
+              0 && (
                 <button
                   type="button"
                   onClick={() => {
@@ -1444,13 +1444,37 @@ Estado de esta semana: *${estadoSellos}*`;
             <div className="space-y-4 p-4">
               <div className="rounded-xl bg-amber-50 p-4">
                 <p className="text-xs font-black uppercase text-amber-700">
-                  Saldo pendiente
+                  Pendiente total
                 </p>
 
                 <p className="mt-1 text-2xl font-black text-amber-700">
                   {dinero(
-                    saldoSellos
+                    saldoTotalPendienteSellos
                   )}
+                </p>
+
+                <div className="mt-2 space-y-1 text-xs text-amber-800">
+                  <p>
+                    Atrasado:{" "}
+                    <span className="font-black">
+                      {dinero(
+                        saldoAtrasadoSellos
+                      )}
+                    </span>
+                  </p>
+
+                  <p>
+                    Semana actual:{" "}
+                    <span className="font-black">
+                      {dinero(
+                        saldoSellos
+                      )}
+                    </span>
+                  </p>
+                </div>
+
+                <p className="mt-2 text-[11px] text-amber-700">
+                  El abono se aplicará primero a las semanas más antiguas.
                 </p>
               </div>
 
