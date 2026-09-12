@@ -89,6 +89,12 @@ export default function SellosPage() {
   const [saldoAtrasadoSellos, setSaldoAtrasadoSellos] =
     useState(0);
 
+  const [saldoSemanaSellos, setSaldoSemanaSellos] =
+    useState(0);
+
+  const [saldoPendienteTotalSellos, setSaldoPendienteTotalSellos] =
+    useState(0);
+
   const [resumenPdfSellos, setResumenPdfSellos] =
     useState<ResumenPdfSellos>({
       dias: [],
@@ -177,6 +183,20 @@ export default function SellosPage() {
         )
       );
 
+      setSaldoSemanaSellos(
+        Number(
+          data?.resumenAcumulado?.saldoSemana ||
+            0
+        )
+      );
+
+      setSaldoPendienteTotalSellos(
+        Number(
+          data?.resumenAcumulado?.saldoPendienteTotal ||
+            0
+        )
+      );
+
       setResumenPdfSellos({
         dias: Array.isArray(
           data?.resumenPdf?.dias
@@ -195,6 +215,8 @@ export default function SellosPage() {
       setSellosDias([]);
       setPagosSellos([]);
       setSaldoAtrasadoSellos(0);
+      setSaldoSemanaSellos(0);
+      setSaldoPendienteTotalSellos(0);
       setResumenPdfSellos({
         dias: [],
         pagos: [],
@@ -478,16 +500,14 @@ export default function SellosPage() {
       );
     }, [pagosSellosActivos]);
 
+  // El saldo NO depende de repartir pagos por semana.
+  // El backend calcula el pendiente acumulado con los pagos
+  // exactamente como fueron registrados.
   const saldoSellos =
-    Math.max(
-      totalSemanalSellos -
-        totalPagadoSellos,
-      0
-    );
+    saldoSemanaSellos;
 
   const saldoTotalPendienteSellos =
-    saldoAtrasadoSellos +
-    saldoSellos;
+    saldoPendienteTotalSellos;
 
   const estadoSellos =
     totalSemanalSellos > 0 &&
@@ -833,13 +853,6 @@ Estado de esta semana: *${estadoSellos}*`;
               0
             );
 
-          const saldoSemana =
-            Math.max(
-              totalSemana -
-                pagadoSemana,
-              0
-            );
-
           const detalleDias =
             diasSemana
               .map((dia) => {
@@ -912,24 +925,17 @@ Estado de esta semana: *${estadoSellos}*`;
                 semana
               )}</h2>
 
-              <div class="resumen">
+              <div class="resumen resumen-dos">
                 <div>
-                  <span>Total sellos</span>
+                  <span>Cargos registrados en esta semana</span>
                   <strong>$${totalSemana.toLocaleString(
                     "es-MX"
                   )}</strong>
                 </div>
 
                 <div>
-                  <span>Pagos capturados</span>
+                  <span>Pagos registrados en esta semana</span>
                   <strong>$${pagadoSemana.toLocaleString(
-                    "es-MX"
-                  )}</strong>
-                </div>
-
-                <div>
-                  <span>Saldo</span>
-                  <strong>$${saldoSemana.toLocaleString(
                     "es-MX"
                   )}</strong>
                 </div>
@@ -1114,6 +1120,10 @@ Estado de esta semana: *${estadoSellos}*`;
               margin-bottom: 8px;
             }
 
+            .resumen.resumen-dos {
+              grid-template-columns: repeat(2, 1fr);
+            }
+
             table {
               width: 100%;
               border-collapse: collapse;
@@ -1207,8 +1217,7 @@ Estado de esta semana: *${estadoSellos}*`;
           ${filasSemanas}
 
           <div class="nota">
-            Este resumen se genera directamente con los cargos y pagos capturados en el sistema.
-            Los pagos anulados no se consideran dentro de los totales.
+            Este resumen conserva cada pago exactamente como fue capturado. Un pago no se divide entre semanas, aunque reduzca saldo atrasado. El saldo general se calcula restando los pagos activos al total acumulado de cargos. Los pagos anulados no se consideran dentro de los totales.
           </div>
 
           <div class="acciones">
@@ -1361,7 +1370,7 @@ Estado de esta semana: *${estadoSellos}*`;
 
             <div className="rounded-xl bg-emerald-50 p-4">
               <p className="text-[10px] font-black uppercase text-emerald-700">
-                Pagado semana
+                Pagos registrados
               </p>
 
               <p className="mt-1 text-xl font-black text-emerald-700">
@@ -1997,7 +2006,7 @@ Estado de esta semana: *${estadoSellos}*`;
                 </div>
 
                 <p className="mt-2 text-[11px] text-amber-700">
-                  El abono se aplicará primero a las semanas más antiguas.
+                  El pago se guardará completo, exactamente por la cantidad capturada. El saldo pendiente acumulado se reducirá automáticamente.
                 </p>
               </div>
 

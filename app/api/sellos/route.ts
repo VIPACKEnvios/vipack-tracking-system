@@ -989,75 +989,94 @@ export async function GET(
         hojaPagos
       );
 
-    const semanasAnteriores =
-      Array.from(
-        new Set(
-          todosLosDias
-            .map(
-              (dia) =>
-                dia.semana ||
-                lunesDeSemana(
-                  dia.fecha
-                )
+    const diasHastaSemana =
+      todosLosDias.filter(
+        (dia) =>
+          (
+            dia.semana ||
+            lunesDeSemana(
+              dia.fecha
             )
-            .filter(
-              (semanaDia) =>
-                Boolean(
-                  semanaDia
-                ) &&
-                (
-                  !semana ||
-                  semanaDia <
-                    semana
-                )
+          ) <= semana
+      );
+
+    const diasAntesSemana =
+      todosLosDias.filter(
+        (dia) =>
+          (
+            dia.semana ||
+            lunesDeSemana(
+              dia.fecha
             )
-        )
-      ).sort();
+          ) < semana
+      );
 
-    let saldoAtrasado = 0;
+    const pagosHastaSemana =
+      todosLosPagos.filter(
+        (pago) =>
+          pago.semana <=
+            semana &&
+          pago.estadoMovimiento ===
+            "Activo"
+      );
 
-    for (
-      const semanaAnterior
-      of semanasAnteriores
-    ) {
-      const diasSemana =
-        todosLosDias.filter(
-          (dia) =>
-            (
-              dia.semana ||
-              lunesDeSemana(
-                dia.fecha
-              )
-            ) ===
-            semanaAnterior
-        );
-
-      const pagosSemana =
-        todosLosPagos.filter(
-          (pago) =>
-            pago.semana ===
-            semanaAnterior
-        );
-
-      const resumenAnterior =
-        resumenSemana(
-          diasSemana,
-          pagosSemana
-        );
-
-      saldoAtrasado +=
-        resumenAnterior.saldo;
-    }
-
-    saldoAtrasado =
+    const totalCargosAcumulados =
       redondear(
-        saldoAtrasado
+        diasHastaSemana.reduce(
+          (acumulado, dia) =>
+            acumulado +
+            numero(dia.total),
+          0
+        )
+      );
+
+    const totalCargosAnteriores =
+      redondear(
+        diasAntesSemana.reduce(
+          (acumulado, dia) =>
+            acumulado +
+            numero(dia.total),
+          0
+        )
+      );
+
+    const totalPagosAcumulados =
+      redondear(
+        pagosHastaSemana.reduce(
+          (acumulado, pago) =>
+            acumulado +
+            numero(pago.monto),
+          0
+        )
+      );
+
+    // El pago NO se divide. Para efectos del saldo acumulado,
+    // el dinero reduce primero lo atrasado y después la semana actual.
+    const saldoAtrasado =
+      redondear(
+        Math.max(
+          totalCargosAnteriores -
+            totalPagosAcumulados,
+          0
+        )
       );
 
     const saldoPendienteTotal =
       redondear(
-        saldoAtrasado +
-        resumen.saldo
+        Math.max(
+          totalCargosAcumulados -
+            totalPagosAcumulados,
+          0
+        )
+      );
+
+    const saldoSemanaAcumulado =
+      redondear(
+        Math.max(
+          saldoPendienteTotal -
+            saldoAtrasado,
+          0
+        )
       );
 
     const diasParaPdf =
@@ -1088,8 +1107,10 @@ export async function GET(
       resumenAcumulado: {
         saldoAtrasado,
         saldoSemana:
-          resumen.saldo,
+          saldoSemanaAcumulado,
         saldoPendienteTotal,
+        totalCargosAcumulados,
+        totalPagosAcumulados,
       },
 
       resumenPdf: {
@@ -1417,9 +1438,9 @@ export async function POST(
 
     /* =====================================================
        AGREGAR PAGO
-       El abono puede cubrir saldo atrasado + semana actual.
-       Se distribuye automáticamente de la semana más antigua
-       a la más reciente.
+       Se guarda EXACTAMENTE como una sola transacción.
+       No se divide entre semanas.
+       El saldo acumulado se recalcula globalmente.
     ===================================================== */
 
     const semana =
@@ -1507,85 +1528,49 @@ export async function POST(
         hojaPagos
       );
 
-    const semanasConSellos =
-      Array.from(
-        new Set(
-          todosLosDias
-            .map(
-              (dia) =>
+    const cargosHastaSemana =
+      redondear(
+        todosLosDias
+          .filter(
+            (dia) =>
+              (
                 dia.semana ||
                 lunesDeSemana(
                   dia.fecha
                 )
-            )
-            .filter(
-              (semanaDia) =>
-                Boolean(
-                  semanaDia
-                ) &&
-                semanaDia <=
-                  semana
-            )
-        )
-      ).sort();
+              ) <= semana
+          )
+          .reduce(
+            (acumulado, dia) =>
+              acumulado +
+              numero(dia.total),
+            0
+          )
+      );
 
-    const pendientesPorSemana:
-      Array<{
-        semana: string;
-        saldo: number;
-      }> = [];
-
-    for (
-      const semanaPendiente
-      of semanasConSellos
-    ) {
-      const diasSemana =
-        todosLosDias.filter(
-          (dia) =>
-            (
-              dia.semana ||
-              lunesDeSemana(
-                dia.fecha
-              )
-            ) ===
-            semanaPendiente
-        );
-
-      const pagosSemana =
-        todosLosPagos.filter(
-          (pago) =>
-            pago.semana ===
-            semanaPendiente
-        );
-
-      const resumenPendiente =
-        resumenSemana(
-          diasSemana,
-          pagosSemana
-        );
-
-      if (
-        resumenPendiente.saldo >
-        0
-      ) {
-        pendientesPorSemana.push({
-          semana:
-            semanaPendiente,
-          saldo:
-            resumenPendiente.saldo,
-        });
-      }
-    }
+    const pagosHastaSemana =
+      redondear(
+        todosLosPagos
+          .filter(
+            (pago) =>
+              pago.semana <=
+                semana &&
+              pago.estadoMovimiento ===
+                "Activo"
+          )
+          .reduce(
+            (acumulado, pago) =>
+              acumulado +
+              numero(pago.monto),
+            0
+          )
+      );
 
     const pendienteTotal =
       redondear(
-        pendientesPorSemana.reduce(
-          (
-            acumulado,
-            pendiente
-          ) =>
-            acumulado +
-            pendiente.saldo,
+        Math.max(
+          cargosHastaSemana -
+            pagosHastaSemana,
           0
         )
       );
@@ -1623,129 +1608,77 @@ export async function POST(
       );
     }
 
-    let restante =
-      monto;
+    // IMPORTANTE:
+    // Un pago capturado = una fila en Excel.
+    // Ejemplo: 10/09/2026 $13,000 se conserva como $13,000,
+    // aunque reduzca saldo de semanas anteriores.
+    const idPago =
+      `PSEL-${Date.now()}`;
 
-    const pagosCreados:
-      FilaPagoSello[] = [];
-
-    for (
-      let indice = 0;
-      indice <
-      pendientesPorSemana.length &&
-      restante > 0;
-      indice++
-    ) {
-      const pendiente =
-        pendientesPorSemana[
-          indice
-        ];
-
-      const aplicar =
-        redondear(
-          Math.min(
-            restante,
-            pendiente.saldo
-          )
-        );
-
-      if (
-        aplicar <= 0
-      ) {
-        continue;
-      }
-
-      const idPago =
-        `PSEL-${Date.now()}-${indice + 1}`;
-
-      const fila =
-        siguienteFilaLibre(
-          hojaPagos
-        );
-
-      escribirCelda(
-        hojaPagos,
-        `A${fila}`,
-        idPago
+    const fila =
+      siguienteFilaLibre(
+        hojaPagos
       );
 
-      escribirCelda(
-        hojaPagos,
-        `B${fila}`,
-        fecha
-      );
+    escribirCelda(
+      hojaPagos,
+      `A${fila}`,
+      idPago
+    );
 
-      escribirCelda(
-        hojaPagos,
-        `C${fila}`,
-        pendiente.semana
-      );
+    escribirCelda(
+      hojaPagos,
+      `B${fila}`,
+      fecha
+    );
 
-      escribirCelda(
-        hojaPagos,
-        `D${fila}`,
-        aplicar
-      );
+    escribirCelda(
+      hojaPagos,
+      `C${fila}`,
+      semana
+    );
 
-      escribirCelda(
-        hojaPagos,
-        `E${fila}`,
-        referencia
-      );
+    escribirCelda(
+      hojaPagos,
+      `D${fila}`,
+      monto
+    );
 
-      escribirCelda(
-        hojaPagos,
-        `F${fila}`,
-        observaciones
-      );
+    escribirCelda(
+      hojaPagos,
+      `E${fila}`,
+      referencia
+    );
 
-      escribirCelda(
-        hojaPagos,
-        `G${fila}`,
-        "Activo"
-      );
+    escribirCelda(
+      hojaPagos,
+      `F${fila}`,
+      observaciones
+    );
 
-      escribirCelda(
-        hojaPagos,
-        `H${fila}`,
-        ""
-      );
+    escribirCelda(
+      hojaPagos,
+      `G${fila}`,
+      "Activo"
+    );
 
-      escribirCelda(
-        hojaPagos,
-        `I${fila}`,
-        ""
-      );
+    escribirCelda(
+      hojaPagos,
+      `H${fila}`,
+      ""
+    );
 
-      asegurarRango(
-        hojaPagos,
-        fila,
-        8
-      );
+    escribirCelda(
+      hojaPagos,
+      `I${fila}`,
+      ""
+    );
 
-      pagosCreados.push({
-        idPago,
-        fecha,
-        semana:
-          pendiente.semana,
-        monto:
-          aplicar,
-        referencia,
-        observaciones,
-        estadoMovimiento:
-          "Activo",
-        motivoAnulacion:
-          "",
-        fechaAnulacion:
-          "",
-      });
-
-      restante =
-        redondear(
-          restante -
-          aplicar
-        );
-    }
+    asegurarRango(
+      hojaPagos,
+      fila,
+      8
+    );
 
     const salida =
       XLSX.write(
@@ -1762,47 +1695,34 @@ export async function POST(
       salida
     );
 
-    const pagosActualizados =
-      leerPagosSellos(
-        hojaPagos,
-        semana
-      );
-
-    const diasSemanaActual =
-      leerSellos(
-        hojaSellos,
-        semana
-      );
-
-    const resumen =
-      resumenSemana(
-        diasSemanaActual,
-        pagosActualizados
+    const nuevoSaldoPendiente =
+      redondear(
+        Math.max(
+          pendienteTotal -
+            monto,
+          0
+        )
       );
 
     return NextResponse.json({
       success: true,
 
       pago: {
+        idPago,
         fecha,
+        semana,
         monto,
         referencia,
         observaciones,
+        estadoMovimiento:
+          "Activo",
       },
 
-      pagosCreados,
-
-      aplicadoDesdeSemana:
-        pagosCreados[0]
-          ?.semana ||
-        semana,
-
-      resumen,
+      saldoPendienteTotal:
+        nuevoSaldoPendiente,
 
       mensaje:
-        pagosCreados.length > 1
-          ? "Abono distribuido correctamente entre saldos atrasados y la semana actual."
-          : "Pago de sellos guardado correctamente.",
+        "Pago guardado correctamente como una sola transacción.",
     });
 
   } catch (
