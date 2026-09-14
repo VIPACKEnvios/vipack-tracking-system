@@ -90,13 +90,11 @@ export default function EnviosPage() {
     return contenido.includes(textoBusqueda);
   });
 
-  const idsEntregadosVisibles = enviosFiltrados
-    .filter((envio) => textoNormalizado(envio.estatus_actual) === "Entregado")
-    .map((envio) => Number(envio.id));
+  const idsVisibles = enviosFiltrados.map((envio) => Number(envio.id));
 
-  const todosEntregadosVisiblesSeleccionados =
-    idsEntregadosVisibles.length > 0 &&
-    idsEntregadosVisibles.every((id) => seleccionadosEliminar.includes(id));
+  const todosVisiblesSeleccionados =
+    idsVisibles.length > 0 &&
+    idsVisibles.every((id) => seleccionadosEliminar.includes(id));
 
   const alternarSeleccion = (id: number) => {
     setSeleccionadosEliminar((actuales) =>
@@ -106,36 +104,32 @@ export default function EnviosPage() {
     );
   };
 
-  const alternarTodosEntregadosVisibles = () => {
-    if (todosEntregadosVisiblesSeleccionados) {
+  const alternarTodosVisibles = () => {
+    if (todosVisiblesSeleccionados) {
       setSeleccionadosEliminar((actuales) =>
-        actuales.filter((id) => !idsEntregadosVisibles.includes(id))
+        actuales.filter((id) => !idsVisibles.includes(id))
       );
       return;
     }
 
     setSeleccionadosEliminar((actuales) =>
-      Array.from(new Set([...actuales, ...idsEntregadosVisibles]))
+      Array.from(new Set([...actuales, ...idsVisibles]))
     );
   };
 
   const eliminarSeleccionados = async () => {
     if (seleccionadosEliminar.length === 0) {
-      alert("Selecciona al menos un envío entregado.");
+      alert("Selecciona al menos un envío para eliminar.");
       return;
     }
 
-    // Protección adicional en el navegador: solo se permiten IDs que actualmente
-    // aparecen como ENTREGADOS dentro de los datos cargados.
-    const idsPermitidos = seleccionadosEliminar.filter((id) => {
-      const envio = envios.find((item) => Number(item.id) === id);
-      return envio && textoNormalizado(envio.estatus_actual) === "Entregado";
-    });
+    // Solo elimina exactamente los IDs que tú seleccionaste en la tabla.
+    const idsPermitidos = seleccionadosEliminar.filter((id) =>
+      envios.some((item) => Number(item.id) === id)
+    );
 
     if (idsPermitidos.length !== seleccionadosEliminar.length) {
-      alert(
-        "Por seguridad, uno o más registros ya no están como Entregado. Actualiza la tabla y vuelve a seleccionar."
-      );
+      alert("Uno o más registros seleccionados ya no existen. Actualiza la tabla y vuelve a seleccionar.");
       setSeleccionadosEliminar([]);
       return;
     }
@@ -143,12 +137,13 @@ export default function EnviosPage() {
     const detalle = idsPermitidos
       .map((id) => {
         const envio = envios.find((item) => Number(item.id) === id);
-        return envio ? `ID ${id} - ${envio.cliente || "Sin cliente"}` : `ID ${id}`;
+        const estado = envio ? textoNormalizado(envio.estatus_actual) : "";
+        return envio ? `ID ${id} - ${envio.cliente || "Sin cliente"} - ${estado}` : `ID ${id}`;
       })
       .join("\n");
 
     const confirmar = confirm(
-      `Vas a eliminar definitivamente ${idsPermitidos.length} envío(s) entregado(s) de Supabase:\n\n${detalle}\n\nEsta acción no se puede deshacer. ¿Deseas continuar?`
+      `Vas a eliminar definitivamente ${idsPermitidos.length} envío(s) de Supabase:\n\n${detalle}\n\nPueden tener cualquier estado. Solo se eliminarán los registros que marcaste.\n\nEsta acción no se puede deshacer. ¿Deseas continuar?`
     );
 
     if (!confirmar) return;
@@ -161,16 +156,12 @@ export default function EnviosPage() {
       .in("id", idsPermitidos);
 
     if (error) {
-      alert(
-        "Supabase bloqueó la eliminación: " +
-          error.message +
-          "\n\nNo se eliminó ningún registro desde esta pantalla. Si la tabla tiene una política de protección para DELETE, el siguiente paso será ajustar esa política de forma segura para permitir únicamente los entregados."
-      );
+      alert("Supabase bloqueó la eliminación: " + error.message);
       setEliminando(false);
       return;
     }
 
-    alert(`✅ Se eliminaron ${idsPermitidos.length} envío(s) entregado(s).`);
+    alert(`✅ Se eliminaron ${idsPermitidos.length} envío(s) seleccionado(s).`);
     setSeleccionadosEliminar([]);
     setEliminando(false);
     await cargarEnvios();
@@ -828,14 +819,14 @@ export default function EnviosPage() {
                           alignItems: "center",
                           gap: "6px",
                           cursor:
-                            idsEntregadosVisibles.length > 0 ? "pointer" : "default",
+                            idsVisibles.length > 0 ? "pointer" : "default",
                         }}
                       >
                         <input
                           type="checkbox"
-                          checked={todosEntregadosVisiblesSeleccionados}
-                          disabled={idsEntregadosVisibles.length === 0 || eliminando}
-                          onChange={alternarTodosEntregadosVisibles}
+                          checked={todosVisiblesSeleccionados}
+                          disabled={idsVisibles.length === 0 || eliminando}
+                          onChange={alternarTodosVisibles}
                         />
                         Elegir
                       </label>
@@ -864,23 +855,14 @@ export default function EnviosPage() {
                     <tr key={envio.id}>
                       {mostrarEntregados && (
                         <td style={td}>
-                          {estadoActual === "Entregado" ? (
-                            <input
-                              type="checkbox"
-                              checked={seleccionadosEliminar.includes(Number(envio.id))}
-                              disabled={eliminando}
-                              onChange={() => alternarSeleccion(Number(envio.id))}
-                              aria-label={`Seleccionar envío ${envio.id} para eliminar`}
-                              style={{ width: "18px", height: "18px", cursor: "pointer" }}
-                            />
-                          ) : (
-                            <span
-                              title="Solo se pueden eliminar envíos entregados"
-                              style={{ color: "#9ca3af", fontSize: "12px" }}
-                            >
-                              —
-                            </span>
-                          )}
+                          <input
+                            type="checkbox"
+                            checked={seleccionadosEliminar.includes(Number(envio.id))}
+                            disabled={eliminando}
+                            onChange={() => alternarSeleccion(Number(envio.id))}
+                            aria-label={`Seleccionar envío ${envio.id} para eliminar`}
+                            style={{ width: "18px", height: "18px", cursor: "pointer" }}
+                          />
                         </td>
                       )}
                       <td style={td}>{envio.id}</td>
