@@ -150,19 +150,47 @@ export default function EnviosPage() {
 
     setEliminando(true);
 
-    const { error } = await supabase
+    const { data: filasEliminadas, error } = await supabase
       .from("envios")
       .delete()
-      .in("id", idsPermitidos);
+      .in("id", idsPermitidos)
+      .select("id");
 
     if (error) {
-      alert("Supabase bloqueó la eliminación: " + error.message);
+      alert("❌ Supabase bloqueó la eliminación: " + error.message);
       setEliminando(false);
       return;
     }
 
-    alert(`✅ Se eliminaron ${idsPermitidos.length} envío(s) seleccionado(s).`);
-    setSeleccionadosEliminar([]);
+    const idsEliminados = (filasEliminadas || []).map((fila: any) =>
+      Number(fila.id)
+    );
+
+    if (idsEliminados.length === 0) {
+      alert(
+        "⚠️ Supabase no eliminó ningún registro. La solicitud llegó, pero una política RLS probablemente está bloqueando DELETE. Revisa la política de la tabla envios."
+      );
+      setEliminando(false);
+      await cargarEnvios();
+      return;
+    }
+
+    const idsNoEliminados = idsPermitidos.filter(
+      (id) => !idsEliminados.includes(id)
+    );
+
+    if (idsNoEliminados.length > 0) {
+      alert(
+        `⚠️ Se eliminaron ${idsEliminados.length} de ${idsPermitidos.length} envío(s).\n\nNo se pudieron eliminar los ID: ${idsNoEliminados.join(", ")}.`
+      );
+      setSeleccionadosEliminar(idsNoEliminados);
+    } else {
+      alert(
+        `✅ Supabase confirmó la eliminación de ${idsEliminados.length} envío(s).\n\nID eliminados: ${idsEliminados.join(", ")}`
+      );
+      setSeleccionadosEliminar([]);
+    }
+
     setEliminando(false);
     await cargarEnvios();
   };
