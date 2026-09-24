@@ -8,15 +8,24 @@ export const dynamic = "force-dynamic";
 const RUTA_EXCEL = "Envios/Paquetes_USA.xlsx";
 const HOJA_PAQUETES = "Paquetes_USA";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const supabaseServiceKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error(
+    "Faltan variables para recuperar la conexión de OneDrive."
+  );
+}
 
 const supabase = createClient(
   supabaseUrl,
-  supabaseServiceKey
+  supabaseServiceKey,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  }
 );
 
 type PaqueteUSA = {
@@ -40,30 +49,21 @@ function texto(valor: unknown): string {
 }
 
 function fechaTijuana(): string {
-  const partes = new Intl.DateTimeFormat(
-    "en-CA",
-    {
-      timeZone: "America/Tijuana",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }
-  ).formatToParts(new Date());
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Tijuana",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
 
   const year =
-    partes.find(
-      (parte) => parte.type === "year"
-    )?.value || "";
+    partes.find((parte) => parte.type === "year")?.value || "";
 
   const month =
-    partes.find(
-      (parte) => parte.type === "month"
-    )?.value || "";
+    partes.find((parte) => parte.type === "month")?.value || "";
 
   const day =
-    partes.find(
-      (parte) => parte.type === "day"
-    )?.value || "";
+    partes.find((parte) => parte.type === "day")?.value || "";
 
   return `${year}-${month}-${day}`;
 }
@@ -73,84 +73,106 @@ function fechaTijuana(): string {
 ========================================================= */
 
 async function obtenerAccessToken(): Promise<string> {
-  const { data, error } = await supabase
-    .from("onedrive_connections")
-    .select("*")
-    .limit(1)
-    .single();
-
-  if (error || !data) {
-    throw new Error(
-      `No se encontró la conexión de OneDrive: ${
-        error?.message || "sin datos"
-      }`
-    );
-  }
-
-  const refreshToken =
-    data.refresh_token ||
-    data.refreshToken ||
-    data.microsoft_refresh_token;
-
-  if (!refreshToken) {
-    throw new Error(
-      "La conexión de OneDrive no tiene refresh_token."
-    );
-  }
-
-  const clientId =
-    process.env.MICROSOFT_CLIENT_ID;
-
-  const clientSecret =
-    process.env.MICROSOFT_CLIENT_SECRET;
-
-  const tenantId =
-    process.env.MICROSOFT_TENANT_ID ||
-    "common";
+  const clientId = process.env.ONEDRIVE_CLIENT_ID;
+  const clientSecret = process.env.ONEDRIVE_CLIENT_SECRET;
 
   if (!clientId || !clientSecret) {
     throw new Error(
-      "Faltan MICROSOFT_CLIENT_ID o MICROSOFT_CLIENT_SECRET."
+      "Faltan variables de configuración de OneDrive."
     );
   }
 
-  const body = new URLSearchParams({
-    client_id: clientId,
-    client_secret: clientSecret,
-    refresh_token: refreshToken,
-    grant_type: "refresh_token",
-    scope:
-      "offline_access Files.ReadWrite User.Read",
-  });
+  const { data: conexion, error } = await supabase
+    .from("onedrive_connections")
+    .select("id, refresh_token")
+    .order("id", {
+      ascending: false,
+    })
+    .limit(1)
+    .maybeSingle();
 
-  const respuesta = await fetch(
-    `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
+  if (error) {
+    throw new Error(
+      `No se pudo consultar OneDrive: ${error.message}`
+    );
+  }
+
+  if (!conexion?.refresh_token) {
+    throw new Error(
+      "No existe una conexión activa de OneDrive."
+    );
+  }
+
+  const tokenResponse = await fetch(
+    "https://login.microsoftonline.com/consumers/oauth2/v2.0/token",
     {
       method: "POST",
+
       headers: {
         "Content-Type":
           "application/x-www-form-urlencoded",
       },
-      body,
+
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: "refresh_token",
+        refresh_token: conexion.refresh_token,
+        scope:
+          "openid profile offline_access User.Read Files.ReadWrite",
+      }),
+
       cache: "no-store",
     }
   );
 
-  const resultado =
-    await respuesta.json();
+  let tokenData: any = null;
 
-  if (
-    !respuesta.ok ||
-    !resultado.access_token
-  ) {
+  try {
+    tokenData = await tokenResponse.json();
+  } catch {
+    tokenData = null;
+  }
+
+  if (!tokenResponse.ok) {
     throw new Error(
-      resultado.error_description ||
-        resultado.error ||
-        "No se pudo renovar el token de OneDrive."
+      tokenData?.error_description ||
+        tokenData?.error ||
+        "No se pudo renovar el acceso a OneDrive."
     );
   }
 
-  return resultado.access_token;
+  const accessToken = tokenData?.access_token;
+
+  if (!accessToken) {
+    throw new Error(
+      "Microsoft no devolvió access_token."
+    );
+  }
+
+  const nuevoRefreshToken = tokenData?.refresh_token;
+
+  if (
+    nuevoRefreshToken &&
+    nuevoRefreshToken !== conexion.refresh_token
+  ) {
+    const { error: updateError } = await supabase
+      .from("onedrive_connections")
+      .update({
+        refresh_token: nuevoRefreshToken,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", conexion.id);
+
+    if (updateError) {
+      console.error(
+        "No se pudo actualizar refresh_token:",
+        updateError
+      );
+    }
+  }
+
+  return accessToken;
 }
 
 /* =========================================================
@@ -160,25 +182,20 @@ async function obtenerAccessToken(): Promise<string> {
 async function descargarExcel(
   accessToken: string
 ): Promise<ArrayBuffer> {
-  const ruta = RUTA_EXCEL
-    .split("/")
-    .map(encodeURIComponent)
-    .join("/");
+  const url =
+    `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
+      RUTA_EXCEL
+    )}:/content`;
 
-  const respuesta = await fetch(
-    `https://graph.microsoft.com/v1.0/me/drive/root:/${ruta}:/content`,
-    {
-      headers: {
-        Authorization:
-          `Bearer ${accessToken}`,
-      },
-      cache: "no-store",
-    }
-  );
+  const respuesta = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    cache: "no-store",
+  });
 
   if (!respuesta.ok) {
-    const detalle =
-      await respuesta.text();
+    const detalle = await respuesta.text();
 
     throw new Error(
       `No se pudo descargar ${RUTA_EXCEL}. ${respuesta.status}: ${detalle}`
@@ -190,48 +207,37 @@ async function descargarExcel(
 
 /* =========================================================
    SUBIR EXCEL
-   IMPORTANTE:
-   Convertimos Uint8Array a ArrayBuffer para evitar
-   el error de TypeScript "No overload matches this call".
 ========================================================= */
 
 async function subirExcel(
   accessToken: string,
   contenido: Uint8Array
 ): Promise<void> {
-  const ruta = RUTA_EXCEL
-    .split("/")
-    .map(encodeURIComponent)
-    .join("/");
+  const url =
+    `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
+      RUTA_EXCEL
+    )}:/content`;
 
-  const arrayBuffer = new ArrayBuffer(
-    contenido.byteLength
-  );
+  const arrayBuffer = new ArrayBuffer(contenido.byteLength);
 
-  new Uint8Array(arrayBuffer).set(
-    contenido
-  );
+  new Uint8Array(arrayBuffer).set(contenido);
 
-  const respuesta = await fetch(
-    `https://graph.microsoft.com/v1.0/me/drive/root:/${ruta}:/content`,
-    {
-      method: "PUT",
+  const respuesta = await fetch(url, {
+    method: "PUT",
 
-      headers: {
-        Authorization:
-          `Bearer ${accessToken}`,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type":
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    },
 
-        "Content-Type":
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      },
+    body: arrayBuffer,
 
-      body: arrayBuffer,
-    }
-  );
+    cache: "no-store",
+  });
 
   if (!respuesta.ok) {
-    const detalle =
-      await respuesta.text();
+    const detalle = await respuesta.text();
 
     throw new Error(
       `No se pudo guardar ${RUTA_EXCEL}. ${respuesta.status}: ${detalle}`
@@ -246,15 +252,14 @@ async function subirExcel(
 function leerPaquetes(
   hoja: XLSX.WorkSheet
 ): PaqueteUSA[] {
-  const filas =
-    XLSX.utils.sheet_to_json<unknown[]>(
-      hoja,
-      {
-        header: 1,
-        defval: "",
-        raw: false,
-      }
-    );
+  const filas = XLSX.utils.sheet_to_json<unknown[]>(
+    hoja,
+    {
+      header: 1,
+      defval: "",
+      raw: false,
+    }
+  );
 
   if (filas.length <= 1) {
     return [];
@@ -263,37 +268,18 @@ function leerPaquetes(
   return filas
     .slice(1)
     .map((fila) => {
-      const columnas =
-        Array.isArray(fila)
-          ? fila
-          : [];
+      const columnas = Array.isArray(fila) ? fila : [];
 
       return {
         id: texto(columnas[0]),
-
-        cliente:
-          texto(columnas[1]),
-
-        tokenCliente:
-          texto(columnas[2]),
-
-        rastreo:
-          texto(columnas[3]),
-
-        tienda:
-          texto(columnas[4]),
-
-        fechaRegistro:
-          texto(columnas[5]),
-
-        estatus:
-          texto(columnas[6]),
-
-        fechaRecibido:
-          texto(columnas[7]),
-
-        fechaCompra:
-          texto(columnas[8]),
+        cliente: texto(columnas[1]),
+        tokenCliente: texto(columnas[2]),
+        rastreo: texto(columnas[3]),
+        tienda: texto(columnas[4]),
+        fechaRegistro: texto(columnas[5]),
+        estatus: texto(columnas[6]),
+        fechaRecibido: texto(columnas[7]),
+        fechaCompra: texto(columnas[8]),
       };
     })
     .filter(
@@ -314,29 +300,20 @@ export async function GET() {
       await obtenerAccessToken();
 
     const archivo =
-      await descargarExcel(
-        accessToken
-      );
+      await descargarExcel(accessToken);
 
-    const workbook =
-      XLSX.read(
-        archivo,
-        {
-          type: "array",
-          cellDates: false,
-        }
-      );
+    const workbook = XLSX.read(archivo, {
+      type: "array",
+      cellDates: false,
+    });
 
     const hoja =
-      workbook.Sheets[
-        HOJA_PAQUETES
-      ];
+      workbook.Sheets[HOJA_PAQUETES];
 
     if (!hoja) {
       return NextResponse.json(
         {
           success: false,
-
           error:
             `No existe la hoja "${HOJA_PAQUETES}" dentro de Paquetes_USA.xlsx.`,
         },
@@ -352,16 +329,14 @@ export async function GET() {
     const registrados =
       paquetes.filter(
         (paquete) =>
-          paquete.estatus
-            .toLowerCase() !==
+          paquete.estatus.toLowerCase() !==
           "recibido"
       ).length;
 
     const recibidos =
       paquetes.filter(
         (paquete) =>
-          paquete.estatus
-            .toLowerCase() ===
+          paquete.estatus.toLowerCase() ===
           "recibido"
       ).length;
 
@@ -371,11 +346,8 @@ export async function GET() {
       paquetes,
 
       resumen: {
-        total:
-          paquetes.length,
-
+        total: paquetes.length,
         registrados,
-
         recibidos,
       },
     });
@@ -410,18 +382,15 @@ export async function PATCH(
   request: NextRequest
 ) {
   try {
-    const body =
-      await request.json();
+    const body = await request.json();
 
-    const id =
-      texto(body?.id);
+    const id = texto(body?.id);
 
     if (!id) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Falta el ID del paquete.",
+          error: "Falta el ID del paquete.",
         },
         {
           status: 400,
@@ -433,29 +402,20 @@ export async function PATCH(
       await obtenerAccessToken();
 
     const archivo =
-      await descargarExcel(
-        accessToken
-      );
+      await descargarExcel(accessToken);
 
-    const workbook =
-      XLSX.read(
-        archivo,
-        {
-          type: "array",
-          cellDates: false,
-        }
-      );
+    const workbook = XLSX.read(archivo, {
+      type: "array",
+      cellDates: false,
+    });
 
     const hoja =
-      workbook.Sheets[
-        HOJA_PAQUETES
-      ];
+      workbook.Sheets[HOJA_PAQUETES];
 
     if (!hoja) {
       return NextResponse.json(
         {
           success: false,
-
           error:
             `No existe la hoja "${HOJA_PAQUETES}".`,
         },
@@ -467,15 +427,14 @@ export async function PATCH(
 
     const rango =
       XLSX.utils.decode_range(
-        hoja["!ref"] ||
-          "A1:I1"
+        hoja["!ref"] || "A1:I1"
       );
 
     let filaEncontrada = -1;
 
     /*
-     * La fila 0 contiene los encabezados.
-     * Por eso comenzamos en la fila 1.
+     * Fila 0 = encabezados.
+     * Comenzamos desde la fila 1.
      */
     for (
       let fila = 1;
@@ -503,7 +462,6 @@ export async function PATCH(
       return NextResponse.json(
         {
           success: false,
-
           error:
             "No se encontró el paquete.",
         },
@@ -514,7 +472,7 @@ export async function PATCH(
     }
 
     /*
-     * Columna G = Estatus
+     * G = Estatus
      */
     const celdaEstatus =
       XLSX.utils.encode_cell({
@@ -523,7 +481,7 @@ export async function PATCH(
       });
 
     /*
-     * Columna H = FechaRecibido
+     * H = FechaRecibido
      */
     const celdaFechaRecibido =
       XLSX.utils.encode_cell({
@@ -544,23 +502,14 @@ export async function PATCH(
       v: fechaRecibido,
     };
 
-    /*
-     * Convertimos nuevamente todo el libro
-     * a XLSX.
-     */
     const contenido =
-      XLSX.write(
-        workbook,
-        {
-          type: "array",
-          bookType: "xlsx",
-        }
-      );
+      XLSX.write(workbook, {
+        type: "array",
+        bookType: "xlsx",
+      });
 
     const bytes =
-      new Uint8Array(
-        contenido
-      );
+      new Uint8Array(contenido);
 
     await subirExcel(
       accessToken,
@@ -575,8 +524,7 @@ export async function PATCH(
 
       paquete: {
         id,
-        estatus:
-          "Recibido",
+        estatus: "Recibido",
         fechaRecibido,
       },
     });
