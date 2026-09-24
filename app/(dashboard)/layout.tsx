@@ -85,6 +85,11 @@ const menuInventario: EnlaceMenu[] = [
     href: "/clientes",
     icono: <IconoUsuarios />,
   },
+  {
+    etiqueta: "Paquetes USA",
+    href: "/paquetes-usa",
+    icono: <IconoPaquete />,
+  },
 ];
 
 export default function DashboardLayout({
