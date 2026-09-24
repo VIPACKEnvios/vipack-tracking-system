@@ -11,13 +11,6 @@ export const revalidate = 0;
 ========================================================= */
 
 const RUTA_EXCEL = "Envios/Paquetes_USA.xlsx";
-
-/*
-  Cambia este nombre SOLO si la pestaña dentro del Excel
-  tiene otro nombre.
-
-  Si tu pestaña se llama "Paquetes_USA", déjalo así.
-*/
 const HOJA_PAQUETES = "Paquetes_USA";
 
 /* =========================================================
@@ -143,10 +136,7 @@ async function obtenerAccessToken() {
 
   const supabase = crearSupabase();
 
-  const {
-    data: conexion,
-    error,
-  } = await supabase
+  const { data: conexion, error } = await supabase
     .from("onedrive_connections")
     .select("id, refresh_token")
     .order("id", {
@@ -190,8 +180,7 @@ async function obtenerAccessToken() {
     }
   );
 
-  const tokenData =
-    await leerJsonSeguro(tokenResponse);
+  const tokenData = await leerJsonSeguro(tokenResponse);
 
   if (!tokenResponse.ok) {
     throw new Error(
@@ -201,8 +190,7 @@ async function obtenerAccessToken() {
     );
   }
 
-  const accessToken =
-    tokenData?.access_token;
+  const accessToken = tokenData?.access_token;
 
   if (!accessToken) {
     throw new Error(
@@ -210,21 +198,19 @@ async function obtenerAccessToken() {
     );
   }
 
-  const nuevoRefreshToken =
-    tokenData?.refresh_token;
+  const nuevoRefreshToken = tokenData?.refresh_token;
 
   if (
     nuevoRefreshToken &&
     nuevoRefreshToken !== conexion.refresh_token
   ) {
-    const { error: updateError } =
-      await supabase
-        .from("onedrive_connections")
-        .update({
-          refresh_token: nuevoRefreshToken,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", conexion.id);
+    const { error: updateError } = await supabase
+      .from("onedrive_connections")
+      .update({
+        refresh_token: nuevoRefreshToken,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", conexion.id);
 
     if (updateError) {
       console.error(
@@ -238,12 +224,10 @@ async function obtenerAccessToken() {
 }
 
 /* =========================================================
-   DESCARGAR EXCEL
+   EXCEL ONEDRIVE
 ========================================================= */
 
-async function descargarExcel(
-  accessToken: string
-) {
+async function descargarExcel(accessToken: string) {
   const url =
     `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
       RUTA_EXCEL
@@ -253,7 +237,6 @@ async function descargarExcel(
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
-
     cache: "no-store",
   });
 
@@ -267,10 +250,6 @@ async function descargarExcel(
 
   return await response.arrayBuffer();
 }
-
-/* =========================================================
-   SUBIR EXCEL
-========================================================= */
 
 async function subirExcel(
   accessToken: string,
@@ -305,19 +284,16 @@ async function subirExcel(
 }
 
 /* =========================================================
-   VALIDAR CLIENTE POR TOKEN
+   CLIENTE
 ========================================================= */
 
 async function obtenerCliente(token: string) {
   const supabase = crearSupabase();
 
-  const {
-    data: cliente,
-    error,
-  } = await supabase
+  const { data: cliente, error } = await supabase
     .from("clientes_inventario")
     .select(
-      "id_cliente, nombre_cliente, token_inventario, activo"
+      "id_cliente, nombre, token_inventario, activo"
     )
     .eq("token_inventario", token)
     .eq("activo", true)
@@ -334,7 +310,7 @@ async function obtenerCliente(token: string) {
 
 /* =========================================================
    GET
-   LISTAR PAQUETES DE UNA CLIENTA
+   LISTAR PAQUETES DEL CLIENTE
 ========================================================= */
 
 export async function GET(
@@ -360,8 +336,7 @@ export async function GET(
       );
     }
 
-    const cliente =
-      await obtenerCliente(token);
+    const cliente = await obtenerCliente(token);
 
     if (!cliente) {
       return NextResponse.json(
@@ -376,8 +351,7 @@ export async function GET(
       );
     }
 
-    const accessToken =
-      await obtenerAccessToken();
+    const accessToken = await obtenerAccessToken();
 
     const arrayBuffer =
       await descargarExcel(accessToken);
@@ -474,7 +448,7 @@ export async function GET(
 
       cliente: {
         id: cliente.id_cliente,
-        nombre: cliente.nombre_cliente,
+        nombre: cliente.nombre,
       },
 
       paquetes,
@@ -531,8 +505,7 @@ export async function POST(
       );
     }
 
-    const cliente =
-      await obtenerCliente(token);
+    const cliente = await obtenerCliente(token);
 
     if (!cliente) {
       return NextResponse.json(
@@ -572,8 +545,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-          error:
-            "La tienda es obligatoria.",
+          error: "La tienda es obligatoria.",
         },
         {
           status: 400,
@@ -605,10 +577,7 @@ export async function POST(
       );
     }
 
-    /*
-      Evitar que la misma clienta
-      registre dos veces el mismo rastreo.
-    */
+    /* Evitar rastreo duplicado para el mismo cliente */
 
     const rango = XLSX.utils.decode_range(
       hoja["!ref"] || "A1:I1"
@@ -655,17 +624,15 @@ export async function POST(
       fechaTijuana();
 
     /*
-      COLUMNAS:
-
-      A ID
-      B Cliente
-      C TokenCliente
-      D Rastreo
-      E Tienda
-      F FechaRegistro
-      G Estatus
-      H FechaRecibido
-      I FechaCompra
+      A = ID
+      B = Cliente
+      C = TokenCliente
+      D = Rastreo
+      E = Tienda
+      F = FechaRegistro
+      G = Estatus
+      H = FechaRecibido
+      I = FechaCompra
     */
 
     escribirCelda(
@@ -677,7 +644,7 @@ export async function POST(
     escribirCelda(
       hoja,
       `B${fila}`,
-      cliente.nombre_cliente
+      cliente.nombre
     );
 
     escribirCelda(
@@ -747,8 +714,7 @@ export async function POST(
 
       paquete: {
         id,
-        cliente:
-          cliente.nombre_cliente,
+        cliente: cliente.nombre,
         rastreo,
         tienda,
         fechaRegistro,
