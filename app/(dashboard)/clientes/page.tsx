@@ -17,7 +17,7 @@ type Solicitud = {
 };
 
 type Cliente = {
-  id: string;
+  id: number;
   id_cliente: number;
   nombre: string;
   carpeta_cliente: string | null;
@@ -25,8 +25,16 @@ type Cliente = {
   activo: boolean;
 };
 
-type RespuestaSolicitudes = { success: boolean; solicitudes?: Solicitud[]; error?: string };
-type RespuestaClientes = { success: boolean; clientes?: Cliente[]; error?: string };
+type RespuestaSolicitudes = {
+  success: boolean;
+  solicitudes?: Solicitud[];
+  error?: string;
+};
+type RespuestaClientes = {
+  success: boolean;
+  clientes?: Cliente[];
+  error?: string;
+};
 type RespuestaAprobar = {
   success: boolean;
   error?: string;
@@ -34,6 +42,13 @@ type RespuestaAprobar = {
   requiere_revision?: boolean;
   cliente?: { id_cliente: number; carpeta_cliente: string };
 };
+type RespuestaEstado = {
+  success: boolean;
+  error?: string;
+  mensaje?: string;
+  cliente?: Cliente;
+};
+type FiltroClientes = "activos" | "inactivos" | "todos";
 
 const numero = (id: number) => String(id).padStart(5, "0");
 
@@ -42,11 +57,13 @@ export default function ClientesPage() {
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [estado, setEstado] = useState("pendiente");
+  const [filtroClientes, setFiltroClientes] = useState<FiltroClientes>("activos");
   const [busqueda, setBusqueda] = useState("");
   const [seleccionada, setSeleccionada] = useState<Solicitud | null>(null);
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
   const [cargando, setCargando] = useState(false);
   const [aprobando, setAprobando] = useState(false);
+  const [cambiandoEstado, setCambiandoEstado] = useState(false);
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
 
@@ -55,40 +72,73 @@ export default function ClientesPage() {
     setError("");
     try {
       if (pestana === "solicitudes") {
-        const res = await fetch(`/api/clientes/solicitudes?estado=${encodeURIComponent(estado)}`, { cache: "no-store" });
+        const res = await fetch(
+          `/api/clientes/solicitudes?estado=${encodeURIComponent(estado)}`,
+          { cache: "no-store" }
+        );
         const data: RespuestaSolicitudes = await res.json();
-        if (!res.ok || !data.success) throw new Error(data.error || "No se pudieron consultar las solicitudes.");
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || "No se pudieron consultar las solicitudes.");
+        }
         const lista = Array.isArray(data.solicitudes) ? data.solicitudes : [];
         setSolicitudes(lista);
         setSeleccionada((prev) => lista.find((x) => x.id === prev?.id) || null);
       } else {
-        const res = await fetch("/api/inventarios/clientes", { cache: "no-store" });
+        const res = await fetch(
+          `/api/inventarios/clientes?estado=${encodeURIComponent(filtroClientes)}`,
+          { cache: "no-store" }
+        );
         const data: RespuestaClientes = await res.json();
-        if (!res.ok || !data.success) throw new Error(data.error || "No se pudieron consultar los clientes.");
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || "No se pudieron consultar los clientes.");
+        }
         const lista = Array.isArray(data.clientes) ? data.clientes : [];
         setClientes(lista);
-        setClienteSeleccionado((prev) => lista.find((x) => x.id_cliente === prev?.id_cliente) || null);
+        setClienteSeleccionado((prev) =>
+          lista.find((x) => x.id === prev?.id) || null
+        );
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ocurrió un error al consultar la información.");
     } finally {
       setCargando(false);
     }
-  }, [pestana, estado]);
+  }, [pestana, estado, filtroClientes]);
 
-  useEffect(() => { void cargar(); }, [cargar]);
-  useEffect(() => { setBusqueda(""); setMensaje(""); setError(""); }, [pestana]);
+  useEffect(() => {
+    void cargar();
+  }, [cargar]);
 
-  const solicitudesFiltradas = useMemo(() => solicitudes.filter((s) =>
-    `${s.nombre} ${s.telefono} ${s.folio} ${s.id_cliente_asignado ?? ""}`.toLowerCase().includes(busqueda.trim().toLowerCase())
-  ), [solicitudes, busqueda]);
-  const clientesFiltrados = useMemo(() => clientes.filter((c) =>
-    `${c.nombre} ${c.id_cliente} ${numero(c.id_cliente)} ${c.carpeta_cliente ?? ""}`.toLowerCase().includes(busqueda.trim().toLowerCase())
-  ), [clientes, busqueda]);
+  useEffect(() => {
+    setBusqueda("");
+    setMensaje("");
+    setError("");
+  }, [pestana]);
+
+  const solicitudesFiltradas = useMemo(
+    () => solicitudes.filter((s) =>
+      `${s.nombre} ${s.telefono} ${s.folio} ${s.id_cliente_asignado ?? ""}`
+        .toLowerCase()
+        .includes(busqueda.trim().toLowerCase())
+    ),
+    [solicitudes, busqueda]
+  );
+
+  const clientesFiltrados = useMemo(
+    () => clientes.filter((c) =>
+      `${c.nombre} ${c.id_cliente} ${numero(c.id_cliente)} ${c.carpeta_cliente ?? ""}`
+        .toLowerCase()
+        .includes(busqueda.trim().toLowerCase())
+    ),
+    [clientes, busqueda]
+  );
 
   async function aprobar() {
     if (!seleccionada || aprobando || seleccionada.estado !== "pendiente") return;
-    if (!window.confirm(`¿Crear al cliente "${seleccionada.nombre}"? Se reservará un número, se actualizará el Excel y se creará su carpeta de OneDrive.`)) return;
+    if (!window.confirm(
+      `¿Crear al cliente "${seleccionada.nombre}"? Se reservará un número, se actualizará el Excel y se creará su carpeta de OneDrive.`
+    )) return;
+
     setAprobando(true);
     setError("");
     setMensaje("");
@@ -100,15 +150,57 @@ export default function ClientesPage() {
       });
       const data: RespuestaAprobar = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(`${data.error || "No se pudo aprobar."}${data.detalle ? ` — ${data.detalle}` : ""}${data.requiere_revision ? " Requiere revisión manual antes de reintentar." : ""}`);
+        throw new Error(
+          `${data.error || "No se pudo aprobar."}${data.detalle ? ` — ${data.detalle}` : ""}${data.requiere_revision ? " Requiere revisión manual antes de reintentar." : ""}`
+        );
       }
-      setMensaje(data.cliente ? `Cliente #${numero(data.cliente.id_cliente)} creado correctamente.` : "Cliente creado correctamente.");
+      setMensaje(data.cliente
+        ? `Cliente #${numero(data.cliente.id_cliente)} creado correctamente.`
+        : "Cliente creado correctamente."
+      );
       setSeleccionada(null);
       await cargar();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo crear el cliente.");
     } finally {
       setAprobando(false);
+    }
+  }
+
+  async function cambiarEstadoCliente() {
+    const cliente = clienteSeleccionado;
+    if (!cliente || cambiandoEstado || cargando) return;
+
+    const nuevoEstado = !cliente.activo;
+    const pregunta = nuevoEstado
+      ? `¿Reactivar a ${cliente.nombre} (#${numero(cliente.id_cliente)})? Volverá a tener acceso a su inventario privado.`
+      : `¿Dar de baja a ${cliente.nombre} (#${numero(cliente.id_cliente)})? Dejará de aparecer entre los clientes activos. No se eliminarán su historial ni su carpeta de OneDrive.`;
+
+    if (!window.confirm(pregunta)) return;
+
+    setCambiandoEstado(true);
+    setError("");
+    setMensaje("");
+    try {
+      const res = await fetch("/api/inventarios/clientes/estado", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: cliente.id, activo: nuevoEstado }),
+      });
+      const data: RespuestaEstado = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "No se pudo cambiar el estado del cliente.");
+      }
+      setMensaje(data.mensaje || (nuevoEstado
+        ? "Cliente reactivado correctamente."
+        : "Cliente dado de baja correctamente."
+      ));
+      setClienteSeleccionado(null);
+      await cargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo cambiar el estado.");
+    } finally {
+      setCambiandoEstado(false);
     }
   }
 
@@ -123,7 +215,7 @@ export default function ClientesPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href="/registro-cliente" className="rounded-xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-md hover:bg-cyan-700">+ Registrar cliente</Link>
-            <button type="button" onClick={() => void cargar()} disabled={cargando || aprobando} className="rounded-xl bg-[#072c74] px-5 py-3 text-sm font-black text-white shadow-md disabled:opacity-50">{cargando ? "Actualizando..." : "Actualizar"}</button>
+            <button type="button" onClick={() => void cargar()} disabled={cargando || aprobando || cambiandoEstado} className="rounded-xl bg-[#072c74] px-5 py-3 text-sm font-black text-white shadow-md disabled:opacity-50">{cargando ? "Actualizando..." : "Actualizar"}</button>
           </div>
         </div>
 
@@ -131,13 +223,23 @@ export default function ClientesPage() {
           <button type="button" onClick={() => setPestana("registrados")} className={`rounded-xl px-5 py-3 text-sm font-black ${pestana === "registrados" ? "bg-[#072c74] text-white" : "bg-white text-slate-700"}`}>Clientes registrados</button>
           <button type="button" onClick={() => setPestana("solicitudes")} className={`rounded-xl px-5 py-3 text-sm font-black ${pestana === "solicitudes" ? "bg-[#072c74] text-white" : "bg-white text-slate-700"}`}>Solicitudes</button>
         </div>
+
         {mensaje && <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-800">{mensaje}</div>}
         {error && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">{error}</div>}
 
         <div className="mt-5 grid gap-5 xl:grid-cols-[390px_minmax(0,1fr)]">
           <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
             <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder={pestana === "registrados" ? "Buscar por nombre o número..." : "Buscar por nombre, teléfono o folio..."} className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-800 outline-none focus:border-cyan-500" />
-            {pestana === "solicitudes" && (
+
+            {pestana === "registrados" ? (
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {(["activos", "inactivos", "todos"] as const).map((filtro) => (
+                  <button key={filtro} type="button" onClick={() => { setFiltroClientes(filtro); setClienteSeleccionado(null); }} disabled={cambiandoEstado} className={`rounded-xl px-2 py-3 text-xs font-black sm:text-sm ${filtroClientes === filtro ? "bg-[#072c74] text-white" : "bg-slate-100 text-slate-700 hover:bg-cyan-50"} disabled:opacity-50`}>
+                    {filtro === "activos" ? "Activos" : filtro === "inactivos" ? "Inactivos" : "Todos"}
+                  </button>
+                ))}
+              </div>
+            ) : (
               <select value={estado} onChange={(e) => setEstado(e.target.value)} disabled={aprobando} className="mt-3 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-800">
                 <option value="pendiente">Pendientes</option>
                 <option value="procesando">Procesando</option>
@@ -146,18 +248,18 @@ export default function ClientesPage() {
                 <option value="archivado">Archivados</option>
               </select>
             )}
+
             <div className="mt-4 flex items-center justify-between">
-              <p className="text-sm font-black text-slate-800">{pestana === "registrados" ? "Clientes activos" : "Solicitudes"}</p>
+              <p className="text-sm font-black text-slate-800">{pestana === "registrados" ? (filtroClientes === "activos" ? "Clientes activos" : filtroClientes === "inactivos" ? "Clientes inactivos" : "Todos los clientes") : "Solicitudes"}</p>
               <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-black text-cyan-700">{pestana === "registrados" ? clientesFiltrados.length : solicitudesFiltradas.length}</span>
             </div>
-            {pestana === "registrados" && <p className="mt-2 text-xs text-slate-500">Esta consulta muestra únicamente clientes activos.</p>}
             <div className="mt-3 max-h-[650px] space-y-2 overflow-y-auto pr-1">
               {cargando && <p className="rounded-2xl bg-slate-50 p-5 text-center text-sm text-slate-500">Cargando...</p>}
               {!cargando && !error && (pestana === "registrados" ? clientesFiltrados.length === 0 : solicitudesFiltradas.length === 0) && <p className="rounded-2xl bg-slate-50 p-5 text-center text-sm text-slate-500">No hay resultados.</p>}
               {!cargando && pestana === "registrados" && clientesFiltrados.map((c) => (
-                <button key={c.id_cliente} type="button" onClick={() => setClienteSeleccionado(c)} className={`w-full rounded-2xl border p-4 text-left hover:border-cyan-300 ${clienteSeleccionado?.id_cliente === c.id_cliente ? "border-cyan-500 bg-cyan-50" : "border-slate-200"}`}>
+                <button key={c.id} type="button" onClick={() => setClienteSeleccionado(c)} className={`w-full rounded-2xl border p-4 text-left hover:border-cyan-300 ${clienteSeleccionado?.id === c.id ? "border-cyan-500 bg-cyan-50" : "border-slate-200"}`}>
                   <p className="text-sm font-black text-slate-950">#{numero(c.id_cliente)} · {c.nombre}</p>
-                  <p className="mt-1 text-xs font-bold text-emerald-700">Activo</p>
+                  <p className={`mt-1 text-xs font-bold ${c.activo ? "text-emerald-700" : "text-rose-700"}`}>{c.activo ? "Activo" : "Inactivo"}</p>
                 </button>
               ))}
               {!cargando && pestana === "solicitudes" && solicitudesFiltradas.map((s) => (
@@ -181,10 +283,17 @@ export default function ClientesPage() {
                     <Dato titulo="Estado" valor={clienteSeleccionado.activo ? "Activo" : "Inactivo"} />
                     <Dato titulo="Carpeta de OneDrive" valor={clienteSeleccionado.carpeta_cliente || "—"} />
                   </div>
-                  {clienteSeleccionado.token_inventario ? (
+                  {clienteSeleccionado.activo && clienteSeleccionado.token_inventario ? (
                     <Link href={`/inventario/${encodeURIComponent(clienteSeleccionado.token_inventario)}`} target="_blank" rel="noopener noreferrer" className="mt-6 inline-flex rounded-xl bg-cyan-600 px-5 py-3 text-sm font-black text-white hover:bg-cyan-700">Abrir inventario privado</Link>
-                  ) : <p className="mt-5 text-sm text-amber-700">Este cliente no tiene enlace de inventario disponible.</p>}
-                  <p className="mt-5 text-xs text-slate-500">La opción «Dar de baja» se habilitará cuando exista una API administrativa protegida. No se eliminarán carpetas ni historiales.</p>
+                  ) : (
+                    <p className="mt-5 text-sm text-amber-700">{clienteSeleccionado.activo ? "Este cliente no tiene enlace de inventario disponible." : "El acceso al inventario está suspendido mientras el cliente permanezca inactivo."}</p>
+                  )}
+                  <div className="mt-6 border-t border-slate-200 pt-5">
+                    <p className="mb-3 text-xs text-slate-500">Cambiar el estado no elimina el registro ni su carpeta de OneDrive.</p>
+                    <button type="button" onClick={() => void cambiarEstadoCliente()} disabled={cambiandoEstado || cargando} className={`w-full rounded-xl px-5 py-4 text-sm font-black text-white disabled:opacity-50 ${clienteSeleccionado.activo ? "bg-rose-600 hover:bg-rose-700" : "bg-emerald-600 hover:bg-emerald-700"}`}>
+                      {cambiandoEstado ? "Guardando cambios..." : clienteSeleccionado.activo ? "Dar de baja cliente" : "Reactivar cliente"}
+                    </button>
+                  </div>
                 </>
               )
             ) : (
