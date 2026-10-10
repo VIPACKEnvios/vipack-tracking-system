@@ -35,10 +35,13 @@ export async function GET(request: NextRequest) {
 
     const estado = request.nextUrl.searchParams.get("estado");
 
-    // Por defecto conserva el comportamiento anterior.
+    // Filtros disponibles:
     // estado=activos   -> solamente activos
     // estado=inactivos -> solamente inactivos
     // estado=todos     -> todos los clientes
+    //
+    // Por defecto se muestran solamente activos.
+
     const filtro =
       estado === "inactivos" || estado === "todos"
         ? estado
@@ -52,20 +55,24 @@ export async function GET(request: NextRequest) {
         id_cliente,
         nombre,
         carpeta_cliente,
+        telefono_whatsapp,
         onedrive_folder_id,
         token_inventario,
         activo
         `
       );
 
+    // Filtrar clientes activos.
     if (filtro === "activos") {
       consulta = consulta.eq("activo", true);
     }
 
+    // Filtrar clientes inactivos.
     if (filtro === "inactivos") {
       consulta = consulta.eq("activo", false);
     }
 
+    // Obtener clientes ordenados por ID.
     const { data: clientes, error } = await consulta.order(
       "id_cliente",
       { ascending: true }
@@ -87,6 +94,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Formatear clientes.
     const clientesFormateados = (clientes || []).map(
       (cliente) => ({
         ...cliente,
@@ -94,10 +102,12 @@ export async function GET(request: NextRequest) {
       })
     );
 
+    // Contar clientes activos.
     const totalActivos = clientesFormateados.filter(
       (cliente) => cliente.activo === true
     ).length;
 
+    // Contar clientes inactivos.
     const totalInactivos = clientesFormateados.filter(
       (cliente) => cliente.activo === false
     ).length;
