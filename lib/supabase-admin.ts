@@ -1,3 +1,5 @@
+
+import "server-only";
 import { createClient } from "@supabase/supabase-js";
 
 export function getSupabaseAdmin() {
@@ -7,15 +9,9 @@ export function getSupabaseAdmin() {
   const serviceRoleKey =
     process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl) {
+  if (!supabaseUrl || !serviceRoleKey) {
     throw new Error(
-      "Falta configurar NEXT_PUBLIC_SUPABASE_URL."
-    );
-  }
-
-  if (!serviceRoleKey) {
-    throw new Error(
-      "Falta configurar SUPABASE_SERVICE_ROLE_KEY."
+      "Faltan las variables de conexión administrativa de Supabase."
     );
   }
 

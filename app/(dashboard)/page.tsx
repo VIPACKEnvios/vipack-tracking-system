@@ -12,7 +12,6 @@ import {
 
 } from "react";
 
-import { supabase } from "@/lib/supabase";
 
 
 
@@ -1788,57 +1787,15 @@ export default function DashboardPage() {
 
 
 
-        const {
-
-          data,
-
-          error,
-
-        } = await supabase
-
-          .from("envios")
-
-          .select(
-
-            "id, cliente, pdf"
-
-          )
-
-          .not(
-
-            "pdf",
-
-            "is",
-
-            null
-
-          )
-
-          .order(
-
-            "id",
-
-            {
-
-              ascending: false,
-
-            }
-
-          );
-
-
-
-        if (error) {
-
-          throw error;
-
+        const respuestaEnvios = await fetch("/api/admin/envios-pdf", {
+          cache: "no-store",
+          credentials: "same-origin",
+        });
+        const resultadoEnvios = await respuestaEnvios.json();
+        if (!respuestaEnvios.ok || !resultadoEnvios.success) {
+          throw new Error(resultadoEnvios.error || "No se pudieron cargar los envíos.");
         }
-
-
-
-        const envios =
-
-          (data || []) as EnvioPDF[];
+        const envios = (resultadoEnvios.envios || []) as EnvioPDF[];
 
 
 
@@ -2342,41 +2299,14 @@ export default function DashboardPage() {
 
 
 
-        const envio =
-
-          await supabase
-
-            .from("envios")
-
-            .select(
-
-              "id, cliente, pdf"
-
-            )
-
-            .eq(
-
-              "id",
-
-              pendiente.id
-
-            )
-
-            .single();
-
-
-
-        if (
-
-          envio.error ||
-
-          !envio.data?.pdf
-
-        ) {
-
-          continue;
-
-        }
+        const respuestaEnvio = await fetch(
+          `/api/admin/envios-pdf?id=${encodeURIComponent(pendiente.id)}`,
+          { cache: "no-store", credentials: "same-origin" }
+        );
+        if (!respuestaEnvio.ok) continue;
+        const resultadoEnvio = await respuestaEnvio.json();
+        const envio = resultadoEnvio.envio as EnvioPDF | null;
+        if (!resultadoEnvio.success || !envio?.pdf) continue;
 
 
 
@@ -2386,7 +2316,7 @@ export default function DashboardPage() {
 
             await extraerTextoOCRPDFDesdeUrl(
 
-              envio.data.pdf
+              envio.pdf
 
             );
 
