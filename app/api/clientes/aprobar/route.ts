@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { verificarSesionAdmin } from "@/lib/vipack-auth";
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -16,2575 +17,656 @@ export const revalidate = 0;
 
 
 
-const RUTA_CLIENTES =
+const RUTA_CLIENTES = "Envios/Recoleccion por cliente";
 
-  "Envios/Recoleccion por cliente";
+const RUTA_EXCEL = "Envios/control_recolecciones_bodega.xlsx";
 
+const HOJA_CLIENTES = "Clientes";
 
-
-const RUTA_EXCEL =
-
-  "Envios/control_recolecciones_bodega.xlsx";
+const RECUPERACION = { solicitud: 9, id: 54, nombre: "Nube Yazmin Bello Mosqueda" };
 
 
 
-const HOJA_CLIENTES =
+type Fila = Record<string, unknown>;
 
-  "Clientes";
+type Solicitud = {
 
+  id: number; estado: string; nombre: string; telefono: string;
 
+  direccion: string | null; referencia_domicilio: string | null;
 
-type AprobarBody = {
+  id_cliente_asignado: number | null; carpeta_cliente: string | null;
 
-  solicitud_id?: number | string;
+  onedrive_folder_id: string | null;
 
 };
 
+const limpiar = (v: unknown) => String(v ?? "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
 
+const numero = (n: number) => String(n).padStart(5, "0");
 
-function limpiarTexto(valor: unknown) {
+function idExcel(v: unknown): number | null {
 
-  return String(valor ?? "")
+  if (v === null || v === undefined || limpiar(v) === "") return null;
 
-    .replace(/\u00a0/g, " ")
+  const n = Number(limpiar(v).replace(/^#/, ""));
 
-    .replace(/\s+/g, " ")
-
-    .trim();
-
-}
-
-
-
-function numeroCliente(valor: number) {
-
-  return String(valor).padStart(5, "0");
+  return Number.isInteger(n) && n > 0 ? n : null;
 
 }
 
+function telefono(v: unknown) {
 
+  let s = typeof v === "number" ? Math.trunc(v).toString() : limpiar(v);
 
-function convertirIdCliente(valor: unknown) {
+  if (/^[+-]?\d+(?:\.\d+)?e[+-]?\d+$/i.test(s)) s = Math.trunc(Number(s)).toString();
 
-  if (
+  const n = s.replace(/\D/g, "");
 
-    valor === null ||
+  if (n.length === 10) return `521${n}`;
 
-    valor === undefined ||
+  if (n.length === 12 && n.startsWith("52")) return `521${n.slice(2)}`;
 
-    valor === ""
-
-  ) {
-
-    return null;
-
-  }
-
-
-
-  const numero = Number(
-
-    String(valor)
-
-      .trim()
-
-      .replace(/^#/, "")
-
-  );
-
-
-
-  if (
-
-    !Number.isFinite(numero) ||
-
-    numero <= 0
-
-  ) {
-
-    return null;
-
-  }
-
-
-
-  return Math.trunc(numero);
+  return n;
 
 }
 
+async function jsonSeguro(r: Response): Promise<any> {
 
-
-/*
-
- * Convierte cualquier teléfono recuperable a texto.
-
- *
-
- * Ejemplos:
-
- *
-
- * 9611978818
-
- * -> 5219611978818
-
- *
-
- * 529611978818
-
- * -> 5219611978818
-
- *
-
- * 5219611978818
-
- * -> 5219611978818
-
- *
-
- * Si Excel internamente conserva un número como
-
- * 5219611978818 aunque visualmente muestre
-
- * 5.21961E+12, raw:true permite recuperarlo.
-
- */
-
-function normalizarTelefono(
-
-  valor: unknown
-
-) {
-
-  if (
-
-    valor === null ||
-
-    valor === undefined ||
-
-    valor === ""
-
-  ) {
-
-    return "";
-
-  }
-
-
-
-  let texto = "";
-
-
-
-  if (
-
-    typeof valor === "number" &&
-
-    Number.isFinite(valor)
-
-  ) {
-
-    texto = Math.trunc(valor).toString();
-
-  } else {
-
-    texto = limpiarTexto(valor);
-
-
-
-    /*
-
-     * Por seguridad también manejamos
-
-     * notación científica completa.
-
-     *
-
-     * Ejemplo:
-
-     * 5.219611978818E+12
-
-     */
-
-    if (
-
-      /^[+-]?\d+(?:\.\d+)?e[+-]?\d+$/i.test(
-
-        texto
-
-      )
-
-    ) {
-
-      const numero = Number(texto);
-
-
-
-      if (Number.isFinite(numero)) {
-
-        texto = Math.trunc(
-
-          numero
-
-        ).toString();
-
-      }
-
-    }
-
-  }
-
-
-
-  let telefono = texto.replace(/\D/g, "");
-
-
-
-  if (!telefono) {
-
-    return "";
-
-  }
-
-
-
-  /*
-
-   * 10 dígitos nacionales
-
-   */
-
-  if (telefono.length === 10) {
-
-    return `521${telefono}`;
-
-  }
-
-
-
-  /*
-
-   * 52 + 10 dígitos
-
-   */
-
-  if (
-
-    telefono.length === 12 &&
-
-    telefono.startsWith("52")
-
-  ) {
-
-    return `521${telefono.slice(2)}`;
-
-  }
-
-
-
-  /*
-
-   * Formato que usa VIPACK:
-
-   * 521 + 10 dígitos
-
-   */
-
-  if (
-
-    telefono.length === 13 &&
-
-    telefono.startsWith("521")
-
-  ) {
-
-    return telefono;
-
-  }
-
-
-
-  /*
-
-   * No destruimos números antiguos,
-
-   * extranjeros o con otro formato.
-
-   */
-
-  return telefono;
+  try { return await r.json(); } catch { return null; }
 
 }
 
+function errorHttp(msg: string, status = 409): never {
 
+  const e = new Error(msg) as Error & { status?: number };
 
-async function leerJsonSeguro(
+  e.status = status;
 
-  response: Response
-
-) {
-
-  try {
-
-    return await response.json();
-
-  } catch {
-
-    return null;
-
-  }
+  throw e;
 
 }
 
+function graphPath(path: string) {
 
-
-async function renovarToken(
-
-  clientId: string,
-
-  clientSecret: string,
-
-  refreshToken: string
-
-) {
-
-  const response = await fetch(
-
-    "https://login.microsoftonline.com/consumers/oauth2/v2.0/token",
-
-    {
-
-      method: "POST",
-
-      headers: {
-
-        "Content-Type":
-
-          "application/x-www-form-urlencoded",
-
-      },
-
-      body: new URLSearchParams({
-
-        client_id: clientId,
-
-        client_secret: clientSecret,
-
-        grant_type: "refresh_token",
-
-        refresh_token: refreshToken,
-
-        scope:
-
-          "openid profile offline_access User.Read Files.ReadWrite",
-
-      }),
-
-      cache: "no-store",
-
-    }
-
-  );
-
-
-
-  const data =
-
-    await leerJsonSeguro(response);
-
-
-
-  return {
-
-    response,
-
-    data,
-
-  };
+  return `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(path)}`;
 
 }
 
+async function graphJson(url: string, token: string, init: RequestInit = {}) {
 
+  const r = await fetch(url, {
 
-async function descargarExcel(
+    ...init,
 
-  accessToken: string
+    headers: { Authorization: `Bearer ${token}`, ...(init.headers || {}) },
 
-) {
+    cache: "no-store",
 
-  const url =
+  });
 
-    `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
+  const data = await jsonSeguro(r);
 
-      RUTA_EXCEL
-
-    )}:/content`;
-
-
-
-  const response = await fetch(
-
-    url,
-
-    {
-
-      headers: {
-
-        Authorization:
-
-          `Bearer ${accessToken}`,
-
-      },
-
-      cache: "no-store",
-
-    }
-
-  );
-
-
-
-  if (!response.ok) {
-
-    const detalle =
-
-      await response.text();
-
-
-
-    throw new Error(
-
-      `No se pudo descargar ${RUTA_EXCEL}. HTTP ${response.status}. ${detalle}`
-
-    );
-
-  }
-
-
-
-  return await response.arrayBuffer();
-
-}
-
-
-
-async function subirExcel(
-
-  accessToken: string,
-
-  contenido: Buffer
-
-) {
-
-  const url =
-
-    `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
-
-      RUTA_EXCEL
-
-    )}:/content`;
-
-
-
-  const cuerpo =
-
-    Uint8Array.from(
-
-      contenido
-
-    ).buffer;
-
-
-
-  const response = await fetch(
-
-    url,
-
-    {
-
-      method: "PUT",
-
-      headers: {
-
-        Authorization:
-
-          `Bearer ${accessToken}`,
-
-        "Content-Type":
-
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-
-      },
-
-      body: cuerpo,
-
-      cache: "no-store",
-
-    }
-
-  );
-
-
-
-  const data =
-
-    await leerJsonSeguro(response);
-
-
-
-  if (!response.ok) {
-
-    throw new Error(
-
-      data?.error?.message ||
-
-        `No se pudo actualizar el Excel. HTTP ${response.status}.`
-
-    );
-
-  }
-
-
+  if (!r.ok) errorHttp(data?.error?.message || `Microsoft Graph HTTP ${r.status}`, 502);
 
   return data;
 
 }
 
+async function descargarExcel(token: string) {
 
+  const r = await fetch(`${graphPath(RUTA_EXCEL)}:/content`, {
 
-async function obtenerCarpetaRaizClientes(
+    headers: { Authorization: `Bearer ${token}` }, cache: "no-store",
 
-  accessToken: string
+  });
 
-) {
+  if (!r.ok) errorHttp(`No se pudo descargar el Excel (HTTP ${r.status})`, 502);
 
-  const url =
+  return Buffer.from(await r.arrayBuffer());
 
-    `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
+}
 
-      RUTA_CLIENTES
+async function obtenerVersionExcel(token: string) {
 
-    )}?$select=id,name,folder`;
+  const item = await graphJson(`${graphPath(RUTA_EXCEL)}?$select=id,name,eTag`, token);
 
+  if (!item?.id || !item?.eTag) errorHttp("No se obtuvo la versión del Excel", 502);
 
+  return { id: String(item.id), etag: String(item.eTag) };
 
-  const response = await fetch(
+}
 
-    url,
+async function subirExcel(token: string, id: string, etag: string, contenido: Buffer) {
 
-    {
+  // If-Match evita sobrescribir cambios hechos por otra operación.
 
-      headers: {
+  const r = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(id)}/content`, {
 
-        Authorization:
+    method: "PUT",
 
-          `Bearer ${accessToken}`,
+    headers: {
 
-      },
+      Authorization: `Bearer ${token}`,
 
-      cache: "no-store",
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+
+      "If-Match": etag,
+
+    },
+
+    body: new Uint8Array(contenido),
+
+    cache: "no-store",
+
+  });
+
+  const data = await jsonSeguro(r);
+
+  if (!r.ok) errorHttp(data?.error?.message || `No se actualizó el Excel (HTTP ${r.status}). Revisar antes de reintentar.`, 502);
+
+  return data;
+
+}
+
+async function obtenerRaiz(token: string) {
+
+  const item = await graphJson(`${graphPath(RUTA_CLIENTES)}?$select=id,name,folder`, token);
+
+  if (!item?.id || !item?.folder) errorHttp("No se encontró la carpeta raíz de clientes", 502);
+
+  return String(item.id);
+
+}
+
+async function buscarCarpetaPorNumero(token: string, raiz: string, id: number) {
+
+  const prefijo = numero(id);
+
+  let url: string | null = `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(raiz)}/children?$select=id,name,folder&$top=200`;
+
+  const encontradas: { id: string; name: string }[] = [];
+
+  while (url) {
+
+    const data: any = await graphJson(url, token);
+
+    for (const item of data?.value ?? []) {
+
+      const nombre = limpiar(item.name);
+
+      if (item.folder && (nombre === prefijo || nombre.startsWith(`${prefijo} `))) {
+
+        encontradas.push({ id: String(item.id), name: nombre });
+
+      }
 
     }
 
-  );
-
-
-
-  const data =
-
-    await leerJsonSeguro(response);
-
-
-
-  if (
-
-    !response.ok ||
-
-    !data?.id
-
-  ) {
-
-    throw new Error(
-
-      data?.error?.message ||
-
-        `No se encontró la carpeta ${RUTA_CLIENTES}.`
-
-    );
+    url = data?.["@odata.nextLink"] ?? null;
 
   }
 
+  return encontradas;
 
+}
 
-  return String(data.id);
+async function crearCarpeta(token: string, raiz: string, nombre: string) {
+
+  const url = `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(raiz)}/children`;
+
+  return graphJson(url, token, {
+
+    method: "POST",
+
+    headers: { "Content-Type": "application/json" },
+
+    body: JSON.stringify({ name: nombre, folder: {}, "@microsoft.graph.conflictBehavior": "fail" }),
+
+  });
+
+}
+
+function forzarTelefonosTexto(hoja: XLSX.WorkSheet) {
+
+  if (!hoja["!ref"]) return;
+
+  const rango = XLSX.utils.decode_range(hoja["!ref"]);
+
+  let col = -1;
+
+  for (let c = rango.s.c; c <= rango.e.c; c++) {
+
+    const celda = hoja[XLSX.utils.encode_cell({ r: rango.s.r, c })];
+
+    if (limpiar(celda?.v) === "TelefonoWhatsApp") { col = c; break; }
+
+  }
+
+  if (col < 0) return;
+
+  for (let r = rango.s.r + 1; r <= rango.e.r; r++) {
+
+    const celda = hoja[XLSX.utils.encode_cell({ r, c: col })];
+
+    if (!celda) continue;
+
+    const valor = telefono(celda.v);
+
+    if (!valor) continue;
+
+    celda.t = "s"; celda.v = valor; celda.z = "@"; delete celda.w;
+
+  }
 
 }
 
 
 
-async function crearCarpetaCliente(
-
-  accessToken: string,
-
-  rootFolderId: string,
-
-  nombreCarpeta: string
-
-) {
-
-  const url =
-
-    `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(
-
-      rootFolderId
-
-    )}/children`;
-
-
-
-  const response = await fetch(
-
-    url,
-
-    {
-
-      method: "POST",
-
-      headers: {
-
-        Authorization:
-
-          `Bearer ${accessToken}`,
-
-        "Content-Type":
-
-          "application/json",
-
-      },
-
-      body: JSON.stringify({
-
-        name: nombreCarpeta,
-
-        folder: {},
-
-        "@microsoft.graph.conflictBehavior":
-
-          "fail",
-
-      }),
-
-      cache: "no-store",
-
-    }
-
-  );
-
-
-
-  const data =
-
-    await leerJsonSeguro(response);
-
-
-
-  if (!response.ok) {
-
-    const code =
-
-      data?.error?.code;
-
-
-
-    if (
-
-      response.status === 409 ||
-
-      code === "nameAlreadyExists"
-
-    ) {
-
-      throw new Error(
-
-        `Ya existe una carpeta llamada "${nombreCarpeta}" en OneDrive. Revisa antes de aprobar para evitar duplicados.`
-
-      );
-
-    }
-
-
-
-    throw new Error(
-
-      data?.error?.message ||
-
-        `No se pudo crear la carpeta del cliente. HTTP ${response.status}.`
-
+export async function POST(request: NextRequest) {
+  if (!verificarSesionAdmin(request)) {
+    return NextResponse.json(
+      { success: false, error: "No autorizado. Inicia sesión nuevamente." },
+      { status: 401 }
     );
-
   }
 
+  let etapa = "inicio";
 
-
-  if (!data?.id) {
-
-    throw new Error(
-
-      "OneDrive creó la carpeta pero no devolvió su ID."
-
-    );
-
-  }
-
-
-
-  return {
-
-    id: String(data.id),
-
-    name: String(
-
-      data.name ||
-
-        nombreCarpeta
-
-    ),
-
-  };
-
-}
-
-
-
-async function eliminarCarpeta(
-
-  accessToken: string,
-
-  folderId: string
-
-) {
+  let idAsignado: number | null = null;
+  let bloqueoAdquirido = false;
+  const bloqueoToken = randomUUID();
 
   try {
 
-    await fetch(
+    const body = await request.json().catch(() => ({}));
 
-      `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(
+    const solicitudId = Number(body?.solicitud_id);
 
-        folderId
+    if (!Number.isInteger(solicitudId) || solicitudId <= 0) errorHttp("Solicitud inválida", 400);
 
-      )}`,
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-      {
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-        method: "DELETE",
+    const clientId = process.env.ONEDRIVE_CLIENT_ID;
 
-        headers: {
+    const clientSecret = process.env.ONEDRIVE_CLIENT_SECRET;
 
-          Authorization:
+    if (!url || !key || !clientId || !clientSecret) errorHttp("Faltan variables de entorno", 500);
 
-            `Bearer ${accessToken}`,
+    const supabase = createClient(url, key, {
 
-        },
-
-        cache: "no-store",
-
-      }
-
-    );
-
-  } catch (error) {
-
-    console.error(
-
-      "No se pudo revertir la carpeta creada:",
-
-      error
-
-    );
-
-  }
-
-}
-
-
-
-/*
-
- * Localiza TelefonoWhatsApp y fuerza
-
- * todas sus celdas como texto.
-
- *
-
- * Esto evita:
-
- * 5.21961E+12
-
- *
-
- * y mantiene:
-
- * 5219611978818
-
- */
-
-function forzarTelefonosComoTexto(
-
-  hoja: XLSX.WorkSheet
-
-) {
-
-  const referencia =
-
-    hoja["!ref"];
-
-
-
-  if (!referencia) {
-
-    return;
-
-  }
-
-
-
-  const rango =
-
-    XLSX.utils.decode_range(
-
-      referencia
-
-    );
-
-
-
-  let columnaTelefono = -1;
-
-
-
-  for (
-
-    let columna = rango.s.c;
-
-    columna <= rango.e.c;
-
-    columna++
-
-  ) {
-
-    const direccion =
-
-      XLSX.utils.encode_cell({
-
-        r: rango.s.r,
-
-        c: columna,
-
-      });
-
-
-
-    const celda =
-
-      hoja[direccion];
-
-
-
-    const encabezado =
-
-      limpiarTexto(
-
-        celda?.v
-
-      );
-
-
-
-    if (
-
-      encabezado ===
-
-      "TelefonoWhatsApp"
-
-    ) {
-
-      columnaTelefono =
-
-        columna;
-
-      break;
-
-    }
-
-  }
-
-
-
-  if (
-
-    columnaTelefono < 0
-
-  ) {
-
-    return;
-
-  }
-
-
-
-  for (
-
-    let fila = rango.s.r + 1;
-
-    fila <= rango.e.r;
-
-    fila++
-
-  ) {
-
-    const direccion =
-
-      XLSX.utils.encode_cell({
-
-        r: fila,
-
-        c: columnaTelefono,
-
-      });
-
-
-
-    const celda =
-
-      hoja[direccion];
-
-
-
-    if (!celda) {
-
-      continue;
-
-    }
-
-
-
-    const telefono =
-
-      normalizarTelefono(
-
-        celda.v
-
-      );
-
-
-
-    if (!telefono) {
-
-      continue;
-
-    }
-
-
-
-    /*
-
-     * Forzamos STRING.
-
-     */
-
-    celda.t = "s";
-
-    celda.v = telefono;
-
-
-
-    /*
-
-     * Formato Texto de Excel.
-
-     */
-
-    celda.z = "@";
-
-
-
-    /*
-
-     * Eliminamos representación
-
-     * anterior cacheada.
-
-     */
-
-    delete celda.w;
-
-  }
-
-}
-
-
-
-export async function POST(
-
-  request: Request
-
-) {
-
-  let carpetaCreadaId = "";
-
-  let accessTokenActivo = "";
-  let reservaCreada = false;
-  let idReservado = 0;
-  let excelActualizado = false;
-
-
-
-  try {
-
-    const body =
-
-      (await request.json()) as AprobarBody;
-
-
-
-    const solicitudId =
-
-      Number(
-
-        body?.solicitud_id
-
-      );
-
-
-
-    if (
-
-      !Number.isInteger(
-
-        solicitudId
-
-      ) ||
-
-      solicitudId <= 0
-
-    ) {
-
-      return NextResponse.json(
-
-        {
-
-          success: false,
-
-          error:
-
-            "La solicitud no es válida.",
-
-        },
-
-        {
-
-          status: 400,
-
-        }
-
-      );
-
-    }
-
-
-
-    const clientId =
-
-      process.env
-
-        .ONEDRIVE_CLIENT_ID;
-
-
-
-    const clientSecret =
-
-      process.env
-
-        .ONEDRIVE_CLIENT_SECRET;
-
-
-
-    const supabaseUrl =
-
-      process.env
-
-        .NEXT_PUBLIC_SUPABASE_URL;
-
-
-
-    const supabaseServiceRoleKey =
-
-      process.env
-
-        .SUPABASE_SERVICE_ROLE_KEY;
-
-
-
-    if (
-
-      !clientId ||
-
-      !clientSecret ||
-
-      !supabaseUrl ||
-
-      !supabaseServiceRoleKey
-
-    ) {
-
-      return NextResponse.json(
-
-        {
-
-          success: false,
-
-          error:
-
-            "Faltan variables de configuración de OneDrive o Supabase.",
-
-        },
-
-        {
-
-          status: 500,
-
-        }
-
-      );
-
-    }
-
-
-
-    const supabase =
-
-      createClient(
-
-        supabaseUrl,
-
-        supabaseServiceRoleKey,
-
-        {
-
-          auth: {
-
-            autoRefreshToken:
-
-              false,
-
-            persistSession:
-
-              false,
-
-          },
-
-        }
-
-      );
-
-
-
-    /*
-
-     * 1. Leer solicitud pendiente.
-
-     */
-
-    const {
-
-      data: solicitud,
-
-      error: solicitudError,
-
-    } =
-
-      await supabase
-
-        .from(
-
-          "solicitudes_clientes"
-
-        )
-
-        .select(
-
-          `
-
-          id,
-
-          folio,
-
-          nombre,
-
-          telefono,
-
-          direccion,
-
-          referencia_domicilio,
-
-          estado
-
-          `
-
-        )
-
-        .eq(
-
-          "id",
-
-          solicitudId
-
-        )
-
-        .maybeSingle();
-
-
-
-    if (
-
-      solicitudError
-
-    ) {
-
-      return NextResponse.json(
-
-        {
-
-          success: false,
-
-          error:
-
-            "No se pudo consultar la solicitud.",
-
-          detalle:
-
-            solicitudError.message,
-
-        },
-
-        {
-
-          status: 500,
-
-        }
-
-      );
-
-    }
-
-
-
-    if (!solicitud) {
-
-      return NextResponse.json(
-
-        {
-
-          success: false,
-
-          error:
-
-            "Solicitud no encontrada.",
-
-        },
-
-        {
-
-          status: 404,
-
-        }
-
-      );
-
-    }
-
-
-
-    if (
-
-      solicitud.estado !==
-
-      "pendiente"
-
-    ) {
-
-      return NextResponse.json(
-
-        {
-
-          success: false,
-
-          error:
-
-            "Esta solicitud ya fue procesada.",
-
-        },
-
-        {
-
-          status: 409,
-
-        }
-
-      );
-
-    }
-
-
-
-    /*
-
-     * 2. Validar teléfono antes de
-
-     * crear carpeta o modificar Excel.
-
-     */
-
-    const telefono =
-
-      normalizarTelefono(
-
-        solicitud.telefono
-
-      );
-
-
-
-    if (!telefono) {
-
-      return NextResponse.json(
-
-        {
-
-          success: false,
-
-          error:
-
-            "La solicitud no contiene un teléfono válido.",
-
-        },
-
-        {
-
-          status: 400,
-
-        }
-
-      );
-
-    }
-
-
-
-    /*
-
-     * 3. Obtener conexión OneDrive.
-
-     */
-
-    const {
-
-      data: conexion,
-
-      error: conexionError,
-
-    } =
-
-      await supabase
-
-        .from(
-
-          "onedrive_connections"
-
-        )
-
-        .select(
-
-          "id, refresh_token"
-
-        )
-
-        .order(
-
-          "id",
-
-          {
-
-            ascending: false,
-
-          }
-
-        )
-
-        .limit(1)
-
-        .maybeSingle();
-
-
-
-    if (
-
-      conexionError ||
-
-      !conexion?.refresh_token
-
-    ) {
-
-      return NextResponse.json(
-
-        {
-
-          success: false,
-
-          error:
-
-            "No existe una conexión activa de OneDrive.",
-
-          detalle:
-
-            conexionError?.message ||
-
-            null,
-
-        },
-
-        {
-
-          status: 500,
-
-        }
-
-      );
-
-    }
-
-
-
-    /*
-
-     * 4. Renovar token.
-
-     */
-
-    const {
-
-      response:
-
-        tokenResponse,
-
-      data:
-
-        tokenData,
-
-    } =
-
-      await renovarToken(
-
-        clientId,
-
-        clientSecret,
-
-        conexion.refresh_token
-
-      );
-
-
-
-    if (
-
-      !tokenResponse.ok ||
-
-      !tokenData?.access_token
-
-    ) {
-
-      return NextResponse.json(
-
-        {
-
-          success: false,
-
-          error:
-
-            "No se pudo renovar el acceso a OneDrive.",
-
-          detalle:
-
-            tokenData
-
-              ?.error_description ||
-
-            tokenData?.error ||
-
-            `HTTP ${tokenResponse.status}`,
-
-        },
-
-        {
-
-          status: 400,
-
-        }
-
-      );
-
-    }
-
-
-
-    const accessToken =
-
-      String(
-
-        tokenData.access_token
-
-      );
-
-
-
-    accessTokenActivo =
-
-      accessToken;
-
-
-
-    const nuevoRefreshToken =
-
-      String(
-
-        tokenData
-
-          ?.refresh_token ||
-
-        ""
-
-      ).trim();
-
-
-
-    if (
-
-      nuevoRefreshToken &&
-
-      nuevoRefreshToken !==
-
-        conexion.refresh_token
-
-    ) {
-
-      const {
-
-        error:
-
-          refreshUpdateError,
-
-      } =
-
-        await supabase
-
-          .from(
-
-            "onedrive_connections"
-
-          )
-
-          .update({
-
-            refresh_token:
-
-              nuevoRefreshToken,
-
-            updated_at:
-
-              new Date()
-
-                .toISOString(),
-
-          })
-
-          .eq(
-
-            "id",
-
-            conexion.id
-
-          );
-
-
-
-      if (
-
-        refreshUpdateError
-
-      ) {
-
-        console.error(
-
-          "No se pudo guardar el refresh token renovado:",
-
-          refreshUpdateError
-
-        );
-
-      }
-
-    }
-
-
-
-    /*
-
-     * 5. Descargar Excel.
-
-     */
-
-    const excelBuffer =
-
-      await descargarExcel(
-
-        accessToken
-
-      );
-
-
-
-    const workbook =
-
-      XLSX.read(
-
-        Buffer.from(
-
-          excelBuffer
-
-        ),
-
-        {
-
-          type: "buffer",
-
-        }
-
-      );
-
-
-
-    const hoja =
-
-      workbook.Sheets[
-
-        HOJA_CLIENTES
-
-      ];
-
-
-
-    if (!hoja) {
-
-      return NextResponse.json(
-
-        {
-
-          success: false,
-
-          error:
-
-            `El Excel no contiene la hoja "${HOJA_CLIENTES}".`,
-
-        },
-
-        {
-
-          status: 400,
-
-        }
-
-      );
-
-    }
-
-
-
-    /*
-
-     * IMPORTANTE:
-
-     *
-
-     * raw:true permite leer el
-
-     * valor real de la celda.
-
-     */
-
-    const filas =
-
-      XLSX.utils.sheet_to_json<
-
-        Record<
-
-          string,
-
-          unknown
-
-        >
-
-      >(
-
-        hoja,
-
-        {
-
-          defval: "",
-
-          raw: true,
-
-        }
-
-      );
-
-
-
-    /*
-
-     * 6. Evitar teléfono duplicado.
-
-     */
-
-    const existeTelefono =
-
-      filas.some(
-
-        (fila) => {
-
-          const telefonoExistente =
-
-            normalizarTelefono(
-
-              fila[
-
-                "TelefonoWhatsApp"
-
-              ]
-
-            );
-
-
-
-          return (
-
-            telefonoExistente ===
-
-            telefono
-
-          );
-
-        }
-
-      );
-
-
-
-    if (
-
-      existeTelefono
-
-    ) {
-
-      return NextResponse.json(
-
-        {
-
-          success: false,
-
-          error:
-
-            "Este teléfono ya aparece en la hoja Clientes del Excel.",
-
-        },
-
-        {
-
-          status: 409,
-
-        }
-
-      );
-
-    }
-
-
-
-    /* 7. Reservar el número de forma atómica en Supabase. */
-    const idsExcel = Array.from(new Set(
-      filas.map((fila) => convertirIdCliente(fila["ID Cliente"]))
-        .filter((id): id is number => id !== null)
-    ));
-
-    const { data: numeroReservado, error: reservaError } = await supabase.rpc(
-      "reservar_numero_cliente",
-      { p_solicitud_id: solicitudId, p_ids_excel: idsExcel }
-    );
-    if (reservaError || !Number.isInteger(Number(numeroReservado))) {
-      throw new Error(reservaError?.message || "No se pudo reservar el número de cliente.");
-    }
-    const nuevoId = Number(numeroReservado);
-    reservaCreada = true;
-    idReservado = nuevoId;
-
-    const nombre =
-
-      limpiarTexto(
-
-        solicitud.nombre
-
-      );
-
-
-
-    if (!nombre) {
-
-      return NextResponse.json(
-
-        {
-
-          success: false,
-
-          error:
-
-            "La solicitud no contiene un nombre válido.",
-
-        },
-
-        {
-
-          status: 400,
-
-        }
-
-      );
-
-    }
-
-
-
-    const carpetaCliente =
-
-      `${numeroCliente(
-
-        nuevoId
-
-      )} ${nombre}`;
-
-
-
-    /*
-
-     * 8. Crear carpeta física
-
-     * en OneDrive.
-
-     */
-
-    const rootFolderId =
-
-      await obtenerCarpetaRaizClientes(
-
-        accessToken
-
-      );
-
-
-
-    // No reutilizar un número si todavía existe una carpeta física antigua.
-    // Microsoft Graph devuelve páginas; recorrerlas para evitar falsos libres.
-    let urlCarpetas: string | null =
-      `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(rootFolderId)}/children?$select=id,name,folder&$top=200`;
-    const prefijoReservado = numeroCliente(nuevoId);
-    while (urlCarpetas) {
-      const respuestaCarpetas: Response = await fetch(urlCarpetas, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-        cache: "no-store",
-      });
-      const datosCarpetas = await leerJsonSeguro(respuestaCarpetas);
-      if (!respuestaCarpetas.ok) {
-        throw new Error("No se pudieron verificar las carpetas anteriores de OneDrive.");
-      }
-      const existeNumero = (datosCarpetas?.value ?? []).some((item: any) => {
-        const n = String(item?.name ?? "").trim();
-        return item?.folder && (n === prefijoReservado || n.startsWith(`${prefijoReservado} `));
-      });
-      if (existeNumero) {
-        throw new Error(`El número ${prefijoReservado} todavía tiene una carpeta en OneDrive. Revisa su historial antes de asignarlo.`);
-      }
-      urlCarpetas = datosCarpetas?.["@odata.nextLink"] ?? null;
-    }
-
-    const carpeta =
-
-      await crearCarpetaCliente(
-
-        accessToken,
-
-        rootFolderId,
-
-        carpetaCliente
-
-      );
-
-
-
-    carpetaCreadaId =
-
-      carpeta.id;
-
-
-
-    /*
-
-     * 9. Normalizar teléfonos antiguos.
-
-     *
-
-     * Si el Excel internamente conserva
-
-     * el número completo, aquí queda
-
-     * convertido a string.
-
-     */
-
-    for (
-
-      const fila of filas
-
-    ) {
-
-      if (
-
-        fila[
-
-          "TelefonoWhatsApp"
-
-        ] !==
-
-        undefined &&
-
-        fila[
-
-          "TelefonoWhatsApp"
-
-        ] !==
-
-        null &&
-
-        fila[
-
-          "TelefonoWhatsApp"
-
-        ] !==
-
-        ""
-
-      ) {
-
-        fila[
-
-          "TelefonoWhatsApp"
-
-        ] =
-
-          normalizarTelefono(
-
-            fila[
-
-              "TelefonoWhatsApp"
-
-            ]
-
-          );
-
-      }
-
-    }
-
-
-
-    /*
-
-     * 10. Agregar nuevo cliente.
-
-     */
-
-    filas.push({
-
-      "ID Cliente":
-
-        nuevoId,
-
-
-
-      Nombre:
-
-        nombre,
-
-
-
-      CarpetaCliente:
-
-        carpetaCliente,
-
-
-
-      TelefonoWhatsApp:
-
-        telefono,
-
-
-
-      Direccion:
-
-        limpiarTexto(
-
-          solicitud.direccion
-
-        ),
-
-
-
-      ReferenciaDomicilio:
-
-        limpiarTexto(
-
-          solicitud
-
-            .referencia_domicilio
-
-        ),
+      auth: { autoRefreshToken: false, persistSession: false },
 
     });
 
 
 
-    /*
+    // Mutex persistente y global: serializa todas las aprobaciones que escriben
+    // en el mismo Excel y OneDrive, incluso entre instancias de Vercel.
+    // En caso de error NO se libera automáticamente: podría haber cambios
+    // parciales en OneDrive, Excel o Supabase. Requiere revisión manual.
+    etapa = "adquirir_bloqueo";
+    const { data: bloqueo, error: eBloqueo } = await supabase
+      .from("vipack_bloqueo_aprobaciones")
+      .insert({ id: 1, token: bloqueoToken, solicitud_id: solicitudId })
+      .select("id")
+      .maybeSingle();
 
-     * 11. Reconstruir hoja.
-
-     */
-
-    const nuevaHoja =
-
-      XLSX.utils.json_to_sheet(
-
-        filas
-
-      );
-
-
-
-    /*
-
-     * MUY IMPORTANTE:
-
-     *
-
-     * Fuerza toda la columna
-
-     * TelefonoWhatsApp como TEXTO.
-
-     */
-
-    forzarTelefonosComoTexto(
-
-      nuevaHoja
-
-    );
-
-
-
-    workbook.Sheets[
-
-      HOJA_CLIENTES
-
-    ] = nuevaHoja;
-
-
-
-    /*
-
-     * 12. Generar nuevo XLSX.
-
-     */
-
-    const nuevoExcel =
-
-      XLSX.write(
-
-        workbook,
-
-        {
-
-          type: "buffer",
-
-          bookType: "xlsx",
-
-        }
-
-      );
-
-
-
-    /*
-
-     * 13. Subir Excel.
-
-     */
-
-    const excelAntesDeSubir = await descargarExcel(accessToken);
-    if (!Buffer.from(excelAntesDeSubir).equals(Buffer.from(excelBuffer))) {
-      throw new Error("El Excel cambió durante la aprobación. Requiere revisión; no se sobrescribió.");
+    if (eBloqueo?.code === "23505") {
+      errorHttp("Ya existe una aprobación en curso o pendiente de revisión. No se inició otra.", 409);
     }
-    try {
-
-      await subirExcel(
-
-        accessToken,
-
-        nuevoExcel
-
-      );
-
-    } catch (error) {
-      // Una respuesta fallida de Graph NO demuestra que el archivo no se guardó.
-      // Conservar carpeta y reserva para revisión manual, sin borrado automático.
-      throw error;
+    if (eBloqueo || !bloqueo) {
+      errorHttp(`No se pudo obtener el bloqueo de aprobaciones: ${eBloqueo?.message || "sin confirmación"}`, 500);
     }
-    excelActualizado = true;
+    bloqueoAdquirido = true;
 
-    /*
+    const { data: solicitud, error: eSolicitud } = await supabase
 
-     * A partir de aquí el Excel
+      .from("solicitudes_clientes")
 
-     * ya se actualizó correctamente.
+      .select("id,estado,nombre,telefono,direccion,referencia_domicilio,id_cliente_asignado,carpeta_cliente,onedrive_folder_id")
 
-     *
+      .eq("id", solicitudId).maybeSingle();
 
-     * Evitamos que el catch general
+    if (eSolicitud) errorHttp(eSolicitud.message, 500);
 
-     * elimine la carpeta por un error
+    if (!solicitud) errorHttp("Solicitud no encontrada", 404);
 
-     * posterior de Supabase.
+    const s = solicitud as Solicitud;
 
-     */
+    const recuperando = s.estado === "procesando";
 
-    carpetaCreadaId = "";
+    if (s.estado !== "pendiente" && !recuperando) errorHttp("Solicitud ya atendida", 409);
 
+    if (recuperando && (
 
+      s.id !== RECUPERACION.solicitud ||
 
-    /*
+      Number(s.id_cliente_asignado) !== RECUPERACION.id ||
 
-     * 14. Crear cliente de inventario
+      limpiar(s.nombre) !== RECUPERACION.nombre ||
 
-     * en Supabase.
+      s.carpeta_cliente || s.onedrive_folder_id
 
-     */
+    )) errorHttp("Recuperación automática restringida: requiere revisión manual", 409);
 
-    const tokenInventario =
+    const nombre = limpiar(s.nombre);
 
-      randomUUID();
+    const tel = telefono(s.telefono);
 
+    if (!nombre || !tel) errorHttp("Faltan nombre o teléfono", 400);
 
 
-    const {
 
-      error:
+    const { data: conexion, error: eConexion } = await supabase
 
-        clienteInsertError,
+      .from("onedrive_connections").select("id,refresh_token")
 
-    } =
+      .order("id", { ascending: false }).limit(1).maybeSingle();
 
-      await supabase
+    if (eConexion || !conexion?.refresh_token) errorHttp("No existe conexión OneDrive", 500);
 
-        .from(
+    const rToken = await fetch("https://login.microsoftonline.com/consumers/oauth2/v2.0/token", {
 
-          "clientes_inventario"
+      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
 
-        )
+      body: new URLSearchParams({
 
-        .insert({
+        client_id: clientId, client_secret: clientSecret,
 
-          id_cliente:
+        grant_type: "refresh_token", refresh_token: conexion.refresh_token,
 
-            nuevoId,
+        scope: "openid profile offline_access User.Read Files.ReadWrite",
 
+      }), cache: "no-store",
 
+    });
 
-          nombre,
+    const tokenData = await jsonSeguro(rToken);
 
+    if (!rToken.ok || !tokenData?.access_token) errorHttp("No se pudo renovar acceso a OneDrive", 502);
 
+    const token = String(tokenData.access_token);
 
-          carpeta_cliente:
+    if (tokenData.refresh_token && tokenData.refresh_token !== conexion.refresh_token) {
 
-            carpetaCliente,
+      const { error } = await supabase.from("onedrive_connections")
 
+        .update({ refresh_token: tokenData.refresh_token, updated_at: new Date().toISOString() })
 
+        .eq("id", conexion.id);
 
-          onedrive_folder_id:
-
-            carpeta.id,
-
-
-
-          token_inventario:
-
-            tokenInventario,
-
-
-
-          activo:
-
-            true,
-
-
-
-          updated_at:
-
-            new Date()
-
-              .toISOString(),
-
-        });
-
-
-
-    if (
-
-      clienteInsertError
-
-    ) {
-
-      console.error(
-
-        "El Excel y OneDrive se actualizaron, pero falló clientes_inventario:",
-
-        clienteInsertError
-
-      );
-
-
-
-      return NextResponse.json(
-
-        {
-
-          success: false,
-
-
-
-          error:
-
-            "El cliente se agregó al Excel y se creó su carpeta, pero no se pudo crear su inventario en Supabase.",
-
-
-
-          detalle:
-
-            clienteInsertError.message,
-
-
-
-          requiere_revision:
-
-            true,
-
-
-
-          id_cliente:
-
-            nuevoId,
-
-
-
-          carpeta:
-
-            carpetaCliente,
-
-        },
-
-        {
-
-          status: 500,
-
-        }
-
-      );
+      if (error) errorHttp("No se pudo guardar el nuevo token de OneDrive", 500);
 
     }
 
 
 
-    /*
+    etapa = "lectura_excel";
 
-     * 15. Marcar solicitud aprobada.
+    const version = await obtenerVersionExcel(token);
 
-     */
+    const excelOriginal = await descargarExcel(token);
 
-    const {
+    const libro = XLSX.read(excelOriginal, { type: "buffer" });
 
-      error:
+    const hoja = libro.Sheets[HOJA_CLIENTES];
 
-        solicitudUpdateError,
+    if (!hoja) errorHttp(`Falta hoja ${HOJA_CLIENTES}`, 409);
 
-    } =
+    const filas = XLSX.utils.sheet_to_json<Fila>(hoja, { defval: "", raw: true });
 
-      await supabase
+    if (filas.some(f => telefono(f["TelefonoWhatsApp"]) === tel)) {
 
-        .from(
+      errorHttp("El teléfono ya existe en el Excel. Revisión manual necesaria", 409);
 
-          "solicitudes_clientes"
+    }
 
-        )
+    const ids = Array.from(new Set(filas.map(f => idExcel(f["ID Cliente"]))
 
-        .update({
+      .filter((n): n is number => n !== null)));
 
-          estado:
 
-            "aprobado",
 
+    if (recuperando) {
 
+      etapa = "validar_reserva_existente";
 
-          id_cliente_asignado:
+      const { data: reservas, error: eReserva } = await supabase
 
-            nuevoId,
+        .from("reservas_numeros_clientes").select("id_cliente,solicitud_id,estado")
 
+        .eq("solicitud_id", solicitudId);
 
+      if (eReserva) errorHttp(eReserva.message, 500);
 
-          carpeta_cliente:
+      if (reservas?.length !== 1 || Number(reservas[0].id_cliente) !== RECUPERACION.id ||
 
-            carpetaCliente,
+          reservas[0].estado !== "reservado") errorHttp("Reserva inconsistente", 409);
 
+      idAsignado = RECUPERACION.id;
 
+    } else {
 
-          onedrive_folder_id:
+      etapa = "reservar_numero";
 
-            carpeta.id,
+      const { data, error } = await supabase.rpc("reservar_numero_cliente", {
 
+        p_solicitud_id: solicitudId, p_ids_excel: ids,
 
+      });
 
-          updated_at:
+      if (error || !Number.isInteger(Number(data)) || Number(data) <= 0) {
 
-            new Date()
+        errorHttp(error?.message || "No se pudo reservar ID", 409);
 
-              .toISOString(),
+      }
 
-        })
+      idAsignado = Number(data);
 
-        .eq(
+    }
 
-          "id",
+    const id = idAsignado;
 
-          solicitud.id
+    const carpetaNombre = `${numero(id)} ${nombre}`;
 
-        );
+    if (ids.includes(id)) errorHttp(`ID ${id} ya existe en Excel`, 409);
 
+    const { data: clientesId, error: eClientes } = await supabase
 
+      .from("clientes_inventario").select("id_cliente").eq("id_cliente", id);
 
-    if (
+    if (eClientes) errorHttp(eClientes.message, 500);
 
-      solicitudUpdateError
+    if (clientesId?.length) errorHttp(`ID ${id} ya existe en inventario`, 409);
 
-    ) {
+    const { data: otros, error: eOtros } = await supabase
 
-      return NextResponse.json(
+      .from("solicitudes_clientes").select("id")
 
-        {
+      .eq("id_cliente_asignado", id).neq("id", solicitudId);
 
-          success: false,
+    if (eOtros) errorHttp(eOtros.message, 500);
 
+    if (otros?.length) errorHttp(`ID ${id} está asignado a otra solicitud`, 409);
 
+    const { data: reservasId, error: eReservasId } = await supabase
 
-          error:
+      .from("reservas_numeros_clientes").select("solicitud_id")
 
-            "El cliente fue creado, pero no se pudo actualizar el estado de la solicitud.",
+      .eq("id_cliente", id);
 
+    if (eReservasId) errorHttp(eReservasId.message, 500);
 
+    if (reservasId?.length !== 1 || Number(reservasId[0].solicitud_id) !== solicitudId) {
 
-          detalle:
-
-            solicitudUpdateError.message,
-
-
-
-          requiere_revision:
-
-            true,
-
-
-
-          id_cliente:
-
-            nuevoId,
-
-
-
-          carpeta:
-
-            carpetaCliente,
-
-        },
-
-        {
-
-          status: 500,
-
-        }
-
-      );
+      errorHttp("La reserva del ID no coincide con la solicitud", 409);
 
     }
 
 
 
-    const { error: confirmarReservaError } = await supabase
-      .from("reservas_numeros_clientes")
+    etapa = "verificar_carpetas";
+
+    const raiz = await obtenerRaiz(token);
+
+    const existentes = await buscarCarpetaPorNumero(token, raiz, id);
+
+    if (existentes.length) errorHttp(`Existe carpeta ${numero(id)} en OneDrive. Revisión manual.`, 409);
+
+
+
+    // Validar versión antes de crear carpeta. No reintentar ciegamente
+
+    // después de crearla: el resultado remoto puede ser incierto.
+
+    const versionActual = await obtenerVersionExcel(token);
+
+    if (versionActual.etag !== version.etag || versionActual.id !== version.id) {
+
+      errorHttp("El Excel cambió mientras se aprobaba; reintenta tras revisar", 409);
+
+    }
+
+    etapa = "crear_carpeta";
+
+    const carpeta = await crearCarpeta(token, raiz, carpetaNombre);
+
+    if (!carpeta?.id) errorHttp("OneDrive no devolvió ID de carpeta; revisión manual", 502);
+
+
+
+    etapa = "subir_excel";
+
+    // Mantener columnas y hojas existentes; agregar solo fila nueva.
+
+    const nuevaFila: Fila = {
+
+      "ID Cliente": id, Nombre: nombre, CarpetaCliente: carpetaNombre,
+
+      TelefonoWhatsApp: tel, Direccion: limpiar(s.direccion),
+
+      ReferenciaDomicilio: limpiar(s.referencia_domicilio),
+
+    };
+
+    const encabezados = (XLSX.utils.sheet_to_json<unknown[]>(hoja, {
+
+      header: 1, blankrows: false,
+
+    })[0] ?? []).map(x => limpiar(x));
+
+    const obligatorios = ["ID Cliente", "Nombre", "CarpetaCliente", "TelefonoWhatsApp", "Direccion", "ReferenciaDomicilio"];
+
+    if (obligatorios.some(c => !encabezados.includes(c))) {
+
+      errorHttp("Faltan columnas en el Excel. Carpeta ya creada: requiere revisión manual", 409);
+
+    }
+
+    XLSX.utils.sheet_add_json(hoja, [nuevaFila], {
+
+      skipHeader: true, origin: -1, header: encabezados,
+
+    });
+
+    forzarTelefonosTexto(hoja);
+
+    const nuevoExcel = XLSX.write(libro, { type: "buffer", bookType: "xlsx" }) as Buffer;
+
+    await subirExcel(token, version.id, version.etag, Buffer.from(nuevoExcel));
+
+
+
+    etapa = "crear_inventario";
+
+    const tokenInventario = randomUUID();
+
+    const { error: eInventario } = await supabase.from("clientes_inventario").insert({
+
+      id_cliente: id, nombre, carpeta_cliente: carpetaNombre,
+
+      onedrive_folder_id: String(carpeta.id), token_inventario: tokenInventario,
+
+      activo: true, updated_at: new Date().toISOString(),
+
+    });
+
+    if (eInventario) errorHttp(`Excel y carpeta creados, pero falló inventario: ${eInventario.message}`, 500);
+
+
+
+    etapa = "confirmar_solicitud";
+
+    const { data: aprobadas, error: eAprobar } = await supabase.from("solicitudes_clientes").update({
+
+      estado: "aprobado", id_cliente_asignado: id,
+
+      carpeta_cliente: carpetaNombre, onedrive_folder_id: String(carpeta.id),
+
+      updated_at: new Date().toISOString(),
+
+    }).eq("id", solicitudId).eq("estado", "procesando")
+      .eq("id_cliente_asignado", id).select("id");
+
+    if (eAprobar || aprobadas?.length !== 1) {
+      errorHttp(`Inventario creado, pero no se confirmó exactamente una solicitud: ${eAprobar?.message || "revisar estado"}`, 500);
+    }
+
+
+
+    etapa = "confirmar_reserva";
+
+    const { data: confirmadas, error: eConfirmar } = await supabase.from("reservas_numeros_clientes")
       .update({ estado: "confirmado" })
-      .eq("solicitud_id", solicitudId)
-      .eq("id_cliente", nuevoId);
-    if (confirmarReservaError) {
-      console.error("Reserva pendiente de confirmación (cliente aprobado):", confirmarReservaError);
-      return NextResponse.json({
-        success: false,
-        requiere_revision: true,
-        id_cliente: nuevoId,
-        error: "Cliente aprobado, pero no se pudo confirmar su reserva. Requiere revisión.",
-      }, { status: 500 });
+      .eq("solicitud_id", solicitudId).eq("id_cliente", id)
+      .eq("estado", "reservado").select("solicitud_id");
+
+    if (eConfirmar || confirmadas?.length !== 1) {
+      errorHttp(`Cliente aprobado, pero no se confirmó exactamente una reserva: ${eConfirmar?.message || "revisar reserva"}`, 500);
     }
 
-    /*
-
-     * 16. Respuesta correcta.
-
-     */
+    etapa = "liberar_bloqueo";
+    const { data: liberados, error: eLiberar } = await supabase
+      .from("vipack_bloqueo_aprobaciones")
+      .delete().eq("id", 1).eq("token", bloqueoToken).select("id");
+    if (eLiberar || liberados?.length !== 1) {
+      errorHttp(`Cliente aprobado, pero el bloqueo requiere revisión: ${eLiberar?.message || "no se liberó"}`, 500);
+    }
+    bloqueoAdquirido = false;
 
     return NextResponse.json({
 
-      success: true,
+      success: true, cliente: {
 
+        id_cliente: id, nombre, telefono: tel, direccion: s.direccion,
 
+        referencia_domicilio: s.referencia_domicilio,
 
-      cliente: {
+        carpeta_cliente: carpetaNombre, onedrive_folder_id: String(carpeta.id),
 
-        id_cliente:
-
-          nuevoId,
-
-
-
-        nombre,
-
-
-
-        telefono,
-
-
-
-        direccion:
-
-          solicitud.direccion,
-
-
-
-        referencia_domicilio:
-
-          solicitud
-
-            .referencia_domicilio,
-
-
-
-        carpeta_cliente:
-
-          carpetaCliente,
-
-
-
-        onedrive_folder_id:
-
-          carpeta.id,
-
-
-
-        token_inventario:
-
-          tokenInventario,
+        token_inventario: tokenInventario,
 
       },
 
     });
 
-  } catch (
+  } catch (error: unknown) {
 
-    error: unknown
+    const e = error as Error & { status?: number };
 
-  ) {
+    console.error("VIPACK aprobación requiere revisión", { etapa, idAsignado, error: e.message });
 
-    /*
+    return NextResponse.json({
 
-     * Solo eliminamos carpeta cuando
+      success: false, error: e.message || "Error desconocido",
 
-     * el proceso falló ANTES de que
+      etapa, id_cliente: idAsignado,
+      requiere_revision: bloqueoAdquirido || idAsignado !== null,
 
-     * el Excel quedara confirmado.
-
-     */
-
-    // No eliminar carpetas automáticamente: una operación remota puede
-    // haberse completado aunque su respuesta haya fallado.
-    if (reservaCreada) {
-      console.error("VIPACK: aprobación requiere revisión manual", {
-        idReservado, carpetaCreadaId, excelActualizado,
-      });
-    }
-
-    console.error(
-
-      "Error API clientes/aprobar:",
-
-      error
-
-    );
-
-
-
-    return NextResponse.json(
-
-      {
-
-        success: false,
-
-
-
-        error:
-
-          error instanceof Error
-
-            ? error.message
-
-            : "Error desconocido.",
-
-      },
-
-      {
-
-        status: 500,
-
-      }
-
-    );
+    }, { status: e.status || 500 });
 
   }
 
