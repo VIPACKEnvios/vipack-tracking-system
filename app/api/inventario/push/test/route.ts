@@ -5,20 +5,21 @@ import webpush from "web-push";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+function obtenerSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !supabaseServiceRoleKey) {
-  throw new Error("Faltan variables de Supabase.");
+  if (!url || !key) {
+    throw new Error("Faltan variables de Supabase.");
+  }
+
+  return createClient(url, key, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
 }
-
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-});
-
 export async function GET(request: NextRequest) {
   try {
     // Esta ruta solo puede utilizarse con el secreto del servidor.
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     // Antes de consultar dispositivos, verificar que el cliente exista
     // y tenga acceso activo al inventario.
-    const { data: cliente, error: clienteError } = await supabase
+    const { data: cliente, error: clienteError } = await obtenerSupabaseAdmin()
       .from("clientes_inventario")
       .select("id_cliente, activo")
       .eq("id_cliente", clienteId)
@@ -96,7 +97,7 @@ export async function GET(request: NextRequest) {
 
     webpush.setVapidDetails(subject, publicKey, privateKey);
 
-    const { data: suscripciones, error: suscripcionesError } = await supabase
+    const { data: suscripciones, error: suscripcionesError } = await obtenerSupabaseAdmin()
       .from("push_subscriptions")
       .select("id, cliente_id, endpoint, p256dh, auth, activo")
       .eq("cliente_id", clienteId)
@@ -143,7 +144,7 @@ export async function GET(request: NextRequest) {
     for (const suscripcion of suscripciones) {
       // Evitar envíos posteriores si la clienta fue dada de baja
       // mientras se procesaban los dispositivos anteriores.
-      const { data: clienteVigente, error: vigenciaError } = await supabase
+      const { data: clienteVigente, error: vigenciaError } = await obtenerSupabaseAdmin()
         .from("clientes_inventario")
         .select("id_cliente")
         .eq("id_cliente", clienteId)

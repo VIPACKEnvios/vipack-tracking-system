@@ -11,33 +11,21 @@ export const dynamic = "force-dynamic";
 const BATCH_SIZE = 30;
 const INTERVALO_MINUTOS = 15;
 
-const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL;
+function obtenerSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const supabaseServiceRoleKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error("Faltan variables de Supabase.");
+  }
 
-if (
-  !supabaseUrl ||
-  !supabaseServiceRoleKey
-) {
-  throw new Error(
-    "Faltan variables de Supabase."
-  );
+  return createClient(url, key, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
 }
-
-const supabaseAdmin =
-  createClient(
-    supabaseUrl,
-    supabaseServiceRoleKey,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  );
-
 type ClienteInventario = {
   id_cliente: number;
   token_inventario: string | null;
@@ -294,7 +282,7 @@ export async function GET(
       data,
       error:
         clientesError,
-    } = await supabaseAdmin
+    } = await obtenerSupabaseAdmin()
       .from(
         "clientes_inventario"
       )
