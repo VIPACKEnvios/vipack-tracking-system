@@ -22,9 +22,8 @@ const HOJA_CLIENTES = "Clientes";
 
 const RECUPERACION = { solicitud: 8, id: 55, nombre: "Isabel Alvarado" };
 
-
-
 // Recuperación específica de la solicitud 8. El bloqueo debe estar inactivo al menos 5 minutos.
+
 const EDAD_MINIMA_BLOQUEO_MS = 5 * 60 * 1000;
 
 type Fila = Record<string, unknown>;
@@ -318,40 +317,75 @@ export async function POST(request: NextRequest) {
     etapa = "adquirir_bloqueo";
 
     if (solicitudId === RECUPERACION.solicitud) {
+
       // Recuperar solo el bloqueo previo de esta solicitud, mediante CAS del token.
+
       // Un proceso que siga activo no debe ser desplazado.
+
       const { data: previo, error: ePrevio } = await supabase
+
         .from("vipack_bloqueo_aprobaciones")
+
         .select("id,solicitud_id,token,creado_en")
+
         .eq("id", 1).maybeSingle();
+
       if (ePrevio || !previo || Number(previo.solicitud_id) !== solicitudId) {
+
         errorHttp("No hay un bloqueo de recuperación válido para Isabel.", 409);
+
       }
+
       const edad = Date.now() - new Date(previo.creado_en).getTime();
+
       if (!Number.isFinite(edad) || edad < EDAD_MINIMA_BLOQUEO_MS) {
+
         errorHttp("El bloqueo es demasiado reciente para recuperarlo con seguridad.", 409);
+
       }
+
       const { data: tomado, error: eTomar } = await supabase
+
         .from("vipack_bloqueo_aprobaciones")
+
         .update({ token: bloqueoToken })
+
         .eq("id", 1).eq("solicitud_id", solicitudId)
+
         .eq("token", previo.token).eq("creado_en", previo.creado_en)
+
         .select("id").maybeSingle();
+
       if (eTomar || !tomado) {
+
         errorHttp("El bloqueo cambió o ya fue tomado. No se ejecutó la recuperación.", 409);
+
       }
+
     } else {
+
       const { data: bloqueo, error: eBloqueo } = await supabase
+
         .from("vipack_bloqueo_aprobaciones")
+
         .insert({ id: 1, token: bloqueoToken, solicitud_id: solicitudId })
+
         .select("id").maybeSingle();
+
       if (eBloqueo?.code === "23505") {
+
         errorHttp("Ya existe una aprobación en curso o pendiente de revisión.", 409);
+
       }
+
       if (eBloqueo || !bloqueo) {
+
         errorHttp(`No se pudo obtener el bloqueo: ${eBloqueo?.message || "sin confirmación"}`, 500);
+
       }
+
     }
+
     bloqueoAdquirido = true;
 
     const { data: solicitud, error: eSolicitud } = await supabase
@@ -370,15 +404,11 @@ export async function POST(request: NextRequest) {
 
     const recuperando = s.estado === "procesando";
 
-
-
     if (solicitudId === RECUPERACION.solicitud && !recuperando) {
 
       errorHttp("La solicitud 8 ya no está en estado procesando; no ejecutar recuperación.", 409);
 
     }
-
-
 
     if (s.estado !== "pendiente" && !recuperando) errorHttp("Solicitud ya atendida", 409);
 
@@ -448,8 +478,6 @@ export async function POST(request: NextRequest) {
 
     const excelOriginal = await descargarExcel(token);
 
-
-
     const versionTrasDescarga = await obtenerVersionExcel(token);
 
     if (versionTrasDescarga.id !== version.id || versionTrasDescarga.etag !== version.etag) {
@@ -457,8 +485,6 @@ export async function POST(request: NextRequest) {
       errorHttp("El Excel cambió durante la descarga. Revisar antes de continuar.", 409);
 
     }
-
-
 
     const libro = XLSX.read(excelOriginal, { type: "buffer" });
 
@@ -554,6 +580,22 @@ export async function POST(request: NextRequest) {
 
     }
 
+    // Validar estructura antes de cualquier creación de carpeta en OneDrive.
+    const encabezados = (XLSX.utils.sheet_to_json<unknown[]>(hoja, {
+
+      header: 1, blankrows: false,
+
+    })[0] ?? []).map(x => limpiar(x));
+
+    const obligatorios = ["ID Cliente", "Nombre", "CarpetaCliente", "TelefonoWhatsApp", "Direccion", "ReferenciaDomicilio"];
+
+    if (obligatorios.some(c => !encabezados.includes(c))) {
+
+      errorHttp("Faltan columnas en el Excel; no se creó carpeta", 409);
+
+    }
+
+
     etapa = "verificar_carpetas";
 
     const raiz = await obtenerRaiz(token);
@@ -563,24 +605,27 @@ export async function POST(request: NextRequest) {
     let carpeta: { id: string; name?: string };
 
     if (recuperando) {
-
-      // La carpeta se creó antes del fallo del Excel. Exigir coincidencia
-
-      // única y exacta para evitar enlazar la carpeta de otra persona.
-
-      if (existentes.length !== 1 || existentes[0].name !== carpetaNombre) {
-
-        errorHttp("La carpeta de recuperación no coincide exactamente o hay duplicados. Revisión manual.", 409);
-
+      // Solo para la solicitud 8: reutilizar una carpeta exacta o crearla si no existe.
+      // Si hay nombres distintos o duplicados, detenerse para revisión manual.
+      if (existentes.length > 1) {
+        errorHttp("Hay varias carpetas con el ID 00055. Revisión manual.", 409);
       }
-
-      carpeta = existentes[0];
-
+      if (existentes.length === 1) {
+        if (existentes[0].name !== carpetaNombre) {
+          errorHttp("La carpeta 00055 tiene un nombre distinto. Revisión manual.", 409);
+        }
+        carpeta = existentes[0];
+      } else {
+        carpeta = { id: "" };
+      }
     } else {
 
       if (existentes.length) {
+
         console.error("VIPACK carpeta en conflicto", { id, carpetas: existentes });
+
         errorHttp(`Existe carpeta ${numero(id)} en OneDrive. Revisión manual.`, 409);
+
       }
 
       // Se asignará después de verificar la versión del Excel.
@@ -601,7 +646,7 @@ export async function POST(request: NextRequest) {
 
     }
 
-    if (!recuperando) {
+    if (!carpeta.id) {
 
       etapa = "crear_carpeta";
 
@@ -628,20 +673,6 @@ export async function POST(request: NextRequest) {
       ReferenciaDomicilio: limpiar(s.referencia_domicilio),
 
     };
-
-    const encabezados = (XLSX.utils.sheet_to_json<unknown[]>(hoja, {
-
-      header: 1, blankrows: false,
-
-    })[0] ?? []).map(x => limpiar(x));
-
-    const obligatorios = ["ID Cliente", "Nombre", "CarpetaCliente", "TelefonoWhatsApp", "Direccion", "ReferenciaDomicilio"];
-
-    if (obligatorios.some(c => !encabezados.includes(c))) {
-
-      errorHttp("Faltan columnas en el Excel. Carpeta ya creada: requiere revisión manual", 409);
-
-    }
 
     XLSX.utils.sheet_add_json(hoja, [nuevaFila], {
 
