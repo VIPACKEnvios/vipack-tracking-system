@@ -1,16 +1,33 @@
+
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
+/*
+ * =========================================================
+ * CONFIGURACIÓN DE SUPABASE
+ * =========================================================
+ *
+ * El cliente se crea únicamente cuando se necesita.
+ * Esto evita inicializar Supabase durante el build.
+ */
+
+function obtenerSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error(
+      "Faltan variables de entorno de Supabase para notificaciones."
+    );
+  }
+
+  return createClient(supabaseUrl, supabaseKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
-  }
-);
+  });
+}
 
 type InventarioResponse = {
   success: boolean;
@@ -22,15 +39,17 @@ type InventarioResponse = {
   error?: string;
 };
 
+/*
+ * =========================================================
+ * VALIDAR CLIENTE POR TOKEN
+ * =========================================================
+ */
+
 async function obtenerClientePorToken(
   request: NextRequest,
   token: string
 ) {
   try {
-    /*
-     * Aprovechamos la API de inventario que ya utiliza VIPACK.
-     * Esa API es la que determina qué cliente pertenece al token.
-     */
     const urlInventario = new URL(
       `/api/inventario/${encodeURIComponent(token)}`,
       request.nextUrl.origin
@@ -69,7 +88,7 @@ async function obtenerClientePorToken(
 /*
  * =========================================================
  * GET
- * Obtener las notificaciones del cliente
+ * OBTENER NOTIFICACIONES DEL CLIENTE
  * =========================================================
  */
 
@@ -96,11 +115,10 @@ export async function GET(
       );
     }
 
-    const cliente =
-      await obtenerClientePorToken(
-        request,
-        token
-      );
+    const cliente = await obtenerClientePorToken(
+      request,
+      token
+    );
 
     if (!cliente) {
       return NextResponse.json(
@@ -115,29 +133,27 @@ export async function GET(
       );
     }
 
-    const { data, error } =
-      await supabaseAdmin
-        .from("notificaciones_clientes")
-        .select(
-          `
-            id,
-            cliente_id,
-            titulo,
-            mensaje,
-            tipo,
-            url,
-            leida,
-            created_at
-          `
-        )
-        .eq(
-          "cliente_id",
-          cliente.id_cliente
-        )
-        .order("created_at", {
-          ascending: false,
-        })
-        .limit(30);
+    const supabaseAdmin = obtenerSupabaseAdmin();
+
+    const { data, error } = await supabaseAdmin
+      .from("notificaciones_clientes")
+      .select(
+        `
+          id,
+          cliente_id,
+          titulo,
+          mensaje,
+          tipo,
+          url,
+          leida,
+          created_at
+        `
+      )
+      .eq("cliente_id", cliente.id_cliente)
+      .order("created_at", {
+        ascending: false,
+      })
+      .limit(30);
 
     if (error) {
       console.error(
@@ -157,31 +173,20 @@ export async function GET(
       );
     }
 
-    const notificaciones =
-      data || [];
+    const notificaciones = data || [];
 
-    const noLeidas =
-      notificaciones.filter(
-        (notificacion) =>
-          !notificacion.leida
-      ).length;
+    const noLeidas = notificaciones.filter(
+      (notificacion) => !notificacion.leida
+    ).length;
 
     return NextResponse.json({
       success: true,
-
       cliente: {
-        id_cliente:
-          cliente.id_cliente,
-        nombre:
-          cliente.nombre,
+        id_cliente: cliente.id_cliente,
+        nombre: cliente.nombre,
       },
-
-      total:
-        notificaciones.length,
-
-      no_leidas:
-        noLeidas,
-
+      total: notificaciones.length,
+      no_leidas: noLeidas,
       notificaciones,
     });
   } catch (error) {
@@ -206,7 +211,7 @@ export async function GET(
 /*
  * =========================================================
  * PATCH
- * Marcar una notificación o todas como leídas
+ * MARCAR NOTIFICACIONES COMO LEÍDAS
  * =========================================================
  */
 
@@ -233,18 +238,16 @@ export async function PATCH(
       );
     }
 
-    const cliente =
-      await obtenerClientePorToken(
-        request,
-        token
-      );
+    const cliente = await obtenerClientePorToken(
+      request,
+      token
+    );
 
     if (!cliente) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Cliente no encontrado.",
+          error: "Cliente no encontrado.",
         },
         {
           status: 404,
@@ -252,32 +255,23 @@ export async function PATCH(
       );
     }
 
-    const body =
-      await request.json();
+    const body = await request.json();
 
     /*
      * OPCIÓN 1
-     * Marcar todas como leídas
+     * Marcar todas las notificaciones como leídas
      */
-    if (
-      body?.marcarTodas === true
-    ) {
-      const { error } =
-        await supabaseAdmin
-          .from(
-            "notificaciones_clientes"
-          )
-          .update({
-            leida: true,
-          })
-          .eq(
-            "cliente_id",
-            cliente.id_cliente
-          )
-          .eq(
-            "leida",
-            false
-          );
+
+    if (body?.marcarTodas === true) {
+      const supabaseAdmin = obtenerSupabaseAdmin();
+
+      const { error } = await supabaseAdmin
+        .from("notificaciones_clientes")
+        .update({
+          leida: true,
+        })
+        .eq("cliente_id", cliente.id_cliente)
+        .eq("leida", false);
 
       if (error) {
         console.error(
@@ -306,20 +300,16 @@ export async function PATCH(
 
     /*
      * OPCIÓN 2
-     * Marcar una sola notificación
+     * Marcar una sola notificación como leída
      */
-    const id =
-      Number(body?.id);
 
-    if (
-      !Number.isInteger(id) ||
-      id <= 0
-    ) {
+    const id = Number(body?.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "ID de notificación no válido.",
+          error: "ID de notificación no válido.",
         },
         {
           status: 400,
@@ -328,33 +318,21 @@ export async function PATCH(
     }
 
     /*
-     * MUY IMPORTANTE:
+     * SEGURIDAD
      *
-     * No basta con buscar por ID.
-     * También exigimos que cliente_id sea
-     * exactamente el cliente del token.
-     *
-     * Así un cliente no puede marcar
-     * una notificación de otro cliente.
+     * Se valida tanto el ID de la notificación
+     * como el ID del cliente asociado al token.
      */
-    const {
-      data,
-      error,
-    } = await supabaseAdmin
-      .from(
-        "notificaciones_clientes"
-      )
+
+    const supabaseAdmin = obtenerSupabaseAdmin();
+
+    const { data, error } = await supabaseAdmin
+      .from("notificaciones_clientes")
       .update({
         leida: true,
       })
-      .eq(
-        "id",
-        id
-      )
-      .eq(
-        "cliente_id",
-        cliente.id_cliente
-      )
+      .eq("id", id)
+      .eq("cliente_id", cliente.id_cliente)
       .select(
         `
           id,
@@ -391,8 +369,7 @@ export async function PATCH(
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Notificación no encontrada.",
+          error: "Notificación no encontrada.",
         },
         {
           status: 404,
@@ -402,8 +379,7 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-      notificacion:
-        data,
+      notificacion: data,
     });
   } catch (error) {
     console.error(
