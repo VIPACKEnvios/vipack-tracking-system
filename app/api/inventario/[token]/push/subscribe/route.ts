@@ -28,25 +28,21 @@ type PushBody = {
   };
 };
 
-const supabaseAdmin =
-  createClient(
-    process.env
-      .NEXT_PUBLIC_SUPABASE_URL!,
+function obtenerSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    process.env
-      .SUPABASE_SERVICE_ROLE_KEY!,
+  if (!url || !key) {
+    throw new Error("Faltan variables de Supabase.");
+  }
 
-    {
-      auth: {
-        autoRefreshToken:
-          false,
-
-        persistSession:
-          false,
-      },
-    }
-  );
-
+  return createClient(url, key, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
 async function obtenerClientePorToken(
   token: string
 ) {
@@ -54,7 +50,7 @@ async function obtenerClientePorToken(
     data,
     error,
   } =
-    await supabaseAdmin
+    await obtenerSupabaseAdmin()
       .from(
         "clientes_inventario"
       )
@@ -136,7 +132,7 @@ export async function GET(
     const {
       data: suscripcion,
       error: suscripcionError,
-    } = await supabaseAdmin
+    } = await obtenerSupabaseAdmin()
       .from("push_subscriptions")
       .select(`
         id,
@@ -253,7 +249,7 @@ export async function POST(
     const {
       data: existente,
       error: existenteError,
-    } = await supabaseAdmin
+    } = await obtenerSupabaseAdmin()
       .from("push_subscriptions")
       .select(`
         id,
@@ -290,7 +286,7 @@ export async function POST(
 
     if (existente) {
       const { error: actualizarError } =
-        await supabaseAdmin
+        await obtenerSupabaseAdmin()
           .from("push_subscriptions")
           .update(datosSuscripcion)
           .eq("id", existente.id);
@@ -321,7 +317,7 @@ export async function POST(
     }
 
     const { error: insertarError } =
-      await supabaseAdmin
+      await obtenerSupabaseAdmin()
         .from("push_subscriptions")
         .insert({
           cliente_id: clienteId,
