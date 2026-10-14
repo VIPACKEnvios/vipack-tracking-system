@@ -11,7 +11,14 @@ import {
 type FormularioCliente = {
   nombre: string;
   telefono: string;
-  direccion: string;
+  calle: string;
+  numero_exterior: string;
+  numero_interior: string;
+  colonia: string;
+  delegacion: string;
+  codigo_postal: string;
+  ciudad: string;
+  estado: string;
   referencia_domicilio: string;
 };
 
@@ -24,7 +31,14 @@ type RespuestaRegistro = {
 const formularioInicial: FormularioCliente = {
   nombre: "",
   telefono: "",
-  direccion: "",
+  calle: "",
+  numero_exterior: "",
+  numero_interior: "",
+  colonia: "",
+  delegacion: "",
+  codigo_postal: "",
+  ciudad: "",
+  estado: "",
   referencia_domicilio: "",
 };
 
@@ -49,7 +63,13 @@ export default function RegistroClientePage() {
       const campos = [
         formulario.nombre,
         formulario.telefono,
-        formulario.direccion,
+        formulario.calle,
+        formulario.numero_exterior,
+        formulario.colonia,
+        formulario.delegacion,
+        formulario.codigo_postal,
+        formulario.ciudad,
+        formulario.estado,
         formulario.referencia_domicilio,
       ];
 
@@ -173,8 +193,23 @@ export default function RegistroClientePage() {
                 nombre:
                   formulario.nombre.trim(),
                 telefono,
-                direccion:
-                  formulario.direccion.trim(),
+                // Se conserva "direccion" para compatibilidad con la API actual.
+                direccion: [
+                  [formulario.calle.trim(), formulario.numero_exterior.trim(), formulario.numero_interior.trim()].filter(Boolean).join(" "),
+                  formulario.colonia.trim(),
+                  `C.P. ${formulario.codigo_postal.trim()}`,
+                  formulario.delegacion.trim(),
+                  formulario.ciudad.trim(),
+                  formulario.estado.trim(),
+                ].filter(Boolean).join(", "),
+                calle: formulario.calle.trim(),
+                numero_exterior: formulario.numero_exterior.trim(),
+                numero_interior: formulario.numero_interior.trim(),
+                colonia: formulario.colonia.trim(),
+                delegacion: formulario.delegacion.trim(),
+                codigo_postal: formulario.codigo_postal.trim(),
+                ciudad: formulario.ciudad.trim(),
+                estado: formulario.estado.trim(),
                 referencia_domicilio:
                   formulario
                     .referencia_domicilio
@@ -482,30 +517,70 @@ export default function RegistroClientePage() {
                   }
                 >
                   <div className="space-y-5">
-                    <div>
-                      <label
-                        htmlFor="direccion"
-                        className="mb-2 block text-sm font-black text-slate-800"
-                      >
-                        Dirección completa
-                        <span className="ml-1 text-red-600">
-                          *
-                        </span>
-                      </label>
-
-                      <textarea
-                        id="direccion"
-                        name="direccion"
-                        value={
-                          formulario.direccion
-                        }
-                        onChange={
-                          actualizarCampo
-                        }
-                        required
-                        rows={4}
-                        placeholder="Calle, número exterior/interior, colonia, código postal, ciudad, municipio y estado"
-                        className="w-full min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100 sm:text-sm"
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Campo
+                        etiqueta="Calle"
+                        nombre="calle"
+                        valor={formulario.calle}
+                        onChange={actualizarCampo}
+                        placeholder="Calle"
+                        requerido
+                      />
+                      <Campo
+                        etiqueta="Número exterior"
+                        nombre="numero_exterior"
+                        valor={formulario.numero_exterior}
+                        onChange={actualizarCampo}
+                        placeholder="Número exterior"
+                        requerido
+                      />
+                      <Campo
+                        etiqueta="Número interior"
+                        nombre="numero_interior"
+                        valor={formulario.numero_interior}
+                        onChange={actualizarCampo}
+                        placeholder="Número interior"
+                        
+                      />
+                      <Campo
+                        etiqueta="Colonia"
+                        nombre="colonia"
+                        valor={formulario.colonia}
+                        onChange={actualizarCampo}
+                        placeholder="Colonia"
+                        requerido
+                      />
+                      <Campo
+                        etiqueta="Municipio / Delegación"
+                        nombre="delegacion"
+                        valor={formulario.delegacion}
+                        onChange={actualizarCampo}
+                        placeholder="Municipio / Delegación"
+                        requerido
+                      />
+                      <Campo
+                        etiqueta="Código postal"
+                        nombre="codigo_postal"
+                        valor={formulario.codigo_postal}
+                        onChange={actualizarCampo}
+                        placeholder="Código postal"
+                        requerido
+                      />
+                      <Campo
+                        etiqueta="Ciudad"
+                        nombre="ciudad"
+                        valor={formulario.ciudad}
+                        onChange={actualizarCampo}
+                        placeholder="Ciudad"
+                        requerido
+                      />
+                      <Campo
+                        etiqueta="Estado"
+                        nombre="estado"
+                        valor={formulario.estado}
+                        onChange={actualizarCampo}
+                        placeholder="Estado"
+                        requerido
                       />
                     </div>
 
@@ -639,7 +714,15 @@ type CampoProps = {
   etiqueta: string;
   nombre:
     | "nombre"
-    | "telefono";
+    | "telefono"
+    | "calle"
+    | "numero_exterior"
+    | "numero_interior"
+    | "colonia"
+    | "delegacion"
+    | "codigo_postal"
+    | "ciudad"
+    | "estado";
   valor: string;
   tipo?: string;
   placeholder?: string;

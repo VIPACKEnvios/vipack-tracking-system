@@ -77,6 +77,15 @@ type DatosClienteResponse = {
     direccion: string;
 
     referencia_domicilio: string;
+    calle?: string | null;
+    numero_exterior?: string | null;
+    numero_interior?: string | null;
+    colonia?: string | null;
+    delegacion?: string | null;
+    codigo_postal?: string | null;
+    ciudad?: string | null;
+    estado?: string | null;
+
 
   };
 
@@ -748,22 +757,22 @@ export default function InventarioClientePage() {
 
 
 
-  const [formDatos, setFormDatos] =
+  const [formDatos, setFormDatos] = useState({
+    nombre: "", telefono: "", direccion: "", referencia_domicilio: "",
+    calle: "", numero_exterior: "", numero_interior: "", colonia: "",
+    delegacion: "", codigo_postal: "", ciudad: "", estado: "",
+  });
 
-    useState({
-
-      nombre: "",
-
-      telefono: "",
-
-      direccion: "",
-
-      referencia_domicilio: "",
-
-    });
-
-
-
+  const camposDomicilio = [
+    { nombre: "calle", etiqueta: "Calle" },
+    { nombre: "numero_exterior", etiqueta: "Número exterior" },
+    { nombre: "numero_interior", etiqueta: "Número interior (opcional)" },
+    { nombre: "colonia", etiqueta: "Colonia" },
+    { nombre: "delegacion", etiqueta: "Delegación / Municipio" },
+    { nombre: "codigo_postal", etiqueta: "Código postal" },
+    { nombre: "ciudad", etiqueta: "Ciudad" },
+    { nombre: "estado", etiqueta: "Estado" },
+  ] as const;
 
   const [vistaActiva, setVistaActiva] = useState<"fotos" | "paquetes">("fotos");
   const [paquetes, setPaquetes] = useState<PaqueteUSA[]>([]);
@@ -1417,17 +1426,18 @@ export default function InventarioClientePage() {
 
 
       setFormDatos({
-
         nombre: result.cliente.nombre || "",
-
         telefono: result.cliente.telefono || "",
-
         direccion: result.cliente.direccion || "",
-
-        referencia_domicilio:
-
-          result.cliente.referencia_domicilio || "",
-
+        referencia_domicilio: result.cliente.referencia_domicilio || "",
+        calle: result.cliente.calle || "",
+        numero_exterior: result.cliente.numero_exterior || "",
+        numero_interior: result.cliente.numero_interior || "",
+        colonia: result.cliente.colonia || "",
+        delegacion: result.cliente.delegacion || "",
+        codigo_postal: result.cliente.codigo_postal || "",
+        ciudad: result.cliente.ciudad || "",
+        estado: result.cliente.estado || "",
       });
 
     } catch (error) {
@@ -1468,7 +1478,22 @@ export default function InventarioClientePage() {
 
     );
 
-    const direccion = formDatos.direccion.trim();
+    const domicilio = camposDomicilio.map((campo) => ({
+      nombre: campo.nombre,
+      valor: formDatos[campo.nombre].trim(),
+    }));
+    // Se conserva el domicilio anterior mientras no se capturen campos separados.
+    const tieneCamposSeparados = domicilio.some((campo) => campo.valor !== "");
+    const direccion = tieneCamposSeparados
+      ? [
+          [formDatos.calle, formDatos.numero_exterior, formDatos.numero_interior].filter(Boolean).join(" "),
+          formDatos.colonia,
+          formDatos.codigo_postal ? `C.P. ${formDatos.codigo_postal}` : "",
+          formDatos.delegacion,
+          formDatos.ciudad,
+          formDatos.estado,
+        ].filter(Boolean).join(", ")
+      : formDatos.direccion.trim();
 
     const referenciaDomicilio =
 
@@ -1571,6 +1596,15 @@ export default function InventarioClientePage() {
             referencia_domicilio:
 
               referenciaDomicilio,
+            calle: formDatos.calle.trim(),
+            numero_exterior: formDatos.numero_exterior.trim(),
+            numero_interior: formDatos.numero_interior.trim(),
+            colonia: formDatos.colonia.trim(),
+            delegacion: formDatos.delegacion.trim(),
+            codigo_postal: formDatos.codigo_postal.trim(),
+            ciudad: formDatos.ciudad.trim(),
+            estado: formDatos.estado.trim(),
+
 
           }),
 
@@ -3073,39 +3107,26 @@ export default function InventarioClientePage() {
 
 
 
-                  <label className="block">
-
-                    <span className="text-sm font-black text-slate-800">
-
-                      Dirección completa
-
-                    </span>
-
-                    <textarea
-
-                      rows={3}
-
-                      value={formDatos.direccion}
-
-                      onChange={(event) =>
-
-                        setFormDatos((actual) => ({
-
-                          ...actual,
-
-                          direccion: event.target.value,
-
-                        }))
-
-                      }
-
-                      className="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base font-semibold text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
-
-                    />
-
-                  </label>
-
-
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {camposDomicilio.map((campo) => (
+                      <label key={campo.nombre} className="block">
+                        <span className="text-sm font-black text-slate-800">{campo.etiqueta}</span>
+                        <input
+                          type="text"
+                          value={formDatos[campo.nombre]}
+                          onChange={(event) => setFormDatos((actual) => ({ ...actual, [campo.nombre]: event.target.value }))}
+                          className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base font-semibold text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  {formDatos.direccion && !camposDomicilio.some((campo) => formDatos[campo.nombre].trim()) && (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                      <p className="font-black">Dirección registrada anteriormente</p>
+                      <p className="mt-1 whitespace-pre-wrap">{formDatos.direccion}</p>
+                      <p className="mt-2">Puedes conservarla o capturarla en los campos separados para actualizarla.</p>
+                    </div>
+                  )}
 
                   <label className="block">
 

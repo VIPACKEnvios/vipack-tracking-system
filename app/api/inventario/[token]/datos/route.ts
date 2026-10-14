@@ -23,7 +23,39 @@ type DatosBody = {
   telefono?: string;
   direccion?: string;
   referencia_domicilio?: string;
+  calle?: string;
+  numero_exterior?: string;
+  numero_interior?: string;
+  colonia?: string;
+  delegacion?: string;
+  codigo_postal?: string;
+  ciudad?: string;
+  estado?: string;
 };
+
+const CAMPOS_DOMICILIO = [
+  "calle", "numero_exterior", "numero_interior", "colonia",
+  "delegacion", "codigo_postal", "ciudad", "estado",
+] as const;
+
+function leerDomicilio(body: DatosBody) {
+  // Solo actualizar campos presentes en la petición.
+  // Ausente = conservar el valor anterior; vacío = borrar intencionalmente.
+  const domicilio: Partial<Record<(typeof CAMPOS_DOMICILIO)[number], string | null>> = {};
+  for (const campo of CAMPOS_DOMICILIO) {
+    if (!Object.prototype.hasOwnProperty.call(body, campo)) continue;
+    const valor = body[campo];
+    if (valor !== null && typeof valor !== "string") {
+      throw new Error(`Valor inválido en ${campo}.`);
+    }
+    const limpio = limpiarTexto(valor);
+    if (limpio.length > 200) {
+      throw new Error(`Campo demasiado largo: ${campo}.`);
+    }
+    domicilio[campo] = limpio || null;
+  }
+  return domicilio;
+}
 
 function limpiarTexto(valor: unknown) {
   return String(valor || "")
@@ -412,6 +444,13 @@ export async function GET(
         Number(cliente.id_cliente)
       );
 
+    const { data: domicilio, error: domicilioError } = await supabase
+      .from("remisiones_direcciones")
+      .select(CAMPOS_DOMICILIO.join(","))
+      .eq("id_cliente", Number(cliente.id_cliente))
+      .maybeSingle();
+    if (domicilioError) throw new Error(`Error al consultar domicilio: ${domicilioError.message}`);
+
     return NextResponse.json({
       success: true,
       cliente: {
@@ -435,6 +474,7 @@ export async function GET(
             solicitud
               ?.referencia_domicilio
           ),
+        ...Object.fromEntries(CAMPOS_DOMICILIO.map((campo) => [campo, (domicilio as Record<string, string | null> | null)?.[campo] || ""])),
       },
     });
   } catch (error: unknown) {
@@ -501,6 +541,8 @@ export async function PATCH(
       limpiarTexto(
         body?.referencia_domicilio
       );
+
+    const domicilioSeparado = leerDomicilio(body);
 
     if (nombre.length < 3) {
       return NextResponse.json(
@@ -990,6 +1032,27 @@ export async function PATCH(
       }
     }
 
+    // Guardar los campos separados con el ID permanente de VIPACK.
+    // Se ejecuta al final para no guardar un domicilio si falló OneDrive.
+    // Si la petición antigua no incluye campos separados, no alterar Remisiones.
+    if (Object.keys(domicilioSeparado).length > 0) {
+      const { error: domicilioGuardarError } = await supabase
+        .from("remisiones_direcciones")
+        .upsert(
+          { id_cliente: clienteId, ...domicilioSeparado },
+          { onConflict: "id_cliente" }
+        );
+
+      if (domicilioGuardarError) {
+      console.error("No se pudo sincronizar domicilio de remisiones:", domicilioGuardarError);
+      return NextResponse.json({
+        success: false,
+        requiere_revision: true,
+        error: "Los datos principales se actualizaron, pero no se pudo sincronizar el domicilio con Remisiones. Contacta a VIPACK antes de volver a guardar.",
+      }, { status: 500 });
+      }
+    }
+
     return NextResponse.json({
       success: true,
       cliente: {
@@ -1000,6 +1063,7 @@ export async function PATCH(
         direccion,
         referencia_domicilio:
           referenciaDomicilio,
+        ...domicilioSeparado,
         carpeta_cliente:
           nuevaCarpeta,
         onedrive_folder_id:
