@@ -33,6 +33,10 @@ type Solicitud = {
   id: number; estado: string; nombre: string; telefono: string;
 
   direccion: string | null; referencia_domicilio: string | null;
+  calle: string | null; numero_exterior: string | null;
+  numero_interior: string | null; colonia: string | null;
+  delegacion: string | null; codigo_postal: string | null;
+  ciudad: string | null; estado_domicilio: string | null;
 
   id_cliente_asignado: number | null; carpeta_cliente: string | null;
 
@@ -392,7 +396,7 @@ export async function POST(request: NextRequest) {
 
       .from("solicitudes_clientes")
 
-      .select("id,estado,nombre,telefono,direccion,referencia_domicilio,id_cliente_asignado,carpeta_cliente,onedrive_folder_id")
+      .select("id,estado,nombre,telefono,direccion,referencia_domicilio,calle,numero_exterior,numero_interior,colonia,delegacion,codigo_postal,ciudad,estado_domicilio,id_cliente_asignado,carpeta_cliente,onedrive_folder_id")
 
       .eq("id", solicitudId).maybeSingle();
 
@@ -754,9 +758,39 @@ export async function POST(request: NextRequest) {
 
     bloqueoAdquirido = false;
 
+    // Sincronización secundaria: solo después de finalizar la aprobación.
+    // No alterar ni revertir una aprobación exitosa si falla Remisiones.
+    let advertenciaRemisiones: string | null = null;
+    const domicilioRemisiones = {
+      calle: limpiar(s.calle) || null,
+      numero_exterior: limpiar(s.numero_exterior) || null,
+      numero_interior: limpiar(s.numero_interior) || null,
+      colonia: limpiar(s.colonia) || null,
+      delegacion: limpiar(s.delegacion) || null,
+      codigo_postal: limpiar(s.codigo_postal) || null,
+      ciudad: limpiar(s.ciudad) || null,
+      estado: limpiar(s.estado_domicilio) || null,
+    };
+    if (Object.values(domicilioRemisiones).some(Boolean)) {
+      try {
+        const { error: eDireccion } = await supabase
+          .from("remisiones_direcciones")
+          .upsert({ id_cliente: id, ...domicilioRemisiones }, { onConflict: "id_cliente" });
+        if (eDireccion) throw new Error(eDireccion.message);
+      } catch (e: unknown) {
+        advertenciaRemisiones = "Cliente aprobado, pero no se pudo sincronizar su domicilio con Remisiones.";
+        console.error("VIPACK sincronización Remisiones pendiente", {
+          solicitudId, idCliente: id,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+
     return NextResponse.json({
 
-      success: true, cliente: {
+      success: true,
+      ...(advertenciaRemisiones ? { advertencia: advertenciaRemisiones } : {}),
+      cliente: {
 
         id_cliente: id, nombre, telefono: tel, direccion: s.direccion,
 
