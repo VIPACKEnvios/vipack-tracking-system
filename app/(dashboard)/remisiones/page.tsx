@@ -45,6 +45,16 @@ function leerDireccion(valor?: DireccionGuardada | null): Direccion {
   };
 }
 
+// Solo para impresión: convierte prefijos móviles mexicanos a 10 dígitos.
+// No modifica el teléfono registrado en Excel ni en Supabase.
+function telefonoParaRemision(telefono: string): string {
+  const original = telefono.trim();
+  const digitos = original.replace(/\D/g, "");
+  if (digitos.length === 13 && digitos.startsWith("521")) return digitos.slice(3);
+  if (digitos.length === 12 && digitos.startsWith("52")) return digitos.slice(2);
+  return original;
+}
+
 const remitente = { nombre: "Viridiana Malaga", telefono: "6442350116", rfc: "" };
 
 // Coordenadas calibradas sobre la plantilla A4 REMISIÓN - MATRIZ.
@@ -188,7 +198,7 @@ export default function RemisionesPage() {
         const limpio = valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
         if (!limpio) return;
         const anchoDisponible = width * p.ancho;
-        let tamano = 9;
+        let tamano = 9.5;
         while (tamano > 5 && fuente.widthOfTextAtSize(limpio, tamano) > anchoDisponible) {
           tamano -= 0.25;
         }
@@ -199,7 +209,8 @@ export default function RemisionesPage() {
         }
         pagina.drawText(texto, {
           x: width * p.x,
-          y: height * (1 - p.y),
+          // Ajuste fino: baja el texto ~2.4 mm para centrarlo sobre las líneas.
+          y: height * (1 - p.y - 0.008),
           size: tamano,
           font: fuente,
           color: rgb(0, 0, 0),
@@ -208,7 +219,7 @@ export default function RemisionesPage() {
       dibujar(remitente.nombre, posiciones.remitenteNombre);
       dibujar(remitente.telefono, posiciones.remitenteTelefono);
       dibujar(seleccionado.nombre, posiciones.destinatarioNombre);
-      dibujar(seleccionado.telefono ?? "", posiciones.destinatarioTelefono);
+      dibujar(telefonoParaRemision(seleccionado.telefono ?? ""), posiciones.destinatarioTelefono);
       dibujar(direccion.calle, posiciones.calle);
       dibujar(direccion.numero_exterior, posiciones.numeroExterior);
       dibujar(direccion.numero_interior, posiciones.numeroInterior);
@@ -226,7 +237,7 @@ export default function RemisionesPage() {
       document.body.appendChild(enlace);
       enlace.click();
       enlace.remove();
-      URL.revokeObjectURL(url);
+      window.setTimeout(() => URL.revokeObjectURL(url), 30000);
       setMensaje("Remisión descargada. Revisa los datos antes de imprimir.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo generar el PDF.");
