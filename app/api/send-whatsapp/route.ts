@@ -6,34 +6,44 @@ const client = twilio(
   process.env.TWILIO_AUTH_TOKEN!
 );
 
-function limpiarTelefono(to: any) {
-  return String(to || "")
-    .replace(/\D/g, "")
-    .trim();
+/**
+ * Acepta números mexicanos en formato local, 52 o 521.
+ * Devuelve el formato solicitado por VIPACK: 521 + 10 dígitos.
+ * No modifica los teléfonos del Excel ni del registro de clientes.
+ */
+function normalizarTelefonoWhatsApp(valor: unknown): string | null {
+  const digitos = String(valor ?? "").replace(/\D/g, "");
+
+  if (/^\d{10}$/.test(digitos)) return `521${digitos}`;
+  if (/^52\d{10}$/.test(digitos)) return `521${digitos.slice(2)}`;
+  if (/^521\d{10}$/.test(digitos)) return digitos;
+
+  return null;
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-
     const { to, cliente, pedido, guia, paqueteria, pdfUrl, folio, tipo } = body;
 
-    const telefono = limpiarTelefono(to);
+    const telefono = normalizarTelefonoWhatsApp(to);
     const fromWhatsApp = process.env.TWILIO_WHATSAPP_FROM;
 
     if (!fromWhatsApp) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Falta configurar TWILIO_WHATSAPP_FROM en .env.local",
-        },
+        { success: false, error: "Falta configurar TWILIO_WHATSAPP_FROM en .env.local" },
         { status: 500 }
       );
     }
 
-    if (!telefono || !cliente) {
+    if (!telefono || !String(cliente ?? "").trim()) {
       return NextResponse.json(
-        { success: false, error: "Faltan datos: teléfono o cliente" },
+        {
+          success: false,
+          error: !telefono
+            ? "Teléfono mexicano inválido: usa 10 dígitos, 52 + 10 o 521 + 10"
+            : "Falta el nombre del cliente",
+        },
         { status: 400 }
       );
     }
@@ -63,20 +73,17 @@ export async function POST(req: Request) {
       });
     }
 
-    return NextResponse.json({
-      success: true,
-      sid: message.sid,
-    });
+    return NextResponse.json({ success: true, sid: message.sid });
   } catch (error: any) {
     console.error("Twilio Error completo:", error);
 
     return NextResponse.json(
       {
         success: false,
-        error: error.message,
-        code: error.code || null,
-        moreInfo: error.moreInfo || null,
-        status: error.status || null,
+        error: error?.message || "Error desconocido de Twilio",
+        code: error?.code || null,
+        moreInfo: error?.moreInfo || null,
+        status: error?.status || null,
       },
       { status: 500 }
     );

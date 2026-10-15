@@ -1,10 +1,8 @@
 "use client";
-
 import { useState } from "react";
 import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import { supabase } from "@/lib/supabase";
-
 export default function GuiasPage() {
   const [logs, setLogs] = useState<string[]>([]);
   const [excelFile, setExcelFile] = useState<File | null>(null);
@@ -12,24 +10,19 @@ export default function GuiasPage() {
   const [clientes, setClientes] = useState<any[]>([]);
   const [pdfsEncontrados, setPdfsEncontrados] = useState<string[]>([]);
   const [idEnvio, setIdEnvio] = useState("");
-
   const enviarActualizacionManual = async () => {
     if (!idEnvio) {
       alert("Escribe el ID del envío");
       return;
     }
-
     const confirmar = confirm("¿Enviar WhatsApp de actualización al cliente?");
     if (!confirmar) return;
-
     const response = await fetch("/api/enviar-actualizacion", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: Number(idEnvio) }),
     });
-
     const data = await response.json();
-
     if (data.success) {
       alert("✅ WhatsApp enviado correctamente");
       setIdEnvio("");
@@ -37,10 +30,8 @@ export default function GuiasPage() {
       alert("❌ Error: " + data.error);
     }
   };
-
   const limpiarSoloDigitos = (valor: unknown) =>
     String(valor || "").replace(/\D/g, "");
-
   const normalizarNombreCliente = (nombrePDF: string) =>
     nombrePDF
       .replace(/\.pdf$/i, "")
@@ -48,7 +39,6 @@ export default function GuiasPage() {
       .replace(/[_-]+/g, " ")
       .replace(/\s+/g, " ")
       .trim();
-
   const detectarPaqueteria = (
     textoPDF: string,
     nombrePDF: string
@@ -57,7 +47,6 @@ export default function GuiasPage() {
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .toUpperCase();
-
     /*
      * ESTAFETA:
      * En las etiquetas reales el logotipo puede no formar parte
@@ -71,14 +60,12 @@ export default function GuiasPage() {
     ) {
       return "ESTAFETA";
     }
-
     if (
       fuente.includes("FEDEX") ||
       fuente.includes("FEDERAL EXPRESS")
     ) {
       return "FEDEX";
     }
-
     if (
       fuente.includes("DHL") ||
       fuente.includes("DHL EXPRESS") ||
@@ -86,13 +73,10 @@ export default function GuiasPage() {
     ) {
       return "DHL";
     }
-
     return "";
   };
-
   const normalizarTelefonoMexico = (valor: unknown) => {
     let telefono = limpiarSoloDigitos(valor);
-
     if (
       telefono.length === 13 &&
       telefono.startsWith("521")
@@ -104,10 +88,8 @@ export default function GuiasPage() {
     ) {
       telefono = telefono.slice(2);
     }
-
     return telefono.length === 10 ? telefono : "";
   };
-
   const extraerTelefonoDestinatario = (
     textoPDF: string,
     paqueteria: string,
@@ -117,7 +99,6 @@ export default function GuiasPage() {
       .replace(/\u00a0/g, " ")
       .replace(/\s+/g, " ")
       .trim();
-
     /*
      * DHL:
      * El teléfono correcto del destinatario aparece normalmente
@@ -137,17 +118,14 @@ export default function GuiasPage() {
         .replace(/\u00a0/g, " ")
         .replace(/\s+/g, " ")
         .trim();
-
       /*
        * Primero aislamos el bloque del destinatario.
        */
       const receiverMatch = segundaHoja.match(
         /RECEIVER\s*:?\s*([\s\S]*?)(?=PRODUCT\s+DETAILS|PAYER\s+DETAILS|SHIPMENT\s+DETAILS|FEATURES\s*\/\s*SERVICES|$)/i
       );
-
       const bloqueReceiver =
         receiverMatch?.[1] || "";
-
       /*
        * Buscar primero números con lada de México (+52)
        * dentro del bloque Receiver.
@@ -157,7 +135,6 @@ export default function GuiasPage() {
           /\+?\s*52\s*(?:1\s*)?(\d[\d\s().-]{8,18}\d)/g
         )
       );
-
       for (
         let i = telefonosCon52.length - 1;
         i >= 0;
@@ -167,12 +144,10 @@ export default function GuiasPage() {
           normalizarTelefonoMexico(
             `52${telefonosCon52[i][1]}`
           );
-
         if (telefono) {
           return telefono;
         }
       }
-
       /*
        * Si PDF.js separó el +52 del resto del número,
        * buscamos cualquier teléfono mexicano de 10 dígitos
@@ -184,7 +159,6 @@ export default function GuiasPage() {
             /(?<!\d)(\d[\d\s().-]{8,18}\d)(?!\d)/g
           )
         );
-
       for (
         let i = candidatosReceiver.length - 1;
         i >= 0;
@@ -194,12 +168,10 @@ export default function GuiasPage() {
           normalizarTelefonoMexico(
             candidatosReceiver[i][1]
           );
-
         if (telefono) {
           return telefono;
         }
       }
-
       /*
        * Último respaldo DHL:
        * en la segunda hoja normalmente aparece primero
@@ -211,7 +183,6 @@ export default function GuiasPage() {
           /\+?\s*52\s*(?:1\s*)?(\d[\d\s().-]{8,18}\d)/g
         )
       );
-
       for (
         let i = todosCon52.length - 1;
         i >= 0;
@@ -221,13 +192,11 @@ export default function GuiasPage() {
           normalizarTelefonoMexico(
             `52${todosCon52[i][1]}`
           );
-
         if (telefono) {
           return telefono;
         }
       }
     }
-
     /*
      * ESTAFETA:
      * las etiquetas reales pueden traer primero el teléfono
@@ -239,7 +208,6 @@ export default function GuiasPage() {
         /\bCEL(?:ULAR)?\.?\s*[:.-]?\s*(\d[\d\s().-]{8,18}\d)/gi
       )
     );
-
     for (
       let i = matches.length - 1;
       i >= 0;
@@ -249,12 +217,10 @@ export default function GuiasPage() {
         normalizarTelefonoMexico(
           matches[i][1]
         );
-
       if (telefono) {
         return telefono;
       }
     }
-
     /*
      * Respaldo general para TEL / TELÉFONO / PHONE / WHATSAPP.
      */
@@ -263,7 +229,6 @@ export default function GuiasPage() {
         /(?:TEL(?:EFONO)?|TELÉFONO|PHONE|WHATSAPP)\s*[:#.-]?\s*(\+?\s*52\s*)?(?:1\s*)?(\d[\d\s().-]{8,18}\d)/gi
       )
     );
-
     for (
       let i = alternos.length - 1;
       i >= 0;
@@ -271,23 +236,18 @@ export default function GuiasPage() {
     ) {
       const prefijo =
         alternos[i][1] ? "52" : "";
-
       const telefono =
         normalizarTelefonoMexico(
           `${prefijo}${alternos[i][2]}`
         );
-
       if (telefono) {
         return telefono;
       }
     }
-
     return "";
   };
-
   const limpiarCandidatoGuia = (valor: string) =>
     valor.replace(/[^\d]/g, "");
-
   const guiaValida = (
     guia: string,
     paqueteria: string,
@@ -295,32 +255,27 @@ export default function GuiasPage() {
   ) => {
     if (!guia || !/^\d+$/.test(guia)) return false;
     if (telefono && guia === telefono) return false;
-
     if (
       guia.length === 12 &&
       guia.startsWith("52")
     ) {
       return false;
     }
-
     if (
       guia.length === 13 &&
       guia.startsWith("521")
     ) {
       return false;
     }
-
     if (paqueteria === "DHL") {
       return guia.length === 10;
     }
-
     if (paqueteria === "FEDEX") {
       return (
         guia.length === 12 ||
         guia.length === 15
       );
     }
-
     /*
      * En las etiquetas reales de Estafeta que revisamos,
      * "Código de Rastreo" usa 10 dígitos.
@@ -328,10 +283,8 @@ export default function GuiasPage() {
     if (paqueteria === "ESTAFETA") {
       return guia.length === 10;
     }
-
     return guia.length >= 8 && guia.length <= 30;
   };
-
   const extraerGuiasPDF = (
     textoPDF: string,
     paqueteria: string,
@@ -340,19 +293,15 @@ export default function GuiasPage() {
     const texto = String(textoPDF || "")
       .replace(/\u00a0/g, " ")
       .replace(/\s+/g, " ");
-
     const obtenerPrimeraGuiaValida = (
       regex: RegExp,
       indice = 1
     ) => {
       for (const match of texto.matchAll(regex)) {
         const bruto = match[indice];
-
         if (!bruto) continue;
-
         const guia =
           limpiarCandidatoGuia(bruto);
-
         if (
           guiaValida(
             guia,
@@ -363,10 +312,8 @@ export default function GuiasPage() {
           return guia;
         }
       }
-
       return "";
     };
-
     /*
      * IMPORTANTE:
      * En VIPACK cada archivo PDF corresponde a UNA sola guía.
@@ -378,31 +325,25 @@ export default function GuiasPage() {
      * 2) en cuanto encontramos UNA guía válida, terminamos;
      * 3) los respaldos solo se usan si no encontramos la principal.
      */
-
     if (paqueteria === "ESTAFETA") {
       const principal =
         obtenerPrimeraGuiaValida(
           /C[ÓO]DIGO\s+DE\s+RASTREO\s*[:#.-]?\s*([0-9][0-9\s-]{8,20}[0-9])/gi
         );
-
       if (principal) {
         return [principal];
       }
-
       const secundaria =
         obtenerPrimeraGuiaValida(
           /(?:NO\.?\s*DE\s*GUIA|NO\.?\s*DE\s*GU[IÍ]A|GUIA|GU[IÍ]A|RASTREO|TRACKING)\s*[:#.-]?\s*([\d\s-]{8,24})/gi
         );
-
       if (secundaria) {
         return [secundaria];
       }
-
       const fallback =
         texto.match(
           /(?<!\d)\d{10}(?!\d)/g
         ) || [];
-
       const guia =
         fallback.find((candidato) =>
           guiaValida(
@@ -411,25 +352,20 @@ export default function GuiasPage() {
             telefono
           )
         );
-
       return guia ? [guia] : [];
     }
-
     if (paqueteria === "DHL") {
       const principal =
         obtenerPrimeraGuiaValida(
           /(?:WAYBILL|AWB|TRACKING\s*(?:NO|NUMBER|#)?|GUIA|GU[IÍ]A)\s*[:#.-]?\s*([\d\s-]{8,24})/gi
         );
-
       if (principal) {
         return [principal];
       }
-
       const fallback =
         texto.match(
           /(?<!\d)\d{10}(?!\d)/g
         ) || [];
-
       const guia =
         fallback.find((candidato) =>
           guiaValida(
@@ -438,25 +374,20 @@ export default function GuiasPage() {
             telefono
           )
         );
-
       return guia ? [guia] : [];
     }
-
     if (paqueteria === "FEDEX") {
       const principal =
         obtenerPrimeraGuiaValida(
           /(?:TRACKING\s*(?:ID|NO|NUMBER|#)?|MASTER\s*TRACKING|GUIA|GU[IÍ]A)\s*[:#.-]?\s*([\d\s-]{10,24})/gi
         );
-
       if (principal) {
         return [principal];
       }
-
       const fallback =
         texto.match(
           /(?<!\d)(?:\d{12}|\d{15})(?!\d)/g
         ) || [];
-
       const guia =
         fallback.find((candidato) =>
           guiaValida(
@@ -465,10 +396,8 @@ export default function GuiasPage() {
             telefono
           )
         );
-
       return guia ? [guia] : [];
     }
-
     /*
      * Paquetería no identificada:
      * seguimos respetando UNA sola guía por PDF.
@@ -477,7 +406,6 @@ export default function GuiasPage() {
       texto.match(
         /(?<!\d)\d{8,30}(?!\d)/g
       ) || [];
-
     const guia =
       genericos.find((candidato) =>
         guiaValida(
@@ -486,46 +414,36 @@ export default function GuiasPage() {
           telefono
         )
       );
-
     return guia ? [guia] : [];
   };
-
   const handleGenerateExcelFromZip = async () => {
     if (!zipFile) {
       alert("Debes seleccionar el ZIP con PDFs");
       return;
     }
-
     try {
       setLogs([
         "📦 Leyendo ZIP...",
       ]);
-
       const pdfjs =
         await import("pdfjs-dist");
-
       pdfjs.GlobalWorkerOptions.workerSrc =
         new URL(
           "pdfjs-dist/build/pdf.worker.min.mjs",
           import.meta.url
         ).toString();
-
       const zipArrayBuffer =
         await zipFile.arrayBuffer();
-
       const zip =
         await JSZip.loadAsync(
           zipArrayBuffer
         );
-
       const filas: any[] = [];
       const logsGeneracion: string[] = [];
-
       let totalPDF = 0;
       let totalGuias = 0;
       let pdfSinGuia = 0;
       let pdfSinPaqueteria = 0;
-
       for (
         const fileName of Object.keys(
           zip.files
@@ -533,7 +451,6 @@ export default function GuiasPage() {
       ) {
         const file =
           zip.files[fileName];
-
         if (
           file.dir ||
           !fileName
@@ -542,35 +459,28 @@ export default function GuiasPage() {
         ) {
           continue;
         }
-
         totalPDF++;
-
         const nombrePDF =
           fileName
             .split("/")
             .pop() || "";
-
         const cliente =
           normalizarNombreCliente(
             nombrePDF
           );
-
         try {
           const arrayBuffer =
             await file.async(
               "arraybuffer"
             );
-
           const pdf =
             await pdfjs
               .getDocument({
                 data: arrayBuffer,
               })
               .promise;
-
           let textoPDF = "";
           const paginasTexto: string[] = [];
-
           for (
             let i = 1;
             i <= pdf.numPages;
@@ -578,10 +488,8 @@ export default function GuiasPage() {
           ) {
             const page =
               await pdf.getPage(i);
-
             const content =
               await page.getTextContent();
-
             const textoPagina =
               content.items
                 .map(
@@ -592,50 +500,40 @@ export default function GuiasPage() {
                 .replace(/\u00a0/g, " ")
                 .replace(/\s+/g, " ")
                 .trim();
-
             paginasTexto.push(
               textoPagina
             );
-
             textoPDF +=
               textoPagina + " ";
           }
-
           textoPDF = textoPDF
             .replace(/\u00a0/g, " ")
             .replace(/\s+/g, " ")
             .trim();
-
           const paqueteria =
             detectarPaqueteria(
               textoPDF,
               nombrePDF
             );
-
           if (!paqueteria) {
             pdfSinPaqueteria++;
           }
-
           const telefono =
             extraerTelefonoDestinatario(
               textoPDF,
               paqueteria,
               paginasTexto
             );
-
           const guias =
             extraerGuiasPDF(
               textoPDF,
               paqueteria,
               telefono
             );
-
           if (guias.length === 0) {
             pdfSinGuia++;
-
             const numeroPedido =
               filas.length + 1;
-
             filas.push({
               pedido: `PED-${String(
                 numeroPedido
@@ -657,7 +555,6 @@ export default function GuiasPage() {
                 "",
               enviado: "",
             });
-
             logsGeneracion.push(
               `⚠️ ${nombrePDF}: no se detectó guía${
                 paqueteria
@@ -665,16 +562,12 @@ export default function GuiasPage() {
                   : " ni paquetería"
               }.`
             );
-
             continue;
           }
-
           const guia =
             guias[0];
-
           const numeroPedido =
             filas.length + 1;
-
           filas.push({
             pedido: `PED-${String(
               numeroPedido
@@ -695,9 +588,7 @@ export default function GuiasPage() {
               "",
             enviado: "",
           });
-
           totalGuias++;
-
           logsGeneracion.push(
             `✅ ${nombrePDF}: ${
               paqueteria ||
@@ -714,10 +605,8 @@ export default function GuiasPage() {
           );
         } catch (pdfError: any) {
           pdfSinGuia++;
-
           const numeroPedido =
             filas.length + 1;
-
           filas.push({
             pedido: `PED-${String(
               numeroPedido
@@ -737,7 +626,6 @@ export default function GuiasPage() {
               "",
             enviado: "",
           });
-
           logsGeneracion.push(
             `❌ ${nombrePDF}: no se pudo leer el PDF. ${
               pdfError?.message ||
@@ -746,7 +634,6 @@ export default function GuiasPage() {
           );
         }
       }
-
       if (filas.length === 0) {
         alert(
           "No se encontraron PDFs dentro del ZIP."
@@ -756,7 +643,6 @@ export default function GuiasPage() {
         ]);
         return;
       }
-
       const encabezados = [
         "pedido",
         "fecha_carga",
@@ -769,7 +655,6 @@ export default function GuiasPage() {
         "ultimo_estado_enviado",
         "enviado",
       ];
-
       const worksheet =
         XLSX.utils.json_to_sheet(
           filas,
@@ -777,7 +662,6 @@ export default function GuiasPage() {
             header: encabezados,
           }
         );
-
       /*
        * Anchos para que Excel no abra
        * columnas cortadas.
@@ -794,21 +678,17 @@ export default function GuiasPage() {
         { wch: 25 }, // último estado
         { wch: 12 }, // enviado
       ];
-
       const workbook =
         XLSX.utils.book_new();
-
       XLSX.utils.book_append_sheet(
         workbook,
         worksheet,
         "Guias"
       );
-
       XLSX.writeFile(
         workbook,
         "plantilla_guias_generada.xlsx"
       );
-
       setLogs([
         `✅ Excel generado: ${filas.length} fila(s).`,
         `📄 PDFs procesados: ${totalPDF}.`,
@@ -817,7 +697,6 @@ export default function GuiasPage() {
         `⚠️ PDFs sin paquetería: ${pdfSinPaqueteria}.`,
         ...logsGeneracion,
       ]);
-
       alert(
         `Excel generado correctamente.\n\nPDFs: ${totalPDF}\nGuías detectadas: ${totalGuias}\nSin guía: ${pdfSinGuia}`
       );
@@ -826,58 +705,45 @@ export default function GuiasPage() {
         "Error generando Excel:",
         error
       );
-
       setLogs([
         `❌ Error generando Excel: ${
           error?.message ||
           "Error desconocido"
         }`,
       ]);
-
       alert(
         "No se pudo generar el Excel. Revisa los logs."
       );
     }
   };
-
   const handleValidate = async () => {
     if (!excelFile || !zipFile) {
       alert("Debes seleccionar Excel y ZIP");
       return;
     }
-
     const data = await excelFile.arrayBuffer();
     const workbook = XLSX.read(data);
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
     const jsonData = XLSX.utils.sheet_to_json(sheet);
-
     const zipArrayBuffer = await zipFile.arrayBuffer();
     const zip = await JSZip.loadAsync(zipArrayBuffer);
-
     const nombresPDF: string[] = [];
-
     for (const fileName of Object.keys(zip.files)) {
       const file = zip.files[fileName];
-
       if (!fileName.toLowerCase().endsWith(".pdf")) continue;
-
       const originalName = fileName.split("/").pop() || "";
-
       const cleanName = originalName
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-zA-Z0-9.\-_]/g, "_");
-
+        .replace(/[^a-zA-Z0-9._-]/g, "_");
       const pdfBlob = await file.async("blob");
-
       const { error } = await supabase.storage
         .from("guias")
         .upload(cleanName, pdfBlob, {
           contentType: "application/pdf",
           upsert: true,
         });
-
       if (error) {
         alert("Error subiendo PDF: " + error.message);
         console.error(error);
@@ -885,17 +751,14 @@ export default function GuiasPage() {
         nombresPDF.push(originalName);
       }
     }
-
     const normalizarTexto = (texto: string) =>
       String(texto || "")
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
         .replace(/[^a-z0-9]/g, "");
-
     const clientesConPDF = (jsonData as any[]).map((cliente) => {
       const nombreCliente = normalizarTexto(cliente.cliente);
-
       const pdfEncontrado = nombresPDF.find((pdf) => {
         const nombrePDF = normalizarTexto(pdf.replace(".pdf", ""));
         return (
@@ -903,75 +766,65 @@ export default function GuiasPage() {
           nombreCliente.includes(nombrePDF)
         );
       });
-
       return {
         ...cliente,
         nombre_pdf: pdfEncontrado || "",
       };
     });
-
     setClientes(clientesConPDF);
     setPdfsEncontrados(nombresPDF);
     setLogs([]);
-
     alert("Excel y ZIP validados correctamente");
   };
-
   const handleSendWhatsApp = async () => {
     if (clientes.length === 0) {
       alert("No hay clientes cargados");
       return;
     }
-
     const nuevosLogs: string[] = [];
-
     for (const cliente of clientes) {
       if (cliente.enviado && String(cliente.enviado).toUpperCase() === "SI") {
         nuevosLogs.push(`⏭️ ${cliente.cliente} ya estaba enviado`);
         continue;
       }
-
       const guiaLimpia = String(cliente.guia || "").trim();
-
       if (!guiaLimpia || guiaLimpia === "GUIA_NO_DETECTADA") {
         nuevosLogs.push(`❌ No se envió a ${cliente.cliente}: falta guía`);
         continue;
       }
-
       const { data: existente } = await supabase
         .from("envios")
         .select("id")
         .eq("guia", guiaLimpia)
         .limit(1);
-
       if (existente && existente.length > 0) {
         nuevosLogs.push(`⏭️ ${cliente.cliente} ya existe en sistema`);
         continue;
       }
-
       const tienePDF = pdfsEncontrados.includes(cliente.nombre_pdf);
-
       if (!tienePDF) {
         nuevosLogs.push(`❌ No se envió a ${cliente.cliente}: falta PDF`);
         continue;
       }
-
       const safePdfName = cliente.nombre_pdf
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
         .replace(/[^a-zA-Z0-9._-]/g, "_");
-
       const pdfUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/guias/${safePdfName}`;
-
-      const telefonoLimpio = String(cliente.telefono_whatsapp || "")
-        .replace(/\D/g, "")
-        .trim();
-
+      // Prefijo únicamente al preparar el envío, nunca en el Excel.
+      const telefonoOriginal = String(cliente.telefono_whatsapp ?? "").replace(/\D/g, "");
+      let telefonoLimpio = "";
+      if (/^\d{10}$/.test(telefonoOriginal)) {
+        telefonoLimpio = `521${telefonoOriginal}`;
+      } else if (/^52\d{10}$/.test(telefonoOriginal)) {
+        telefonoLimpio = `521${telefonoOriginal.slice(2)}`;
+      } else if (/^521\d{10}$/.test(telefonoOriginal)) {
+        telefonoLimpio = telefonoOriginal;
+      }
       if (!telefonoLimpio) {
-        nuevosLogs.push(`❌ No se envió a ${cliente.cliente}: falta teléfono`);
+        nuevosLogs.push(`❌ No se envió a ${cliente.cliente}: teléfono mexicano inválido`);
         continue;
       }
-
       try {
         /*
          * IMPORTANTE PARA EL HISTORIAL:
@@ -982,7 +835,6 @@ export default function GuiasPage() {
          * sin que exista su registro histórico.
          */
         const fechaOriginal = new Date().toISOString();
-
         const { data: envioCreado, error: insertError } = await supabase
           .from("envios")
           .insert([
@@ -1003,7 +855,6 @@ export default function GuiasPage() {
           ])
           .select("id")
           .single();
-
         if (insertError || !envioCreado) {
           nuevosLogs.push(
             `❌ NO se envió a ${cliente.cliente}: primero debe guardarse el historial en Supabase. ${
@@ -1012,7 +863,6 @@ export default function GuiasPage() {
           );
           continue;
         }
-
         /*
          * REGISTRAR AUTOMÁTICAMENTE EN TRACKINGMORE
          *
@@ -1026,11 +876,9 @@ export default function GuiasPage() {
         const paqueteriaTracking = String(
           cliente.paqueteria || ""
         ).toUpperCase();
-
         const usarTrackingMore =
           paqueteriaTracking.includes("ESTAFETA") ||
           paqueteriaTracking.includes("DHL");
-
         if (usarTrackingMore) {
           try {
             const trackingResponse = await fetch(
@@ -1046,10 +894,8 @@ export default function GuiasPage() {
                 }),
               }
             );
-
             const trackingData =
               await trackingResponse.json();
-
             if (trackingData.success) {
               nuevosLogs.push(
                 `📍 TrackingMore registrado: ${cliente.cliente} - ${guiaLimpia}`
@@ -1072,7 +918,6 @@ export default function GuiasPage() {
             );
           }
         }
-
         const response = await fetch("/api/send-whatsapp", {
           method: "POST",
           headers: {
@@ -1087,13 +932,10 @@ export default function GuiasPage() {
             pdfUrl: pdfUrl,
           }),
         });
-
         const data = await response.json();
         const fechaRevision = new Date().toISOString();
-
         if (data.success) {
           cliente.enviado = "SI";
-
           const { error: updateError } = await supabase
             .from("envios")
             .update({
@@ -1102,7 +944,6 @@ export default function GuiasPage() {
               fecha_ultima_revision: fechaRevision,
             })
             .eq("id", envioCreado.id);
-
           if (updateError) {
             nuevosLogs.push(
               `⚠️ WhatsApp enviado a ${cliente.cliente}. El historial existe, pero falló la actualización del estado: ${updateError.message}`
@@ -1121,7 +962,6 @@ export default function GuiasPage() {
               fecha_ultima_revision: fechaRevision,
             })
             .eq("id", envioCreado.id);
-
           nuevosLogs.push(
             `❌ Error con ${cliente.cliente}: ${data.error || "Error al enviar WhatsApp"}. El registro se conservó en el historial.`
           );
@@ -1132,11 +972,8 @@ export default function GuiasPage() {
         );
       }
     }
-
     setLogs(nuevosLogs);
   };
-
-
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-gray-100 p-4 text-gray-900 md:p-8">
       <div className="mx-auto max-w-6xl rounded-2xl bg-white p-6 shadow-lg md:p-8">
@@ -1159,7 +996,6 @@ export default function GuiasPage() {
                 borderRadius: "12px",
               }}
             />
-
             <div>
               <h1
                 style={{
@@ -1171,7 +1007,6 @@ export default function GuiasPage() {
               >
                 VIPACK
               </h1>
-
               <p
                 style={{
                   fontSize: "18px",
@@ -1184,13 +1019,11 @@ export default function GuiasPage() {
             </div>
           </div>
         </div>
-
         <div className="space-y-6">
           <div>
            <label className="block text-lg font-semibold mb-2 text-gray-900">
               Subir Excel de clientes
             </label>
-
             <input
               type="file"
               accept=".xlsx,.xls,.csv"
@@ -1200,12 +1033,10 @@ export default function GuiasPage() {
               className="w-full border p-3 rounded-lg bg-white text-gray-900"
             />
           </div>
-
           <div>
             <label className="block text-lg font-semibold mb-2 text-gray-900">
               Subir ZIP con PDFs
             </label>
-
             <input
               type="file"
               accept=".zip"
@@ -1215,7 +1046,6 @@ export default function GuiasPage() {
              className="w-full border p-3 rounded-lg bg-white text-gray-900"
             />
           </div>
-
           <div className="flex flex-wrap gap-4">
             <button
               onClick={handleValidate}
@@ -1223,14 +1053,12 @@ export default function GuiasPage() {
             >
               Validar archivos
             </button>
-
             <button
               onClick={handleSendWhatsApp}
               className="bg-green-600 text-white px-6 py-3 rounded-xl"
             >
               Enviar guías WhatsApp
             </button>
-
             <button
               onClick={handleGenerateExcelFromZip}
               style={{
@@ -1264,7 +1092,6 @@ export default function GuiasPage() {
                 onChange={(e) => setIdEnvio(e.target.value)}
                 className="border p-3 rounded-xl bg-white text-gray-900"
               />
-
               <button
                 onClick={enviarActualizacionManual}
                 style={{
@@ -1282,7 +1109,6 @@ export default function GuiasPage() {
               </button>
             </div>
           </div>
-
           {clientes.length > 0 && (
             <div className="mt-10 overflow-auto">
               <table className="w-full border border-gray-300">
@@ -1296,7 +1122,6 @@ export default function GuiasPage() {
                     <th className="border p-2 text-left">Estado PDF</th>
                   </tr>
                 </thead>
-
                 <tbody>
                   {clientes.map((cliente, index) => (
                     <tr key={index}>
@@ -1305,7 +1130,6 @@ export default function GuiasPage() {
                           {String(value)}
                         </td>
                       ))}
-
                       <td className="border p-2">
                         {pdfsEncontrados.includes(cliente.nombre_pdf)
                           ? "✅ PDF encontrado"
@@ -1317,11 +1141,9 @@ export default function GuiasPage() {
               </table>
             </div>
           )}
-
           {logs.length > 0 && (
             <div className="mt-10 bg-black text-green-400 p-4 rounded-xl">
               <h2 className="text-xl mb-4 font-bold">Logs de WhatsApp</h2>
-
               <div className="space-y-2">
                 {logs.map((log, index) => (
                   <p key={index}>{log}</p>
