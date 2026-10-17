@@ -55,6 +55,26 @@ function telefonoParaRemision(telefono: string): string {
   return original;
 }
 
+// Evita caracteres no compatibles con Helvetica/WinAnsi en pdf-lib.
+// Solo modifica el texto impreso, nunca los datos guardados.
+function textoSeguroPdf(valor: string): string {
+  const equivalencias: Record<string, string> = {
+    "А": "A", "В": "B", "Е": "E", "К": "K", "М": "M", "Н": "H",
+    "О": "O", "Р": "P", "С": "C", "Т": "T", "Х": "X",
+    "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "х": "x",
+    "Ё": "E", "ё": "e", "№": "No.", "–": "-", "—": "-",
+    "‘": "'", "’": "'", "“": "\"", "”": "\"", "…": "...",
+    "\u00a0": " ",
+  };
+  const convertido = Array.from(valor, (caracter) => equivalencias[caracter] ?? caracter).join("");
+  return convertido
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x20-\x7E\xA1-\xFF]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 const remitente = { nombre: "Viridiana Malaga", telefono: "6442350116", rfc: "" };
 
 // Coordenadas calibradas sobre la plantilla A4 REMISIÓN - MATRIZ.
@@ -195,14 +215,14 @@ export default function RemisionesPage() {
       const fuente = await pdf.embedFont(StandardFonts.Helvetica);
       const { width, height } = pagina.getSize();
       const dibujar = (valor: string, p: { x: number; y: number; ancho: number }) => {
-        const limpio = valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+        const limpio = textoSeguroPdf(valor);
         if (!limpio) return;
         const anchoDisponible = width * p.ancho;
-        let tamano = 9.5;
-        while (tamano > 5 && fuente.widthOfTextAtSize(limpio, tamano) > anchoDisponible) {
+        let tamano = 11;
+        while (tamano > 6 && fuente.widthOfTextAtSize(limpio, tamano) > anchoDisponible) {
           tamano -= 0.25;
         }
-        // Nunca invadir el siguiente campo; acortar solo si ni 5pt alcanzan.
+        // Nunca invadir el siguiente campo; acortar si el texto no cabe.
         let texto = limpio;
         while (texto && fuente.widthOfTextAtSize(texto, tamano) > anchoDisponible) {
           texto = texto.slice(0, -1);
@@ -213,7 +233,7 @@ export default function RemisionesPage() {
           y: height * (1 - p.y - 0.008),
           size: tamano,
           font: fuente,
-          color: rgb(0, 0, 0),
+          color: rgb(0.05, 0.20, 0.48),
         });
       };
       dibujar(remitente.nombre, posiciones.remitenteNombre);
@@ -297,7 +317,7 @@ export default function RemisionesPage() {
               ))}
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 24 }}>
-              <button type="button" onClick={() => void guardarDireccion()} disabled={guardando || cargandoDireccion}
+              <button type="button" onClick={() => void guardarDireccion()} disabled={guardando || cargandoDireccion || generandoPdf}
                 style={{ padding: "12px 22px", background: "#0f766e", color: "white", border: "none", borderRadius: 8, fontWeight: 700 }}>
                 {guardando ? "Guardando..." : "Guardar dirección"}
               </button>
