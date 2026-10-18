@@ -5,6 +5,7 @@
 import Link from "next/link";
 import DiagnosticoPushCliente from "./DiagnosticoPushCliente";
 import ControlNotificacionesCliente from "./ControlNotificacionesCliente";
+import ResumenNotificaciones from "./ResumenNotificaciones";
 
 
 
@@ -1223,6 +1224,11 @@ async function cambiarEstadoCliente() {
 
 
           <div className="grid items-start gap-5 lg:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.1fr)]">
+            {pestana === "registrados" && (
+              <div className="lg:col-span-2">
+                <ResumenNotificaciones />
+              </div>
+            )}
 
 
 
