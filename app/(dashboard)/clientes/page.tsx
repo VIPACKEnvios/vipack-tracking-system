@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import DiagnosticoPushCliente from "./DiagnosticoPushCliente";
+import ControlNotificacionesCliente from "./ControlNotificacionesCliente";
 
 
 
@@ -1290,6 +1291,11 @@ async function cambiarEstadoCliente() {
 
 
                 <div className="mt-6 border-t border-slate-100 pt-5"><p className="mb-3 text-xs text-slate-500">Cambiar el estado no elimina el registro ni la carpeta de OneDrive.</p><button type="button" onClick={() => void cambiarEstadoCliente()} disabled={cambiandoEstado || cargando} className={`w-full rounded-xl px-5 py-4 text-sm font-black text-white disabled:opacity-50 ${clienteSeleccionado.activo ? "bg-rose-600 hover:bg-rose-700" : "bg-emerald-600 hover:bg-emerald-700"}`}>{cambiandoEstado ? "Guardando cambios..." : clienteSeleccionado.activo ? "Dar de baja cliente" : "Reactivar cliente"}</button></div>
+
+                <ControlNotificacionesCliente
+                  key={clienteSeleccionado.id_cliente}
+                  clienteId={clienteSeleccionado.id_cliente}
+                />
 
                 <DiagnosticoPushCliente
                   key={clienteSeleccionado.id_cliente}
