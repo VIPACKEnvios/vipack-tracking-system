@@ -61,8 +61,6 @@ async function validarSesion(token: string | undefined) {
     new Uint8Array(firmaCalculada)
   );
 
-  // Comparamos todos los caracteres sin salir
-  // anticipadamente al encontrar una diferencia.
   let diferencia = 0;
 
   for (let i = 0; i < firmaEsperada.length; i++) {
@@ -87,6 +85,7 @@ export async function proxy(request: NextRequest) {
 
   const isPublicApi =
     path === "/api/login" ||
+    path === "/api/push/confirmar-recepcion" ||
     path.startsWith("/api/registro-bazar") ||
     path.startsWith("/api/registro-cliente") ||
     path.startsWith("/api/consulta-bazares") ||

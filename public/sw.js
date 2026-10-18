@@ -1,3 +1,4 @@
+
 self.addEventListener("push", function (event) {
   let data = {
     title: "VIPACK Envíos",
@@ -11,12 +12,25 @@ self.addEventListener("push", function (event) {
     try {
       const payload = event.data.json();
 
-      data = {
-        ...data,
-        ...payload,
-      };
+      if (
+        payload &&
+        typeof payload === "object" &&
+        !Array.isArray(payload)
+      ) {
+        data = {
+          ...data,
+          ...payload,
+        };
+      }
     } catch {
-      data.body = event.data.text();
+      try {
+        data.body = event.data.text();
+      } catch (error) {
+        console.error(
+          "VIPACK: error leyendo notificación:",
+          error
+        );
+      }
     }
   }
 
@@ -33,36 +47,96 @@ self.addEventListener("push", function (event) {
   };
 
   event.waitUntil(
-    self.registration.showNotification(
-      data.title || "VIPACK Envíos",
-      options
-    )
+    (async function () {
+      // Mostrar la notificación normalmente.
+      await self.registration.showNotification(
+        data.title || "VIPACK Envíos",
+        options
+      );
+
+      // Las notificaciones normales no requieren
+      // confirmación de diagnóstico.
+      const entregaId = data.entrega_id;
+      const confirmacionToken = data.confirmacion_token;
+
+      if (
+        typeof entregaId !== "string" ||
+        typeof confirmacionToken !== "string"
+      ) {
+        return;
+      }
+
+      // Confirmar que el navegador procesó
+      // correctamente la notificación.
+      try {
+        const response = await fetch(
+          "/api/push/confirmar-recepcion",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              entrega_id: entregaId,
+              confirmacion_token: confirmacionToken,
+            }),
+            cache: "no-store",
+            credentials: "omit",
+          }
+        );
+
+        if (!response.ok) {
+          console.warn(
+            "VIPACK: confirmación pendiente:",
+            response.status
+          );
+        }
+      } catch (error) {
+        console.error(
+          "VIPACK: no se pudo confirmar recepción:",
+          error
+        );
+      }
+    })()
   );
 });
 
-self.addEventListener("notificationclick", function (event) {
-  event.notification.close();
+self.addEventListener(
+  "notificationclick",
+  function (event) {
+    event.notification.close();
 
-  const url =
-    event.notification?.data?.url || "/";
+    const url =
+      event.notification?.data?.url || "/";
 
-  event.waitUntil(
-    clients
-      .matchAll({
-        type: "window",
-        includeUncontrolled: true,
-      })
-      .then((clientList) => {
+    event.waitUntil(
+      (async function () {
+        const destino = new URL(
+          url,
+          self.location.origin
+        );
+
+        // Evitar abrir destinos externos.
+        if (destino.origin !== self.location.origin) {
+          return;
+        }
+
+        const clientList = await clients.matchAll({
+          type: "window",
+          includeUncontrolled: true,
+        });
+
         for (const client of clientList) {
           if ("focus" in client) {
-            client.navigate(url);
+            await client.navigate(destino.href);
             return client.focus();
           }
         }
 
         if (clients.openWindow) {
-          return clients.openWindow(url);
+          return clients.openWindow(destino.href);
         }
-      })
-  );
-});
+      })()
+    );
+  }
+);
