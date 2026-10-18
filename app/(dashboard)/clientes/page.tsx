@@ -5,7 +5,10 @@
 import Link from "next/link";
 import DiagnosticoPushCliente from "./DiagnosticoPushCliente";
 import ControlNotificacionesCliente from "./ControlNotificacionesCliente";
-import ResumenNotificaciones from "./ResumenNotificaciones";
+import ResumenNotificaciones, {
+  type ClienteNotificacion,
+  type FiltroNotificaciones,
+} from "./ResumenNotificaciones";
 
 
 
@@ -251,6 +254,15 @@ export default function ClientesPage() {
 
   const [filtroClientes, setFiltroClientes] = useState<FiltroClientes>("activos");
 
+  const [filtroNotificaciones, setFiltroNotificaciones] =
+    useState<FiltroNotificaciones>("todos");
+
+  const [clientesNotificaciones, setClientesNotificaciones] =
+    useState<ClienteNotificacion[]>([]);
+
+  const [notificacionesCargadas, setNotificacionesCargadas] =
+    useState(false);
+
 
 
   const [busqueda, setBusqueda] = useState("");
@@ -431,7 +443,7 @@ export default function ClientesPage() {
 
 
 
-      setError(e instanceof Error ? e.message : "Ocurrió un error al consultar la información.");
+      setError(e instanceof Error ? e.message : "Ocurri├│ un error al consultar la informaci├│n.");
 
 
 
@@ -515,35 +527,45 @@ export default function ClientesPage() {
 
 
 
-  const clientesFiltrados = useMemo(
+  const clientesFiltrados = useMemo(() => {
+    const mapa = new Map(
+      clientesNotificaciones.map((n) => [n.id_cliente, n])
+    );
 
+    return clientes.filter((c) => {
+      const coincideBusqueda =
+        `${c.nombre} ${c.id_cliente} ${numero(c.id_cliente)} ${c.carpeta_cliente ?? ""}`
+          .toLowerCase()
+          .includes(busqueda.trim().toLowerCase());
 
+      if (!coincideBusqueda) return false;
+      if (filtroNotificaciones === "todos") return true;
+      if (!notificacionesCargadas) return false;
 
-    () => clientes.filter((c) =>
+      // El resumen únicamente contiene clientes activos.
+      if (!c.activo) return false;
 
+      const datos = mapa.get(c.id_cliente);
+      if (!datos) return false;
 
-
-      `${c.nombre} ${c.id_cliente} ${numero(c.id_cliente)} ${c.carpeta_cliente ?? ""}`
-
-
-
-        .toLowerCase()
-
-
-
-        .includes(busqueda.trim().toLowerCase())
-
-
-
-    ),
-
-
-
-    [clientes, busqueda]
-
-
-
-  );
+      switch (filtroNotificaciones) {
+        case "con_dispositivos":
+          return datos.dispositivos_activos > 0;
+        case "sin_dispositivos":
+          return datos.dispositivos_activos === 0;
+        case "confirmados":
+          return datos.ultima_confirmacion !== null;
+        default:
+          return true;
+      }
+    });
+  }, [
+    clientes,
+    busqueda,
+    filtroNotificaciones,
+    clientesNotificaciones,
+    notificacionesCargadas,
+  ]);
 
 
 
@@ -607,7 +629,7 @@ export default function ClientesPage() {
 
 
 
-      <td>${escapar(c.telefono?.trim() || "—")}</td></tr>`).join("");
+      <td>${escapar(c.telefono?.trim() || "ÔÇö")}</td></tr>`).join("");
 
 
 
@@ -703,7 +725,7 @@ export default function ClientesPage() {
 
 
 
-      <header><div class="marca">VIPACK ENVÍOS</div>
+      <header><div class="marca">VIPACK ENV├ìOS</div>
 
 
 
@@ -711,11 +733,11 @@ export default function ClientesPage() {
 
 
 
-      <div class="meta">Fecha: ${escapar(fecha)} · Total: ${clientesParaMaria.length} clientes</div></header>
+      <div class="meta">Fecha: ${escapar(fecha)} ┬À Total: ${clientesParaMaria.length} clientes</div></header>
 
 
 
-      <table><thead><tr><th>ID</th><th>Nombre</th><th>Teléfono</th></tr></thead>
+      <table><thead><tr><th>ID</th><th>Nombre</th><th>Tel├®fono</th></tr></thead>
 
 
 
@@ -756,8 +778,8 @@ async function aprobar() {
     if (seleccionada.estado !== "pendiente" && !recuperandoNube) return;
 
     const pregunta = recuperandoNube
-      ? "¿Recuperar la solicitud 9 de Nube con el ID 54 ya reservado? Se intentará completar su registro en Excel, OneDrive y Supabase. Ejecuta esta operación una sola vez."
-      : `¿Crear al cliente "${seleccionada.nombre}"? Se reservará un número, se actualizará el Excel y se creará su carpeta de OneDrive.`;
+      ? "┬┐Recuperar la solicitud 9 de Nube con el ID 54 ya reservado? Se intentar├í completar su registro en Excel, OneDrive y Supabase. Ejecuta esta operaci├│n una sola vez."
+      : `┬┐Crear al cliente "${seleccionada.nombre}"? Se reservar├í un n├║mero, se actualizar├í el Excel y se crear├í su carpeta de OneDrive.`;
 
     if (!window.confirm(pregunta)) return;
 
@@ -776,7 +798,7 @@ async function aprobar() {
       const data: RespuestaAprobar = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(
-          `${data.error || "No se pudo completar la operación."}${data.detalle ? ` — ${data.detalle}` : ""}${data.requiere_revision ? " Requiere revisión manual antes de reintentar." : ""}`
+          `${data.error || "No se pudo completar la operaci├│n."}${data.detalle ? ` ÔÇö ${data.detalle}` : ""}${data.requiere_revision ? " Requiere revisi├│n manual antes de reintentar." : ""}`
         );
       }
 
@@ -787,7 +809,7 @@ async function aprobar() {
       setSeleccionada(null);
       await cargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo completar la operación.");
+      setError(e instanceof Error ? e.message : "No se pudo completar la operaci├│n.");
     } finally {
       setAprobando(false);
     }
@@ -813,11 +835,11 @@ async function cambiarEstadoCliente() {
 
 
 
-      ? `¿Reactivar a ${cliente.nombre} (#${numero(cliente.id_cliente)})? Volverá a tener acceso a su inventario privado.`
+      ? `┬┐Reactivar a ${cliente.nombre} (#${numero(cliente.id_cliente)})? Volver├í a tener acceso a su inventario privado.`
 
 
 
-      : `¿Dar de baja a ${cliente.nombre} (#${numero(cliente.id_cliente)})? Dejará de aparecer entre los clientes activos. No se eliminarán su historial ni su carpeta de OneDrive.`;
+      : `┬┐Dar de baja a ${cliente.nombre} (#${numero(cliente.id_cliente)})? Dejar├í de aparecer entre los clientes activos. No se eliminar├ín su historial ni su carpeta de OneDrive.`;
 
 
 
@@ -977,7 +999,7 @@ async function cambiarEstadoCliente() {
 
 
 
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#152d84] to-[#6b42d9] text-2xl text-white shadow-md">👥</div>
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#152d84] to-[#6b42d9] text-2xl text-white shadow-md">­ƒæÑ</div>
 
 
 
@@ -985,7 +1007,7 @@ async function cambiarEstadoCliente() {
 
 
 
-              <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-[#6b42d9]">Centro de operaciones · VIPACK</p>
+              <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-[#6b42d9]">Centro de operaciones ┬À VIPACK</p>
 
 
 
@@ -993,7 +1015,7 @@ async function cambiarEstadoCliente() {
 
 
 
-              <p className="mt-1 text-sm text-slate-500">Registros, solicitudes y listados de tu operación.</p>
+              <p className="mt-1 text-sm text-slate-500">Registros, solicitudes y listados de tu operaci├│n.</p>
 
 
 
@@ -1013,7 +1035,7 @@ async function cambiarEstadoCliente() {
 
 
 
-            <button type="button" onClick={() => void cargar()} disabled={cargando || aprobando || cambiandoEstado} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-[#172d77] hover:bg-slate-50 disabled:opacity-50">{cargando ? "Actualizando..." : "↻ Actualizar"}</button>
+            <button type="button" onClick={() => void cargar()} disabled={cargando || aprobando || cambiandoEstado} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-[#172d77] hover:bg-slate-50 disabled:opacity-50">{cargando ? "Actualizando..." : "Ôå╗ Actualizar"}</button>
 
 
 
@@ -1029,7 +1051,7 @@ async function cambiarEstadoCliente() {
 
 
 
-          {([ ["registrados", "👥 Clientes registrados"], ["solicitudes", "📋 Solicitudes"], ["pdf", "🖨️ PDF para María"] ] as const).map(([clave, texto]) => (
+          {([ ["registrados", "­ƒæÑ Clientes registrados"], ["solicitudes", "­ƒôï Solicitudes"], ["pdf", "­ƒû¿´©Å PDF para Mar├¡a"] ] as const).map(([clave, texto]) => (
 
 
 
@@ -1073,15 +1095,15 @@ async function cambiarEstadoCliente() {
 
 
 
-                  <p className="text-xs font-bold uppercase tracking-widest text-indigo-100">Control interno · VIPACK</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-indigo-100">Control interno ┬À VIPACK</p>
 
 
 
-                  <h2 className="mt-2 text-2xl font-black">Listado para María</h2>
+                  <h2 className="mt-2 text-2xl font-black">Listado para Mar├¡a</h2>
 
 
 
-                  <p className="mt-1 text-sm text-indigo-100">Solo clientes activos con carpeta confirmada en OneDrive · Orden por ID</p>
+                  <p className="mt-1 text-sm text-indigo-100">Solo clientes activos con carpeta confirmada en OneDrive ┬À Orden por ID</p>
 
 
 
@@ -1117,7 +1139,7 @@ async function cambiarEstadoCliente() {
 
             <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
 
-              {incidenciasPDF} carpeta(s) requieren revisión y no se incluyeron en el listado.
+              {incidenciasPDF} carpeta(s) requieren revisi├│n y no se incluyeron en el listado.
 
             </p>
 
@@ -1139,7 +1161,7 @@ async function cambiarEstadoCliente() {
 
 
 
-                  <input id="buscar-pdf" value={busqueda} onChange={e => { setBusqueda(e.target.value); setPaginaPdf(1); }} placeholder="Buscar por nombre, ID o teléfono..." className="w-full max-w-xl rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-[#6840d4]" />
+                  <input id="buscar-pdf" value={busqueda} onChange={e => { setBusqueda(e.target.value); setPaginaPdf(1); }} placeholder="Buscar por nombre, ID o tel├®fono..." className="w-full max-w-xl rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-[#6840d4]" />
 
 
 
@@ -1147,7 +1169,7 @@ async function cambiarEstadoCliente() {
 
 
 
-                <button type="button" onClick={generarPdfMaria} disabled={cargando || clientesParaMaria.length === 0 || Boolean(error)} className="rounded-xl bg-[#5531c6] px-6 py-3 text-sm font-extrabold text-white shadow-sm hover:bg-[#4526a8] disabled:opacity-50">🖨️ Imprimir / Guardar PDF</button>
+                <button type="button" onClick={generarPdfMaria} disabled={cargando || clientesParaMaria.length === 0 || Boolean(error)} className="rounded-xl bg-[#5531c6] px-6 py-3 text-sm font-extrabold text-white shadow-sm hover:bg-[#4526a8] disabled:opacity-50">­ƒû¿´©Å Imprimir / Guardar PDF</button>
 
 
 
@@ -1163,7 +1185,7 @@ async function cambiarEstadoCliente() {
 
 
 
-                  <thead className="bg-[#f1f2fb] text-xs font-black uppercase tracking-wide text-[#243270]"><tr><th className="px-5 py-4">N.º</th><th className="px-5 py-4">ID</th><th className="px-5 py-4">Nombre del cliente</th><th className="px-5 py-4">Teléfono / WhatsApp</th></tr></thead>
+                  <thead className="bg-[#f1f2fb] text-xs font-black uppercase tracking-wide text-[#243270]"><tr><th className="px-5 py-4">N.┬║</th><th className="px-5 py-4">ID</th><th className="px-5 py-4">Nombre del cliente</th><th className="px-5 py-4">Tel├®fono / WhatsApp</th></tr></thead>
 
 
 
@@ -1171,7 +1193,7 @@ async function cambiarEstadoCliente() {
 
 
 
-                    {!cargando && pdfPagina.map((c, i) => <tr key={c.carpeta} className="hover:bg-indigo-50/50"><td className="px-5 py-3 text-slate-500">{(paginaActual - 1) * 15 + i + 1}</td><td className="px-5 py-3 font-extrabold text-[#5531c6]">{c.id}</td><td className="px-5 py-3 font-semibold text-slate-800">{c.nombre}</td><td className="px-5 py-3 text-slate-600">{c.telefono?.trim() || "—"}</td></tr>)}
+                    {!cargando && pdfPagina.map((c, i) => <tr key={c.carpeta} className="hover:bg-indigo-50/50"><td className="px-5 py-3 text-slate-500">{(paginaActual - 1) * 15 + i + 1}</td><td className="px-5 py-3 font-extrabold text-[#5531c6]">{c.id}</td><td className="px-5 py-3 font-semibold text-slate-800">{c.nombre}</td><td className="px-5 py-3 text-slate-600">{c.telefono?.trim() || "ÔÇö"}</td></tr>)}
 
 
 
@@ -1199,7 +1221,7 @@ async function cambiarEstadoCliente() {
 
 
 
-                <span>Mostrando {pdfFiltrados.length ? (paginaActual - 1) * 15 + 1 : 0}–{Math.min(paginaActual * 15, pdfFiltrados.length)} de {pdfFiltrados.length}</span>
+                <span>Mostrando {pdfFiltrados.length ? (paginaActual - 1) * 15 + 1 : 0}ÔÇô{Math.min(paginaActual * 15, pdfFiltrados.length)} de {pdfFiltrados.length}</span>
 
 
 
@@ -1226,7 +1248,15 @@ async function cambiarEstadoCliente() {
           <div className="grid items-start gap-5 lg:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.1fr)]">
             {pestana === "registrados" && (
               <div className="lg:col-span-2">
-                <ResumenNotificaciones />
+                <ResumenNotificaciones
+                  filtro={filtroNotificaciones}
+                  onFiltroChange={(valor) => {
+                    setFiltroNotificaciones(valor);
+                    setClienteSeleccionado(null);
+                  }}
+                  onClientesChange={setClientesNotificaciones}
+                  onCargaChange={setNotificacionesCargadas}
+                />
               </div>
             )}
 
@@ -1236,7 +1266,7 @@ async function cambiarEstadoCliente() {
 
 
 
-              <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder={pestana === "registrados" ? "Buscar por nombre o número..." : "Buscar por nombre, teléfono o folio..."} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-[#6840d4]" />
+              <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder={pestana === "registrados" ? "Buscar por nombre o n├║mero..." : "Buscar por nombre, tel├®fono o folio..."} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-[#6840d4]" />
 
 
 
@@ -1260,11 +1290,11 @@ async function cambiarEstadoCliente() {
 
 
 
-                {!cargando && pestana === "registrados" && clientesFiltrados.map(c => <button key={c.id} type="button" onClick={() => setClienteSeleccionado(c)} className={`w-full rounded-xl border px-4 py-3 text-left transition hover:border-indigo-300 ${clienteSeleccionado?.id === c.id ? "border-[#6840d4] bg-indigo-50" : "border-slate-200 bg-white"}`}><div className="flex items-start justify-between gap-2"><p className="text-sm font-extrabold text-[#111c4b]">#{numero(c.id_cliente)} · {c.nombre}</p><span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${c.activo ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>{c.activo ? "Activo" : "Inactivo"}</span></div><p className="mt-1 text-xs text-slate-500">{c.telefono_whatsapp?.trim() || "Sin teléfono"}</p></button>)}
+                {!cargando && pestana === "registrados" && clientesFiltrados.map(c => <button key={c.id} type="button" onClick={() => setClienteSeleccionado(c)} className={`w-full rounded-xl border px-4 py-3 text-left transition hover:border-indigo-300 ${clienteSeleccionado?.id === c.id ? "border-[#6840d4] bg-indigo-50" : "border-slate-200 bg-white"}`}><div className="flex items-start justify-between gap-2"><p className="text-sm font-extrabold text-[#111c4b]">#{numero(c.id_cliente)} ┬À {c.nombre}</p><span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${c.activo ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>{c.activo ? "Activo" : "Inactivo"}</span></div><p className="mt-1 text-xs text-slate-500">{c.telefono_whatsapp?.trim() || "Sin tel├®fono"}</p></button>)}
 
 
 
-                {!cargando && pestana === "solicitudes" && solicitudesFiltradas.map(s => <button key={s.id} type="button" onClick={() => setSeleccionada(s)} className={`w-full rounded-xl border px-4 py-3 text-left hover:border-indigo-300 ${seleccionada?.id === s.id ? "border-[#6840d4] bg-indigo-50" : "border-slate-200"}`}><p className="text-sm font-extrabold text-[#111c4b]">{s.nombre}</p><p className="mt-1 text-xs font-bold text-[#5531c6]">{s.folio} · {s.telefono}</p></button>)}
+                {!cargando && pestana === "solicitudes" && solicitudesFiltradas.map(s => <button key={s.id} type="button" onClick={() => setSeleccionada(s)} className={`w-full rounded-xl border px-4 py-3 text-left hover:border-indigo-300 ${seleccionada?.id === s.id ? "border-[#6840d4] bg-indigo-50" : "border-slate-200"}`}><p className="text-sm font-extrabold text-[#111c4b]">{s.nombre}</p><p className="mt-1 text-xs font-bold text-[#5531c6]">{s.folio} ┬À {s.telefono}</p></button>)}
 
 
 
@@ -1280,7 +1310,7 @@ async function cambiarEstadoCliente() {
 
 
 
-              {pestana === "registrados" ? (!clienteSeleccionado ? <Vacio texto="Selecciona un cliente de la lista para ver su información." /> : <>
+              {pestana === "registrados" ? (!clienteSeleccionado ? <Vacio texto="Selecciona un cliente de la lista para ver su informaci├│n." /> : <>
 
 
 
@@ -1288,11 +1318,11 @@ async function cambiarEstadoCliente() {
 
 
 
-                <div className="mt-5 grid gap-3 sm:grid-cols-2"><Dato titulo="Estado" valor={clienteSeleccionado.activo ? "Activo" : "Inactivo"}/><Dato titulo="Carpeta de OneDrive" valor={clienteSeleccionado.carpeta_cliente || "—"}/><div className="sm:col-span-2"><Dato titulo="Teléfono / WhatsApp" valor={clienteSeleccionado.telefono_whatsapp || "—"}/></div></div>
+                <div className="mt-5 grid gap-3 sm:grid-cols-2"><Dato titulo="Estado" valor={clienteSeleccionado.activo ? "Activo" : "Inactivo"}/><Dato titulo="Carpeta de OneDrive" valor={clienteSeleccionado.carpeta_cliente || "ÔÇö"}/><div className="sm:col-span-2"><Dato titulo="Tel├®fono / WhatsApp" valor={clienteSeleccionado.telefono_whatsapp || "ÔÇö"}/></div></div>
 
 
 
-                {clienteSeleccionado.activo && clienteSeleccionado.token_inventario ? <Link href={`/inventario/${encodeURIComponent(clienteSeleccionado.token_inventario)}`} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex rounded-xl bg-[#0b9cbf] px-5 py-3 text-sm font-bold text-white hover:bg-[#087f9d]">Abrir inventario privado ↗</Link> : <p className="mt-5 text-sm text-amber-700">{clienteSeleccionado.activo ? "Este cliente no tiene enlace de inventario disponible." : "El acceso al inventario está suspendido mientras el cliente permanezca inactivo."}</p>}
+                {clienteSeleccionado.activo && clienteSeleccionado.token_inventario ? <Link href={`/inventario/${encodeURIComponent(clienteSeleccionado.token_inventario)}`} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex rounded-xl bg-[#0b9cbf] px-5 py-3 text-sm font-bold text-white hover:bg-[#087f9d]">Abrir inventario privado Ôåù</Link> : <p className="mt-5 text-sm text-amber-700">{clienteSeleccionado.activo ? "Este cliente no tiene enlace de inventario disponible." : "El acceso al inventario est├í suspendido mientras el cliente permanezca inactivo."}</p>}
 
 
 
@@ -1320,15 +1350,15 @@ async function cambiarEstadoCliente() {
 
 
 
-                <div className="mt-5 grid gap-3 sm:grid-cols-2"><Dato titulo="Teléfono / WhatsApp" valor={seleccionada.telefono}/><Dato titulo="Fecha de registro" valor={seleccionada.created_at ? new Date(seleccionada.created_at).toLocaleString("es-MX") : "—"}/><div className="sm:col-span-2"><Dato titulo="Dirección" valor={seleccionada.direccion}/></div><div className="sm:col-span-2"><Dato titulo="Referencia del domicilio" valor={seleccionada.referencia_domicilio}/></div></div>
+                <div className="mt-5 grid gap-3 sm:grid-cols-2"><Dato titulo="Tel├®fono / WhatsApp" valor={seleccionada.telefono}/><Dato titulo="Fecha de registro" valor={seleccionada.created_at ? new Date(seleccionada.created_at).toLocaleString("es-MX") : "ÔÇö"}/><div className="sm:col-span-2"><Dato titulo="Direcci├│n" valor={seleccionada.direccion}/></div><div className="sm:col-span-2"><Dato titulo="Referencia del domicilio" valor={seleccionada.referencia_domicilio}/></div></div>
 
 
 
-                {seleccionada.estado === "pendiente" && <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5"><p className="font-black text-amber-950">Pendiente de aprobación</p><p className="mt-2 text-sm text-amber-800">Al aprobar, se reservará un número, se actualizará el Excel y se creará la carpeta de OneDrive.</p><button type="button" onClick={() => void aprobar()} disabled={aprobando} className="mt-4 w-full rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 px-5 py-4 font-black text-white disabled:opacity-50">{aprobando ? "Creando cliente..." : "Crear cliente"}</button></div>}
+                {seleccionada.estado === "pendiente" && <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5"><p className="font-black text-amber-950">Pendiente de aprobaci├│n</p><p className="mt-2 text-sm text-amber-800">Al aprobar, se reservar├í un n├║mero, se actualizar├í el Excel y se crear├í la carpeta de OneDrive.</p><button type="button" onClick={() => void aprobar()} disabled={aprobando} className="mt-4 w-full rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 px-5 py-4 font-black text-white disabled:opacity-50">{aprobando ? "Creando cliente..." : "Crear cliente"}</button></div>}
 
 
 
-                {seleccionada.estado === "aprobado" && <div className="mt-6 rounded-2xl bg-emerald-50 p-5 text-sm text-emerald-800"><p className="font-black">Cliente aprobado</p><p>ID asignado: {seleccionada.id_cliente_asignado ?? "—"}</p><p>Carpeta: {seleccionada.carpeta_cliente || "—"}</p></div>}
+                {seleccionada.estado === "aprobado" && <div className="mt-6 rounded-2xl bg-emerald-50 p-5 text-sm text-emerald-800"><p className="font-black">Cliente aprobado</p><p>ID asignado: {seleccionada.id_cliente_asignado ?? "ÔÇö"}</p><p>Carpeta: {seleccionada.carpeta_cliente || "ÔÇö"}</p></div>}
 
 
 
@@ -1389,7 +1419,7 @@ function Vacio({ texto }: { texto: string }) {
 
 
 
-  return <div className="flex min-h-[220px] items-center justify-center text-center"><div><div className="text-3xl">👤</div><h2 className="mt-3 text-lg font-black text-[#111c4b]">Selecciona un registro</h2><p className="mt-2 text-sm text-slate-500">{texto}</p></div></div>;
+  return <div className="flex min-h-[220px] items-center justify-center text-center"><div><div className="text-3xl">­ƒæñ</div><h2 className="mt-3 text-lg font-black text-[#111c4b]">Selecciona un registro</h2><p className="mt-2 text-sm text-slate-500">{texto}</p></div></div>;
 
 
 
@@ -1401,7 +1431,7 @@ function Dato({ titulo, valor }: { titulo: string; valor: string }) {
 
 
 
-  return <div className="rounded-xl bg-slate-50 p-4"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">{titulo}</p><p className="mt-2 break-words text-sm font-bold text-slate-900">{valor || "—"}</p></div>;
+  return <div className="rounded-xl bg-slate-50 p-4"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">{titulo}</p><p className="mt-2 break-words text-sm font-bold text-slate-900">{valor || "ÔÇö"}</p></div>;
 
 
 

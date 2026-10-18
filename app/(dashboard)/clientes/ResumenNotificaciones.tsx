@@ -35,6 +35,7 @@ type Props = {
   filtro?: FiltroNotificaciones;
   onFiltroChange?: (filtro: FiltroNotificaciones) => void;
   onClientesChange?: (clientes: ClienteNotificacion[]) => void;
+  onCargaChange?: (cargado: boolean) => void;
 };
 
 const opciones: {
@@ -51,6 +52,7 @@ export default function ResumenNotificaciones({
   filtro = "todos",
   onFiltroChange,
   onClientesChange,
+  onCargaChange,
 }: Props) {
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -58,6 +60,7 @@ export default function ResumenNotificaciones({
 
   const actualizar = useCallback(async (signal?: AbortSignal) => {
     setCargando(true);
+    onCargaChange?.(false);
     setError("");
 
     try {
@@ -75,6 +78,7 @@ export default function ResumenNotificaciones({
       }
 
       setResumen(datos.resumen);
+      onCargaChange?.(true);
       onClientesChange?.(
         Array.isArray(datos.clientes) ? datos.clientes : []
       );
@@ -87,7 +91,7 @@ export default function ResumenNotificaciones({
     } finally {
       if (!signal?.aborted) setCargando(false);
     }
-  }, [onClientesChange]);
+  }, [onClientesChange, onCargaChange]);
 
   useEffect(() => {
     const controlador = new AbortController();
