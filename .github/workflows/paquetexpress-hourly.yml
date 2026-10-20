@@ -1,0 +1,36 @@
+
+name: VIPACK - Revisar Paquetexpress
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vipack-paquetexpress-hourly
+  cancel-in-progress: false
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Consultar correos Paquetexpress
+        env:
+          CRON_SECRET: ${{ secrets.VIPACK_CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "ERROR: Falta configurar VIPACK_CRON_SECRET."
+            exit 1
+          fi
+
+          curl --fail-with-body --show-error --silent \
+            --retry 2 \
+            --retry-delay 10 \
+            --max-time 240 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://vipack-envios.com/api/cron/paquetexpress"
