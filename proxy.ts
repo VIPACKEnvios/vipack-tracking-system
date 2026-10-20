@@ -90,6 +90,7 @@ export async function proxy(request: NextRequest) {
     path.startsWith("/api/registro-cliente") ||
     path.startsWith("/api/consulta-bazares") ||
     path.startsWith("/api/trackingmore/") ||
+    path === "/api/cron/paquetexpress" ||
     path === "/api/onedrive/login" ||
     path === "/api/onedrive/callback" ||
     path.startsWith("/api/inventario/");

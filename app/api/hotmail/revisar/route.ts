@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-import { verificarSesionAdmin } from "@/lib/vipack-auth";
+import { verificarAccesoHotmail } from "@/lib/vipack-cron-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { cifrarToken, descifrarToken } from "@/lib/hotmail/crypto";
 
@@ -42,6 +42,7 @@ type Envio = {
   paqueteria: string | null;
   estatus_actual: string | null;
   estado_manual_bloqueado: boolean | null;
+  entregado: boolean | null;
 };
 
 type Evento =
@@ -123,7 +124,7 @@ async function renovarToken(refreshToken: string) {
 
   if (!clientId || !clientSecret) {
     throw new Error(
-      "Configuración Microsoft incompleta."
+      "Configuraci├│n Microsoft incompleta."
     );
   }
 
@@ -163,7 +164,7 @@ async function renovarToken(refreshToken: string) {
 
   if (!datos.access_token) {
     throw new Error(
-      "Microsoft no devolvió un token."
+      "Microsoft no devolvi├│ un token."
     );
   }
 
@@ -277,7 +278,7 @@ async function consultarMensajes(
 
     if (!respuesta.ok) {
       throw new Error(
-        `Microsoft Graph respondió ${respuesta.status}.`
+        `Microsoft Graph respondi├│ ${respuesta.status}.`
       );
     }
 
@@ -288,7 +289,7 @@ async function consultarMensajes(
 
     if (!Array.isArray(datos.value)) {
       throw new Error(
-        "Microsoft devolvió una lista de mensajes inválida."
+        "Microsoft devolvi├│ una lista de mensajes inv├ílida."
       );
     }
 
@@ -305,7 +306,7 @@ async function consultarMensajes(
 
       if (!Number.isFinite(fecha)) {
         throw new Error(
-          "Se encontró un correo sin fecha válida."
+          "Se encontr├│ un correo sin fecha v├ílida."
         );
       }
 
@@ -336,7 +337,7 @@ async function consultarMensajes(
         url.hostname !== "graph.microsoft.com"
       ) {
         throw new Error(
-          "Enlace de paginación no válido."
+          "Enlace de paginaci├│n no v├ílido."
         );
       }
     }
@@ -407,12 +408,12 @@ async function consultarCuerpo(
 export async function GET(
   request: NextRequest
 ) {
-  if (!verificarSesionAdmin(request)) {
+  if (!verificarAccesoHotmail(request)) {
     return NextResponse.json(
       {
         success: false,
         error:
-          "Sesión administrativa no autorizada.",
+          "Sesi├│n administrativa no autorizada.",
       },
       { status: 401 }
     );
@@ -437,7 +438,7 @@ export async function GET(
       !configuracion
     ) {
       throw new Error(
-        "No se pudo consultar la configuración de Paquetexpress."
+        "No se pudo consultar la configuraci├│n de Paquetexpress."
       );
     }
 
@@ -447,7 +448,7 @@ export async function GET(
 
     if (!Number.isFinite(fechaInicio)) {
       throw new Error(
-        "Fecha de inicio no válida."
+        "Fecha de inicio no v├ílida."
       );
     }
 
@@ -561,14 +562,14 @@ export async function GET(
               } = await supabase
                 .from("envios")
                 .select(
-                  "id,guia,paqueteria,estatus_actual,estado_manual_bloqueado"
+                  "id,guia,paqueteria,estatus_actual,estado_manual_bloqueado,entregado"
                 )
                 .eq("guia", guia)
                 .limit(2);
 
               if (errorEnvios) {
                 throw new Error(
-                  "Error al buscar la guía."
+                  "Error al buscar la gu├¡a."
                 );
               }
 
@@ -602,7 +603,7 @@ export async function GET(
                 envioId = envio.id;
 
                 if (
-                  estaEntregado(
+                  envio.entregado || estaEntregado(
                     envio.estatus_actual
                   )
                 ) {
@@ -698,7 +699,7 @@ export async function GET(
       {
         success: false,
         error:
-          "No se pudo realizar la revisión.",
+          "No se pudo realizar la revisi├│n.",
       },
       { status: 500 }
     );

@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-import { verificarSesionAdmin } from "@/lib/vipack-auth";
+import { verificarAccesoHotmail } from "@/lib/vipack-cron-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { GET as revisarCorreos } from "../revisar/route";
 
@@ -37,17 +37,22 @@ type Candidato = {
 };
 
 export async function POST(request: NextRequest) {
-  if (!verificarSesionAdmin(request)) {
+  if (!verificarAccesoHotmail(request)) {
     return NextResponse.json(
       {
         success: false,
-        error: "Sesión administrativa no autorizada.",
+        error: "Acceso no autorizado.",
+        enviaWhatsapp: false,
       },
       { status: 401 }
     );
   }
 
   try {
+    console.log(
+      "[VIPACK PAQUETEXPRESS] Iniciando registro de eventos."
+    );
+
     const supabase = getSupabaseAdmin();
 
     const { data: configuracion, error: errorConfig } =
@@ -58,20 +63,31 @@ export async function POST(request: NextRequest) {
         .single();
 
     if (errorConfig || !configuracion) {
+      console.error(
+        "[VIPACK PAQUETEXPRESS] No se pudo leer la configuración:",
+        errorConfig?.message || "Configuración inexistente"
+      );
+
       return NextResponse.json(
         {
           success: false,
           error: "No se pudo leer la configuración.",
+          enviaWhatsapp: false,
         },
         { status: 500 }
       );
     }
 
     if (!configuracion.registro_eventos_activo) {
+      console.log(
+        "[VIPACK PAQUETEXPRESS] Registro de eventos desactivado."
+      );
+
       return NextResponse.json({
         success: true,
         modo: "registro_desactivado",
         registrados: 0,
+        modificaEnvios: false,
         enviaWhatsapp: false,
       });
     }
@@ -84,10 +100,21 @@ export async function POST(request: NextRequest) {
       throw new Error("Fecha de inicio inválida.");
     }
 
+    console.log(
+      "[VIPACK PAQUETEXPRESS] Consultando correos."
+    );
+
     const respuestaRevision = await revisarCorreos(request);
 
     if (!respuestaRevision.ok) {
-      throw new Error("No fue posible revisar los correos.");
+      console.error(
+        "[VIPACK PAQUETEXPRESS] Falló la revisión. HTTP:",
+        respuestaRevision.status
+      );
+
+      throw new Error(
+        `La revisión de correos respondió HTTP ${respuestaRevision.status}.`
+      );
     }
 
     const revision: ResultadoRevision =
@@ -98,7 +125,9 @@ export async function POST(request: NextRequest) {
       !revision.resultados ||
       revision.resultados.length === 0
     ) {
-      throw new Error("La revisión no fue completa.");
+      throw new Error(
+        "La revisión de correos no fue completa."
+      );
     }
 
     if (
@@ -108,11 +137,16 @@ export async function POST(request: NextRequest) {
           cuenta.limitePaginasAlcanzado === true
       )
     ) {
+      console.error(
+        "[VIPACK PAQUETEXPRESS] Lectura incompleta de Hotmail."
+      );
+
       return NextResponse.json(
         {
           success: false,
           error:
             "Lectura incompleta. No se registraron eventos.",
+          modificaEnvios: false,
           enviaWhatsapp: false,
         },
         { status: 409 }
@@ -155,20 +189,25 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        const tipoEvento = evento.evento;
-        const clave = `${evento.envio_id}:${tipoEvento}`;
+        const clave =
+          `${evento.envio_id}:${evento.evento}`;
 
         if (!candidatos.has(clave)) {
           candidatos.set(clave, {
             envio_id: evento.envio_id,
             guia: evento.guia,
-            tipo_evento: tipoEvento,
+            tipo_evento: evento.evento,
             cuenta_origen: cuenta.cuenta,
             fecha_evento: evento.fecha as string,
           });
         }
       }
     }
+
+    console.log(
+      "[VIPACK PAQUETEXPRESS] Candidatos encontrados:",
+      candidatos.size
+    );
 
     let registrados = 0;
     let duplicados = 0;
@@ -190,9 +229,15 @@ export async function POST(request: NextRequest) {
       );
 
       if (error || typeof data !== "string") {
+        console.error(
+          "[VIPACK PAQUETEXPRESS] Error al registrar evento:",
+          error?.message || "Respuesta inválida de Supabase"
+        );
+
         errores.push(
           `No se pudo registrar la guía ${candidato.guia}.`
         );
+
         continue;
       }
 
@@ -208,6 +253,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    console.log(
+      "[VIPACK PAQUETEXPRESS] Registro finalizado:",
+      {
+        candidatos: candidatos.size,
+        registrados,
+        duplicados,
+        omitidos,
+        errores: errores.length,
+      }
+    );
+
     return NextResponse.json({
       success: errores.length === 0,
       modo: "registro_seguro_sin_whatsapp",
@@ -220,12 +276,20 @@ export async function POST(request: NextRequest) {
       modificaEnvios: false,
       enviaWhatsapp: false,
     });
-  } catch {
+  } catch (error) {
+    console.error(
+      "[VIPACK PAQUETEXPRESS] Error en registro:",
+      error instanceof Error
+        ? error.message
+        : "Error desconocido"
+    );
+
     return NextResponse.json(
       {
         success: false,
         error:
           "No se pudo completar el registro de eventos.",
+        modificaEnvios: false,
         enviaWhatsapp: false,
       },
       { status: 500 }
