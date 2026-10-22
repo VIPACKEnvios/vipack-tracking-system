@@ -25,6 +25,7 @@ type CajaBody = {
   pesoCobrable?: number;
   precioAereo?: number | null;
   precioTerrestre?: number | null;
+  precioDHLExpress?: number | null;
 };
 
 type NuevaCotizacionBody = {
@@ -33,8 +34,10 @@ type NuevaCotizacionBody = {
   cajas?: CajaBody[];
   totalAereo?: number;
   totalTerrestre?: number;
+  totalDHLExpress?: number;
   enviarAereo?: boolean;
   enviarTerrestre?: boolean;
+  enviarDHLExpress?: boolean;
   observaciones?: string;
 };
 
@@ -658,11 +661,11 @@ export async function POST(
         .filter(Boolean)
         .join(" / ");
 
-    escribirCelda(
-      hojaCotizaciones,
-      `K${filaCot}`,
-      opciones
-    );
+    const opcionesCompletas = [opciones, body.enviarDHLExpress ? "DHL Express Aéreo" : ""]
+      .filter(Boolean).join(" / ");
+    escribirCelda(hojaCotizaciones, `K${filaCot}`, opcionesCompletas);
+    // Columna S: total DHL Express (sin modificar columnas existentes).
+    escribirCelda(hojaCotizaciones, `S${filaCot}`, numero(body.totalDHLExpress));
 
     escribirCelda(
       hojaCotizaciones,
@@ -711,7 +714,7 @@ export async function POST(
     asegurarRango(
       hojaCotizaciones,
       filaCot,
-      17
+      18
     );
 
     let filaDetalle =
@@ -826,11 +829,9 @@ export async function POST(
         )
       );
 
-      asegurarRango(
-        hojaDetalle,
-        filaDetalle,
-        9
-      );
+      // Columna K: precio DHL Express por caja.
+      escribirCelda(hojaDetalle, `K${filaDetalle}`, numero(caja.precioDHLExpress));
+      asegurarRango(hojaDetalle, filaDetalle, 10);
 
       filaDetalle += 1;
     }

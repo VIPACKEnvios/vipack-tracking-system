@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-type TipoServicio = "Aereo" | "Terrestre";
+type TipoServicio = "Aereo" | "Terrestre" | "DHLExpress";
 
 type Tarifa = {
   tipo: TipoServicio;
@@ -25,6 +25,7 @@ type BorradorCotizacion = {
   cajas: Caja[];
   enviarAereo: boolean;
   enviarTerrestre: boolean;
+  enviarDHLExpress?: boolean;
   observaciones: string;
   guardadoEn: string;
 };
@@ -68,6 +69,17 @@ const TARIFAS: Tarifa[] = [
   { tipo: "Aereo", peso_min: 41, peso_max: 45, precio: 2530 },
   { tipo: "Aereo", peso_min: 46, peso_max: 50, precio: 2750 },
   { tipo: "Aereo", peso_min: 51, peso_max: 60, precio: 3100 },
+
+  { tipo: "DHLExpress", peso_min: 1, peso_max: 5, precio: 1100 },
+  { tipo: "DHLExpress", peso_min: 6, peso_max: 10, precio: 1400 },
+  { tipo: "DHLExpress", peso_min: 11, peso_max: 15, precio: 1800 },
+  { tipo: "DHLExpress", peso_min: 16, peso_max: 20, precio: 1950 },
+  { tipo: "DHLExpress", peso_min: 21, peso_max: 25, precio: 2300 },
+  { tipo: "DHLExpress", peso_min: 26, peso_max: 30, precio: 2600 },
+  { tipo: "DHLExpress", peso_min: 31, peso_max: 35, precio: 2900 },
+  { tipo: "DHLExpress", peso_min: 36, peso_max: 40, precio: 3350 },
+  { tipo: "DHLExpress", peso_min: 41, peso_max: 45, precio: 3600 },
+  { tipo: "DHLExpress", peso_min: 46, peso_max: 50, precio: 4050 },
 ];
 
 const CAJA_INICIAL: Caja = {
@@ -168,6 +180,7 @@ export default function CotizacionesPage() {
     useState(true);
   const [enviarTerrestre, setEnviarTerrestre] =
     useState(true);
+  const [enviarDHLExpress, setEnviarDHLExpress] = useState(false);
   const [observaciones, setObservaciones] =
     useState("");
 
@@ -549,6 +562,7 @@ export default function CotizacionesPage() {
           borrador.enviarTerrestre ??
             true
         );
+        setEnviarDHLExpress(borrador.enviarDHLExpress ?? false);
         setObservaciones(
           borrador.observaciones ||
             ""
@@ -592,6 +606,7 @@ export default function CotizacionesPage() {
               cajas,
               enviarAereo,
               enviarTerrestre,
+              enviarDHLExpress,
               observaciones,
               guardadoEn,
             };
@@ -624,6 +639,7 @@ export default function CotizacionesPage() {
     cajas,
     enviarAereo,
     enviarTerrestre,
+    enviarDHLExpress,
     observaciones,
   ]);
 
@@ -693,6 +709,11 @@ export default function CotizacionesPage() {
         "Terrestre",
         pesoCobrable
       );
+      const medidasDHLValidas = largo > 0 && ancho > 0 && alto > 0 &&
+        largo <= 60 && ancho <= 60 && alto <= 60 && pesoReal > 0 && pesoReal <= 50;
+      const tarifaDHLExpress = medidasDHLValidas
+        ? obtenerTarifa("DHLExpress", pesoCobrable)
+        : null;
 
       return {
         ...caja,
@@ -705,6 +726,7 @@ export default function CotizacionesPage() {
         pesoCobrable,
         tarifaAerea,
         tarifaTerrestre,
+        tarifaDHLExpress,
       };
     });
 
@@ -719,6 +741,10 @@ export default function CotizacionesPage() {
         total +
         (caja.tarifaTerrestre?.precio || 0),
       0
+    );
+
+    const totalDHLExpress = detalle.reduce(
+      (total, caja) => total + (caja.tarifaDHLExpress?.precio || 0), 0
     );
 
     const pesoRealTotal = detalle.reduce(
@@ -738,23 +764,25 @@ export default function CotizacionesPage() {
       0
     );
 
-    const cajasSinTarifa = detalle.filter(
-      (caja) =>
-        caja.pesoCobrable > 0 &&
-        (!caja.tarifaAerea ||
-          !caja.tarifaTerrestre)
+    const cajasSinTarifa = detalle.filter((caja) =>
+      caja.pesoCobrable > 0 && (
+        (enviarAereo && !caja.tarifaAerea) ||
+        (enviarTerrestre && !caja.tarifaTerrestre) ||
+        (enviarDHLExpress && !caja.tarifaDHLExpress)
+      )
     ).length;
 
     return {
       detalle,
       totalAereo,
       totalTerrestre,
+      totalDHLExpress,
       pesoRealTotal,
       pesoVolumetricoTotal,
       pesoCobrableTotal,
       cajasSinTarifa,
     };
-  }, [cajas]);
+  }, [cajas, enviarAereo, enviarTerrestre, enviarDHLExpress]);
 
   function agregarCaja() {
     setCajas((actuales) => [
@@ -804,6 +832,7 @@ export default function CotizacionesPage() {
     setCajas([CAJA_INICIAL]);
     setEnviarAereo(true);
     setEnviarTerrestre(true);
+    setEnviarDHLExpress(false);
     setObservaciones("");
     setBorradorRestaurado(
       false
@@ -839,10 +868,11 @@ export default function CotizacionesPage() {
 
     if (
       !enviarAereo &&
-      !enviarTerrestre
+      !enviarTerrestre &&
+      !enviarDHLExpress
     ) {
       window.alert(
-        "Selecciona Aéreo, Terrestre o ambos."
+        "Selecciona al menos un servicio: Aéreo, Terrestre o DHL Express."
       );
       return;
     }
@@ -918,14 +948,17 @@ export default function CotizacionesPage() {
                         caja.tarifaTerrestre
                           ?.precio ??
                         null,
+                      precioDHLExpress: caja.tarifaDHLExpress?.precio ?? null,
                     })
                   ),
                 totalAereo:
                   calculo.totalAereo,
                 totalTerrestre:
                   calculo.totalTerrestre,
+                totalDHLExpress: calculo.totalDHLExpress,
                 enviarAereo,
                 enviarTerrestre,
+                enviarDHLExpress,
                 observaciones:
                   observaciones.trim(),
               }),
@@ -1009,11 +1042,10 @@ export default function CotizacionesPage() {
     }
 
     if (enviarTerrestre) {
-      lineas.push(
-        `Terrestre: ${dinero(
-          calculo.totalTerrestre
-        )}`
-      );
+      lineas.push(`Terrestre: ${dinero(calculo.totalTerrestre)}`);
+    }
+    if (enviarDHLExpress) {
+      lineas.push(`DHL Express Aéreo: ${dinero(calculo.totalDHLExpress)}`);
     }
 
     if (
@@ -1382,7 +1414,7 @@ export default function CotizacionesPage() {
                       </div>
                     </div>
 
-                    <div className="mt-2.5 grid grid-cols-2 gap-2 sm:mt-3 sm:gap-2.5">
+                    <div className="mt-2.5 grid grid-cols-1 gap-2 sm:mt-3 sm:grid-cols-3 sm:gap-2.5">
                       <div className="rounded-xl border border-sky-200 bg-sky-50 p-2.5 sm:p-3">
                         <p className="text-xs font-bold uppercase text-sky-700">
                           Aéreo
@@ -1413,9 +1445,16 @@ export default function CotizacionesPage() {
                               )
                             : "Sin tarifa"}
                         </p>
-                      </div>
-                    </div>
-                  </article>
+                       </div>
+                       <div className="rounded-xl border border-red-200 bg-red-50 p-2.5 sm:p-3">
+                         <p className="text-xs font-bold uppercase text-red-700">DHL Express Aéreo</p>
+                         <p className="mt-1 text-xl font-black text-red-950">
+                           {caja.pesoCobrable <= 0 ? "—" : caja.tarifaDHLExpress
+                             ? dinero(caja.tarifaDHLExpress.precio) : "No disponible"}
+                         </p>
+                       </div>
+                     </div>
+                   </article>
                 ))}
               </div>
             </section>
@@ -1499,13 +1538,20 @@ export default function CotizacionesPage() {
                     className="h-5 w-5"
                   />
                 </label>
-              </div>
+                 <label className="flex cursor-pointer items-center justify-between rounded-xl border border-red-200 bg-red-50 p-2.5 sm:p-3">
+                   <div>
+                     <p className="font-black text-red-950">✈️ DHL Express Aéreo</p>
+                     <p className="mt-1 text-xl font-black text-red-950 sm:text-2xl">{dinero(calculo.totalDHLExpress)}</p>
+                   </div>
+                   <input type="checkbox" checked={enviarDHLExpress}
+                     onChange={(e) => setEnviarDHLExpress(e.target.checked)} className="h-5 w-5" />
+                 </label>
+               </div>
 
-              {calculo.cajasSinTarifa > 0 && (
+               {calculo.cajasSinTarifa > 0 && (
                 <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">
                   Hay {calculo.cajasSinTarifa} caja(s)
-                  fuera del rango de tarifas de 2 a 60
-                  kg.
+                   sin tarifa para alguno de los servicios seleccionados. Para DHL Express verifica medidas (máximo 60 cm por lado), peso real (máximo 50 kg) y peso cobrable (máximo 50 kg).
                 </div>
               )}
 
