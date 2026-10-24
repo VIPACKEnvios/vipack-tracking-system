@@ -922,12 +922,13 @@ export async function PATCH(
     } = await supabase
       .from("clientes_inventario")
       .update({
-        nombre,
-        carpeta_cliente:
-          nuevaCarpeta,
-        updated_at:
-          new Date().toISOString(),
-      })
+  nombre,
+  telefono_whatsapp: telefono,
+  carpeta_cliente:
+    nuevaCarpeta,
+  updated_at:
+    new Date().toISOString(),
+})
       .eq(
         "id",
         cliente.id
