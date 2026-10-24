@@ -1,8 +1,13 @@
+
 {
   "crons": [
     {
       "path": "/api/trackingmore/sync",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/paquetexpress",
+      "schedule": "0 9 * * *"
     }
   ]
 }

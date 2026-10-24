@@ -56,6 +56,7 @@ type ResultadoEvento = {
   evento: Evento;
   fecha: string | null;
   resultado: string;
+  mensaje_id: string;
 };
 
 function normalizar(texto: string): string {
@@ -550,6 +551,7 @@ export async function GET(
                   null,
                 resultado:
                   "sin_guia_detectada",
+                  mensaje_id: mensaje.id,
               });
 
               continue;
@@ -628,6 +630,7 @@ export async function GET(
                   mensaje.receivedDateTime ||
                   null,
                 resultado,
+                mensaje_id: mensaje.id,
               });
             }
           } catch {
@@ -642,6 +645,7 @@ export async function GET(
                 null,
               resultado:
                 "error_lectura_mensaje",
+                mensaje_id: mensaje.id,
             });
           }
         }

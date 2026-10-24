@@ -8,12 +8,15 @@ import { GET as revisarCorreos } from "../revisar/route";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+type TipoEvento = "recoleccion" | "comienzo_viaje";
+
 type EventoDetectado = {
   guia: string | null;
   envio_id: number | null;
   evento: string;
   fecha: string | null;
   resultado: string;
+  mensaje_id: string;
 };
 
 type ResultadoCuenta = {
@@ -31,28 +34,40 @@ type ResultadoRevision = {
 type Candidato = {
   envio_id: number;
   guia: string;
-  tipo_evento: "recoleccion" | "comienzo_viaje";
+  tipo_evento: TipoEvento;
   cuenta_origen: string;
   fecha_evento: string;
 };
+
+type CandidatoPendiente = {
+  guia: string;
+  tipo_evento: TipoEvento;
+  cuenta_origen: string;
+  fecha_evento: string;
+  mensaje_id: string;
+};
+
+function esTipoEventoValido(
+  evento: string
+): evento is TipoEvento {
+  return (
+    evento === "recoleccion" ||
+    evento === "comienzo_viaje"
+  );
+}
 
 export async function POST(request: NextRequest) {
   if (!verificarAccesoHotmail(request)) {
     return NextResponse.json(
       {
         success: false,
-        error: "Acceso no autorizado.",
-        enviaWhatsapp: false,
+        error: "Sesión administrativa no autorizada.",
       },
       { status: 401 }
     );
   }
 
   try {
-    console.log(
-      "[VIPACK PAQUETEXPRESS] Iniciando registro de eventos."
-    );
-
     const supabase = getSupabaseAdmin();
 
     const { data: configuracion, error: errorConfig } =
@@ -63,30 +78,21 @@ export async function POST(request: NextRequest) {
         .single();
 
     if (errorConfig || !configuracion) {
-      console.error(
-        "[VIPACK PAQUETEXPRESS] No se pudo leer la configuración:",
-        errorConfig?.message || "Configuración inexistente"
-      );
-
       return NextResponse.json(
         {
           success: false,
           error: "No se pudo leer la configuración.",
-          enviaWhatsapp: false,
         },
         { status: 500 }
       );
     }
 
     if (!configuracion.registro_eventos_activo) {
-      console.log(
-        "[VIPACK PAQUETEXPRESS] Registro de eventos desactivado."
-      );
-
       return NextResponse.json({
         success: true,
         modo: "registro_desactivado",
         registrados: 0,
+        pendientesRegistrados: 0,
         modificaEnvios: false,
         enviaWhatsapp: false,
       });
@@ -100,21 +106,10 @@ export async function POST(request: NextRequest) {
       throw new Error("Fecha de inicio inválida.");
     }
 
-    console.log(
-      "[VIPACK PAQUETEXPRESS] Consultando correos."
-    );
-
     const respuestaRevision = await revisarCorreos(request);
 
     if (!respuestaRevision.ok) {
-      console.error(
-        "[VIPACK PAQUETEXPRESS] Falló la revisión. HTTP:",
-        respuestaRevision.status
-      );
-
-      throw new Error(
-        `La revisión de correos respondió HTTP ${respuestaRevision.status}.`
-      );
+      throw new Error("No fue posible revisar los correos.");
     }
 
     const revision: ResultadoRevision =
@@ -125,9 +120,7 @@ export async function POST(request: NextRequest) {
       !revision.resultados ||
       revision.resultados.length === 0
     ) {
-      throw new Error(
-        "La revisión de correos no fue completa."
-      );
+      throw new Error("La revisión no fue completa.");
     }
 
     if (
@@ -137,16 +130,11 @@ export async function POST(request: NextRequest) {
           cuenta.limitePaginasAlcanzado === true
       )
     ) {
-      console.error(
-        "[VIPACK PAQUETEXPRESS] Lectura incompleta de Hotmail."
-      );
-
       return NextResponse.json(
         {
           success: false,
           error:
             "Lectura incompleta. No se registraron eventos.",
-          modificaEnvios: false,
           enviaWhatsapp: false,
         },
         { status: 409 }
@@ -155,25 +143,23 @@ export async function POST(request: NextRequest) {
 
     const candidatos = new Map<string, Candidato>();
 
+    const candidatosPendientes =
+      new Map<string, CandidatoPendiente>();
+
+    let eventosOmitidos = 0;
+
     for (const cuenta of revision.resultados) {
       for (const evento of cuenta.eventos || []) {
         if (
-          evento.resultado !== "coincidencia_valida" ||
           !evento.guia ||
-          evento.envio_id === null ||
-          !Number.isSafeInteger(evento.envio_id)
+          !/^\d{12}$/.test(evento.guia)
         ) {
+          eventosOmitidos++;
           continue;
         }
 
-        if (
-          evento.evento !== "recoleccion" &&
-          evento.evento !== "comienzo_viaje"
-        ) {
-          continue;
-        }
-
-        if (!/^\d{12}$/.test(evento.guia)) {
+        if (!esTipoEventoValido(evento.evento)) {
+          eventosOmitidos++;
           continue;
         }
 
@@ -186,36 +172,90 @@ export async function POST(request: NextRequest) {
           fechaEvento < fechaInicio ||
           fechaEvento > Date.now() + 5 * 60_000
         ) {
+          eventosOmitidos++;
           continue;
         }
 
-        const clave =
-          `${evento.envio_id}:${evento.evento}`;
+        const tipoEvento = evento.evento;
 
-        if (!candidatos.has(clave)) {
-          candidatos.set(clave, {
-            envio_id: evento.envio_id,
-            guia: evento.guia,
-            tipo_evento: evento.evento,
-            cuenta_origen: cuenta.cuenta,
-            fecha_evento: evento.fecha as string,
-          });
+        // GUÍAS QUE YA EXISTEN EN VIPACK
+        if (evento.resultado === "coincidencia_valida") {
+          if (
+            evento.envio_id === null ||
+            !Number.isSafeInteger(evento.envio_id) ||
+            evento.envio_id <= 0
+          ) {
+            eventosOmitidos++;
+            continue;
+          }
+
+          const clave =
+            `${evento.envio_id}:${tipoEvento}`;
+
+          if (!candidatos.has(clave)) {
+            candidatos.set(clave, {
+              envio_id: evento.envio_id,
+              guia: evento.guia,
+              tipo_evento: tipoEvento,
+              cuenta_origen: cuenta.cuenta,
+              fecha_evento: evento.fecha as string,
+            });
+          }
+
+          continue;
         }
+
+        // GUÍAS NUEVAS QUE AÚN NO TIENEN CLIENTE
+        if (evento.resultado === "sin_coincidencia") {
+          if (
+            !evento.mensaje_id ||
+            typeof evento.mensaje_id !== "string" ||
+            !evento.mensaje_id.trim()
+          ) {
+            eventosOmitidos++;
+            continue;
+          }
+
+          const clavePendiente = [
+            cuenta.cuenta,
+            evento.mensaje_id,
+            evento.guia,
+            tipoEvento,
+          ].join(":");
+
+          if (!candidatosPendientes.has(clavePendiente)) {
+            candidatosPendientes.set(clavePendiente, {
+              guia: evento.guia,
+              tipo_evento: tipoEvento,
+              cuenta_origen: cuenta.cuenta,
+              fecha_evento: evento.fecha as string,
+              mensaje_id: evento.mensaje_id,
+            });
+          }
+
+          continue;
+        }
+
+        // GUÍAS ENTREGADAS, BLOQUEADAS,
+        // DUPLICADAS O NO IDENTIFICADAS
+        eventosOmitidos++;
       }
     }
 
-    console.log(
-      "[VIPACK PAQUETEXPRESS] Candidatos encontrados:",
-      candidatos.size
-    );
-
     let registrados = 0;
     let duplicados = 0;
-    let omitidos = 0;
+    let omitidos = eventosOmitidos;
+
+    let pendientesRegistrados = 0;
+    let pendientesDuplicados = 0;
+    let pendientesOmitidos = 0;
 
     const errores: string[] = [];
-    const resultadosRegistro: Record<string, number> = {};
 
+    const resultadosRegistro: Record<string, number> = {};
+    const resultadosPendientes: Record<string, number> = {};
+
+    // REGISTRO DE GUÍAS EXISTENTES
     for (const candidato of candidatos.values()) {
       const { data, error } = await supabase.rpc(
         "registrar_evento_paquexpress",
@@ -229,15 +269,9 @@ export async function POST(request: NextRequest) {
       );
 
       if (error || typeof data !== "string") {
-        console.error(
-          "[VIPACK PAQUETEXPRESS] Error al registrar evento:",
-          error?.message || "Respuesta inválida de Supabase"
-        );
-
         errores.push(
-          `No se pudo registrar la guía ${candidato.guia}.`
+          `No se pudo registrar la guía existente ${candidato.guia}.`
         );
-
         continue;
       }
 
@@ -253,26 +287,56 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(
-      "[VIPACK PAQUETEXPRESS] Registro finalizado:",
-      {
-        candidatos: candidatos.size,
-        registrados,
-        duplicados,
-        omitidos,
-        errores: errores.length,
+    // REGISTRO DE GUÍAS NUEVAS Y SU HISTORIAL
+    for (const candidato of candidatosPendientes.values()) {
+      const { data, error } = await supabase.rpc(
+        "registrar_guia_paquexpress_pendiente",
+        {
+          p_guia: candidato.guia,
+          p_tipo_evento: candidato.tipo_evento,
+          p_fecha_evento: candidato.fecha_evento,
+          p_cuenta_origen: candidato.cuenta_origen,
+          p_mensaje_id: candidato.mensaje_id,
+        }
+      );
+
+      if (error || typeof data !== "string") {
+        errores.push(
+          `No se pudo guardar la guía pendiente ${candidato.guia}.`
+        );
+        continue;
       }
-    );
+
+      resultadosPendientes[data] =
+        (resultadosPendientes[data] || 0) + 1;
+
+      if (data === "registrado") {
+        pendientesRegistrados++;
+      } else if (data === "duplicado") {
+        pendientesDuplicados++;
+      } else {
+        pendientesOmitidos++;
+      }
+    }
 
     return NextResponse.json({
       success: errores.length === 0,
       modo: "registro_seguro_sin_whatsapp",
+
       candidatos: candidatos.size,
       registrados,
       duplicados,
       omitidos,
+
+      candidatosPendientes: candidatosPendientes.size,
+      pendientesRegistrados,
+      pendientesDuplicados,
+      pendientesOmitidos,
+
       resultadosRegistro,
+      resultadosPendientes,
       errores,
+
       modificaEnvios: false,
       enviaWhatsapp: false,
     });
