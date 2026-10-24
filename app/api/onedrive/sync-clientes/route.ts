@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { verificarSesionAdmin } from "@/lib/vipack-auth";
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
 import * as XLSX from "xlsx";
@@ -39,6 +40,7 @@ type ClienteSupabase = {
   onedrive_folder_id: string | null;
   token_inventario: string | null;
   activo: boolean;
+  telefono_whatsapp: string | null;
 };
 
 function normalizar(
@@ -492,7 +494,10 @@ function buscarCarpetaCliente(
   };
 }
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  if (!verificarSesionAdmin(request)) {
+    return NextResponse.json({ success: false, error: "No autorizado." }, { status: 401 });
+  }
   try {
     const clientId =
       process.env.ONEDRIVE_CLIENT_ID;
@@ -885,7 +890,8 @@ export async function POST() {
         carpeta_cliente,
         onedrive_folder_id,
         token_inventario,
-        activo
+        activo,
+        telefono_whatsapp
         `
       )
       .order(
@@ -1060,6 +1066,9 @@ export async function POST() {
             nombre:
               clienteExcel.nombre,
 
+            telefono_whatsapp:
+              clienteExcel.telefono_whatsapp,
+
             carpeta_cliente:
               carpetaFinal,
 
@@ -1152,6 +1161,12 @@ export async function POST() {
        * actualizar datos desde Excel
        * y vincular carpeta si faltaba.
        */
+      // El ID y el nombre deben coincidir para completar un teléfono faltante.
+      const telefonoActual = String(existente.telefono_whatsapp ?? "").trim();
+      const telefonoExcel = clienteExcel.telefono_whatsapp?.trim() || null;
+      const completarTelefono = !telefonoActual && Boolean(telefonoExcel) &&
+        normalizar(existente.nombre) === normalizar(clienteExcel.nombre);
+
       const {
         data:
           actualizado,
@@ -1163,6 +1178,7 @@ export async function POST() {
           "clientes_inventario"
         )
         .update({
+          ...(completarTelefono ? { telefono_whatsapp: telefonoExcel } : {}),
           nombre:
             clienteExcel.nombre,
 
@@ -1176,7 +1192,7 @@ export async function POST() {
             tokenInventario,
 
           activo:
-            true,
+            existente.activo,
 
           updated_at:
             new Date()
