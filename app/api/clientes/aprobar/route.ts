@@ -697,6 +697,7 @@ export async function POST(request: NextRequest) {
     const { error: eInventario } = await supabase.from("clientes_inventario").insert({
 
       id_cliente: id, nombre, carpeta_cliente: carpetaNombre,
+      telefono_whatsapp: tel,
 
       onedrive_folder_id: String(carpeta.id), token_inventario: tokenInventario,
 
