@@ -20,7 +20,7 @@ const RUTA_EXCEL = "Envios/control_recolecciones_bodega.xlsx";
 
 const HOJA_CLIENTES = "Clientes";
 
-const RECUPERACION = { solicitud: 8, id: 55, nombre: "Isabel Alvarado" };
+const RECUPERACION = { solicitud: 16, id: 84, nombre: "laura guadalupe cruz muñoz" };
 
 // Recuperación específica de la solicitud 8. El bloqueo debe estar inactivo al menos 5 minutos.
 
