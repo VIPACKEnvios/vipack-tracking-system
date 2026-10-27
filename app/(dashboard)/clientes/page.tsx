@@ -1,4 +1,4 @@
-"use client";
+	"use client";
 
 
 
@@ -181,6 +181,7 @@ type RespuestaAprobar = {
 
 
   detalle?: string;
+  etapa?: string;
 
 
 
@@ -282,6 +283,7 @@ export default function ClientesPage() {
 
 
   const [aprobando, setAprobando] = useState(false);
+  const [rechazando, setRechazando] = useState(false);
 
 
 
@@ -768,17 +770,12 @@ export default function ClientesPage() {
 async function aprobar() {
     if (!seleccionada || aprobando) return;
 
-    const recuperandoLaura =
-      seleccionada.id === 16 &&
-      seleccionada.estado === "procesando" &&
-      Number(seleccionada.id_cliente_asignado) === 84 &&
-      seleccionada.nombre.trim().toLocaleLowerCase("es-MX") === "laura guadalupe cruz muñoz" &&
-      !seleccionada.carpeta_cliente;
+    const recuperando = seleccionada.estado === "procesando";
 
-    if (seleccionada.estado !== "pendiente" && !recuperandoLaura) return;
+    if (seleccionada.estado !== "pendiente" && !recuperando) return;
 
-    const pregunta = recuperandoLaura
-      ? "¿Recuperar la solicitud 16 de Laura con el ID 00084 ya reservado? Se intentará completar su registro en Excel, OneDrive y Supabase. Ejecuta esta operación una sola vez."
+    const pregunta = recuperando
+      ? `¿Revisar y recuperar la solicitud ${seleccionada.id} de ${seleccionada.nombre}? Se conservará su ID reservado si es válido. El sistema se detendrá si encuentra conflictos en Excel, OneDrive o Supabase. No repitas la operación si aparece un error.`
       : `¿Crear al cliente "${seleccionada.nombre}"? Se reservará un número, se actualizará el Excel y se creará su carpeta de OneDrive.`;
 
     if (!window.confirm(pregunta)) return;
@@ -798,13 +795,13 @@ async function aprobar() {
       const data: RespuestaAprobar = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(
-          `${data.error || "No se pudo completar la operación."}${data.detalle ? ` — ${data.detalle}` : ""}${data.requiere_revision ? " Requiere revisión manual antes de reintentar." : ""}`
+          `${data.error || "No se pudo completar la operación."}${data.detalle ? ` — ${data.detalle}` : ""}${data.etapa ? ` (Etapa: ${data.etapa})` : ""}${data.requiere_revision ? " Requiere revisión manual antes de reintentar." : ""}`
         );
       }
 
       setMensaje(data.cliente
-        ? `Cliente #${numero(data.cliente.id_cliente)} ${recuperandoLaura ? "recuperado" : "creado"} correctamente.`
-        : recuperandoLaura ? "Cliente recuperado correctamente." : "Cliente creado correctamente."
+        ? `Cliente #${numero(data.cliente.id_cliente)} ${recuperando ? "recuperado" : "creado"} correctamente.`
+        : recuperando ? "Cliente recuperado correctamente." : "Cliente creado correctamente."
       );
       setSeleccionada(null);
       await cargar();
@@ -812,6 +809,42 @@ async function aprobar() {
       setError(e instanceof Error ? e.message : "No se pudo completar la operación.");
     } finally {
       setAprobando(false);
+    }
+  }
+
+ async function rechazarSolicitud() {
+    const solicitud = seleccionada;
+    if (!solicitud || solicitud.estado !== "pendiente" || aprobando || rechazando || cargando) return;
+    const motivo = window.prompt(
+      `Motivo para rechazar la solicitud de ${solicitud.nombre}:`,
+      "Cliente ya registrado"
+    );
+    if (motivo === null) return;
+    const motivoLimpio = motivo.trim();
+    if (motivoLimpio.length < 5 || motivoLimpio.length > 500) {
+      setError("Escribe un motivo de 5 a 500 caracteres.");
+      return;
+    }
+    if (!window.confirm(`¿Rechazar la solicitud ${solicitud.folio} de ${solicitud.nombre}?\n\nMotivo: ${motivoLimpio}\n\nNo se eliminará ningún cliente registrado.`)) return;
+    setRechazando(true);
+    setError("");
+    setMensaje("");
+    try {
+      const res = await fetch("/api/clientes/rechazar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ solicitud_id: solicitud.id, motivo: motivoLimpio }),
+      });
+      const data: { success?: boolean; error?: string } = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "No se pudo rechazar la solicitud.");
+      setSeleccionada(null);
+      await cargar();
+      setMensaje(`Solicitud de ${solicitud.nombre} rechazada. El cliente existente no fue modificado.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo rechazar la solicitud.");
+    } finally {
+      setRechazando(false);
     }
   }
 
@@ -1035,7 +1068,7 @@ async function cambiarEstadoCliente() {
 
 
 
-            <button type="button" onClick={() => void cargar()} disabled={cargando || aprobando || cambiandoEstado} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-[#172d77] hover:bg-slate-50 disabled:opacity-50">{cargando ? "Actualizando..." : "↻ Actualizar"}</button>
+            <button type="button" onClick={() => void cargar()} disabled={cargando || aprobando || rechazando || cambiandoEstado} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-[#172d77] hover:bg-slate-50 disabled:opacity-50">{cargando ? "Actualizando..." : "↻ Actualizar"}</button>
 
 
 
@@ -1270,7 +1303,7 @@ async function cambiarEstadoCliente() {
 
 
 
-              {pestana === "registrados" ? <div className="mt-4 grid grid-cols-3 gap-2">{(["activos", "inactivos", "todos"] as const).map(f => <button key={f} type="button" onClick={() => { setFiltroClientes(f); setClienteSeleccionado(null); }} disabled={cambiandoEstado} className={`rounded-xl px-2 py-3 text-sm font-bold capitalize ${filtroClientes === f ? "bg-[#172d87] text-white" : "bg-slate-100 text-slate-600 hover:bg-indigo-50"}`}>{f}</button>)}</div> : <select value={estado} onChange={e => setEstado(e.target.value)} disabled={aprobando} className="mt-4 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold"><option value="pendiente">Pendientes</option><option value="procesando">Procesando</option><option value="aprobado">Aprobados</option><option value="rechazado">Rechazados</option><option value="archivado">Archivados</option></select>}
+              {pestana === "registrados" ? <div className="mt-4 grid grid-cols-3 gap-2">{(["activos", "inactivos", "todos"] as const).map(f => <button key={f} type="button" onClick={() => { setFiltroClientes(f); setClienteSeleccionado(null); }} disabled={cambiandoEstado} className={`rounded-xl px-2 py-3 text-sm font-bold capitalize ${filtroClientes === f ? "bg-[#172d87] text-white" : "bg-slate-100 text-slate-600 hover:bg-indigo-50"}`}>{f}</button>)}</div> : <select value={estado} onChange={e => setEstado(e.target.value)} disabled={aprobando || rechazando} className="mt-4 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold"><option value="pendiente">Pendientes</option><option value="procesando">Procesando</option><option value="aprobado">Aprobados</option><option value="rechazado">Rechazados</option><option value="archivado">Archivados</option></select>}
 
 
 
@@ -1354,7 +1387,7 @@ async function cambiarEstadoCliente() {
 
 
 
-                {seleccionada.estado === "pendiente" && <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5"><p className="font-black text-amber-950">Pendiente de aprobación</p><p className="mt-2 text-sm text-amber-800">Al aprobar, se reservará un número, se actualizará el Excel y se creará la carpeta de OneDrive.</p><button type="button" onClick={() => void aprobar()} disabled={aprobando} className="mt-4 w-full rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 px-5 py-4 font-black text-white disabled:opacity-50">{aprobando ? "Creando cliente..." : "Crear cliente"}</button></div>}
+                {seleccionada.estado === "pendiente" && <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5"><p className="font-black text-amber-950">Pendiente de aprobación</p><p className="mt-2 text-sm text-amber-800">Al aprobar, se reservará un número, se actualizará el Excel y se creará la carpeta de OneDrive.</p><button type="button" onClick={() => void aprobar()} disabled={aprobando || rechazando || cargando} className="mt-4 w-full rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 px-5 py-4 font-black text-white disabled:opacity-50">{aprobando ? "Creando cliente..." : "Crear cliente"}</button><button type="button" onClick={() => void rechazarSolicitud()} disabled={aprobando || rechazando || cargando} className="mt-3 w-full rounded-xl bg-red-600 px-5 py-4 font-black text-white hover:bg-red-700 disabled:opacity-50">{rechazando ? "Rechazando solicitud..." : "Rechazar solicitud"}</button></div>}
 
 
 
@@ -1365,19 +1398,15 @@ async function cambiarEstadoCliente() {
                 {seleccionada.estado === "procesando" && (
                   <div className="mt-6 rounded-2xl bg-amber-50 p-5 text-sm text-amber-800">
                     <p>Solicitud en proceso. No intentes aprobarla de nuevo hasta revisar su estado.</p>
-                    {seleccionada.id === 16 &&
-                      Number(seleccionada.id_cliente_asignado) === 84 &&
-                      seleccionada.nombre.trim().toLocaleLowerCase("es-MX") === "laura guadalupe cruz muñoz" &&
-                      !seleccionada.carpeta_cliente && (
-                        <button
-                          type="button"
-                          onClick={() => void aprobar()}
-                          disabled={aprobando || cargando}
-                          className="mt-4 w-full rounded-xl bg-indigo-700 px-5 py-4 font-black text-white hover:bg-indigo-800 disabled:opacity-50"
-                        >
-                          {aprobando ? "Recuperando cliente..." : "Recuperar cliente ID 00084"}
-                        </button>
-                      )}
+                    <p className="mt-2 text-xs text-amber-900">Antes de continuar, confirma que no haya otra aprobación activa. Si se detectan registros parciales, se solicitará revisión manual.</p>
+                    <button
+                      type="button"
+                      onClick={() => void aprobar()}
+                      disabled={aprobando || cargando}
+                      className="mt-4 w-full rounded-xl bg-indigo-700 px-5 py-4 font-black text-white hover:bg-indigo-800 disabled:opacity-50"
+                    >
+                      {aprobando ? "Revisando recuperación..." : "Revisar / recuperar aprobación"}
+                    </button>
                   </div>
                 )}
 
