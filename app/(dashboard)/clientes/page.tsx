@@ -768,17 +768,17 @@ export default function ClientesPage() {
 async function aprobar() {
     if (!seleccionada || aprobando) return;
 
-    const recuperandoNube =
-      seleccionada.id === 9 &&
+    const recuperandoLaura =
+      seleccionada.id === 16 &&
       seleccionada.estado === "procesando" &&
-      Number(seleccionada.id_cliente_asignado) === 54 &&
-      seleccionada.nombre.trim() === "Nube Yazmin Bello Mosqueda" &&
+      Number(seleccionada.id_cliente_asignado) === 84 &&
+      seleccionada.nombre.trim().toLocaleLowerCase("es-MX") === "laura guadalupe cruz muñoz" &&
       !seleccionada.carpeta_cliente;
 
-    if (seleccionada.estado !== "pendiente" && !recuperandoNube) return;
+    if (seleccionada.estado !== "pendiente" && !recuperandoLaura) return;
 
-    const pregunta = recuperandoNube
-      ? "¿Recuperar la solicitud 9 de Nube con el ID 54 ya reservado? Se intentará completar su registro en Excel, OneDrive y Supabase. Ejecuta esta operación una sola vez."
+    const pregunta = recuperandoLaura
+      ? "¿Recuperar la solicitud 16 de Laura con el ID 00084 ya reservado? Se intentará completar su registro en Excel, OneDrive y Supabase. Ejecuta esta operación una sola vez."
       : `¿Crear al cliente "${seleccionada.nombre}"? Se reservará un número, se actualizará el Excel y se creará su carpeta de OneDrive.`;
 
     if (!window.confirm(pregunta)) return;
@@ -803,8 +803,8 @@ async function aprobar() {
       }
 
       setMensaje(data.cliente
-        ? `Cliente #${numero(data.cliente.id_cliente)} ${recuperandoNube ? "recuperado" : "creado"} correctamente.`
-        : recuperandoNube ? "Cliente recuperado correctamente." : "Cliente creado correctamente."
+        ? `Cliente #${numero(data.cliente.id_cliente)} ${recuperandoLaura ? "recuperado" : "creado"} correctamente.`
+        : recuperandoLaura ? "Cliente recuperado correctamente." : "Cliente creado correctamente."
       );
       setSeleccionada(null);
       await cargar();
@@ -1365,9 +1365,9 @@ async function cambiarEstadoCliente() {
                 {seleccionada.estado === "procesando" && (
                   <div className="mt-6 rounded-2xl bg-amber-50 p-5 text-sm text-amber-800">
                     <p>Solicitud en proceso. No intentes aprobarla de nuevo hasta revisar su estado.</p>
-                    {seleccionada.id === 9 &&
-                      Number(seleccionada.id_cliente_asignado) === 54 &&
-                      seleccionada.nombre.trim() === "Nube Yazmin Bello Mosqueda" &&
+                    {seleccionada.id === 16 &&
+                      Number(seleccionada.id_cliente_asignado) === 84 &&
+                      seleccionada.nombre.trim().toLocaleLowerCase("es-MX") === "laura guadalupe cruz muñoz" &&
                       !seleccionada.carpeta_cliente && (
                         <button
                           type="button"
@@ -1375,7 +1375,7 @@ async function cambiarEstadoCliente() {
                           disabled={aprobando || cargando}
                           className="mt-4 w-full rounded-xl bg-indigo-700 px-5 py-4 font-black text-white hover:bg-indigo-800 disabled:opacity-50"
                         >
-                          {aprobando ? "Recuperando cliente..." : "Recuperar cliente ID 54"}
+                          {aprobando ? "Recuperando cliente..." : "Recuperar cliente ID 00084"}
                         </button>
                       )}
                   </div>
