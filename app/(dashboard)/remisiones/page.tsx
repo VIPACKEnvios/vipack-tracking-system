@@ -75,6 +75,37 @@ function textoSeguroPdf(valor: string): string {
     .trim();
 }
 
+// Interpreta mensajes de WhatsApp por etiquetas. Los datos siempre se pueden corregir.
+function extraerDatosWhatsApp(texto: string): { nombre: string; telefono: string; direccion: Direccion; referencia: string } {
+  const resultado = { nombre: "", telefono: "", direccion: { ...direccionVacia }, referencia: "" };
+  const lineas = texto.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+  const normalizar = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 #/]/g, " ").replace(/\s+/g, " ").trim();
+  for (const linea of lineas) {
+    const separador = linea.indexOf(":");
+    if (separador < 0) continue;
+    const etiqueta = normalizar(linea.slice(0, separador));
+    const valor = linea.slice(separador + 1).trim();
+    if (!valor) continue;
+    if (/^(nombre|nombre completo|destinatario)$/.test(etiqueta)) resultado.nombre = valor;
+    else if (/^(telefono|tel|celular|numero de celular|numero de telefono|telefono celular)$/.test(etiqueta)) resultado.telefono = valor;
+    else if (/^(calle|direccion|domicilio|calle y numero)$/.test(etiqueta)) {
+      const match = valor.match(/^(.*?)\s+(?:#|no\.?\s*|num\.?\s*)([\w/-]+)\s*$/i);
+      resultado.direccion.calle = match ? match[1].trim() : valor;
+      if (match) resultado.direccion.numero_exterior = match[2];
+    }
+    else if (/^(numero exterior|num exterior|# casa|numero de casa|numero|casa)$/.test(etiqueta)) resultado.direccion.numero_exterior = valor;
+    else if (/^(numero interior|num interior|interior)$/.test(etiqueta)) resultado.direccion.numero_interior = valor;
+    else if (/^(colonia|col)$/.test(etiqueta)) resultado.direccion.colonia = valor;
+    else if (/^(c p|cp|codigo postal|codigo p)$/.test(etiqueta)) resultado.direccion.codigo_postal = valor;
+    else if (/^(ciudad|localidad)$/.test(etiqueta)) resultado.direccion.ciudad = valor;
+    else if (/^(municipio|delegacion|delegacion municipio)$/.test(etiqueta)) resultado.direccion.delegacion = valor;
+    else if (/^(estado)$/.test(etiqueta)) resultado.direccion.estado = valor;
+    else if (/^(referencia|referencias|referencia domicilio)$/.test(etiqueta)) resultado.referencia = valor;
+  }
+  // No inferimos municipio, estado ni datos faltantes.
+  return resultado;
+}
+
 const remitente = { nombre: "Viridiana Malaga", telefono: "6442350116", rfc: "" };
 
 // Coordenadas calibradas sobre la plantilla A4 REMISIÓN - MATRIZ.
@@ -95,6 +126,11 @@ const posiciones = {
 };
 
 export default function RemisionesPage() {
+  const [modoCaptura, setModoCaptura] = useState<"registrado" | "manual">("registrado");
+  const [nombreManual, setNombreManual] = useState("");
+  const [telefonoManual, setTelefonoManual] = useState("");
+  const [mensajeWhatsApp, setMensajeWhatsApp] = useState("");
+  const [referenciaManual, setReferenciaManual] = useState("");
   const [clientes, setClientes] = useState<ClienteExcel[]>([]);
   const seleccionActual = useRef(0);
   const [cargandoDireccion, setCargandoDireccion] = useState(false);
@@ -198,10 +234,47 @@ export default function RemisionesPage() {
     }
   }
 
-  async function descargarRemision() {
-    if (!seleccionado || cargandoDireccion || guardando || generandoPdf) return;
+  function cambiarModo(modo: "registrado" | "manual") {
+    seleccionActual.current += 1;
+    setModoCaptura(modo);
+    setIdSeleccionado("");
+    setDireccion({ ...direccionVacia });
+    setCargandoDireccion(false);
+    setError("");
+    setMensaje("");
+  }
+
+  function interpretarWhatsApp() {
+    const datos = extraerDatosWhatsApp(mensajeWhatsApp);
+    setNombreManual(datos.nombre);
+    setTelefonoManual(datos.telefono);
+    setDireccion(datos.direccion);
+    setReferenciaManual(datos.referencia);
+    setError("");
+    setMensaje("Datos identificados. Revisa y completa los campos antes de generar la remisión.");
+  }
+
+  async function descargarRemision(modo: "descargar" | "imprimir" = "descargar") {
+    const esManual = modoCaptura === "manual";
+    if ((!esManual && !seleccionado) || cargandoDireccion || guardando || generandoPdf) return;
+    const nombreDestinatario = esManual ? nombreManual.trim() : (seleccionado?.nombre ?? "");
+    const telefonoDestinatario = esManual ? telefonoManual.trim() : (seleccionado?.telefono ?? "");
+    if (!nombreDestinatario || !telefonoDestinatario || !direccion.calle.trim() || !direccion.colonia.trim() || !direccion.codigo_postal.trim() || !direccion.ciudad.trim() || !direccion.estado.trim()) {
+      setError("Completa nombre, teléfono, calle, colonia, código postal, ciudad y estado antes de generar la remisión.");
+      return;
+    }
     setMensaje("");
     setError("");
+    // Abrir la ventana desde el clic para que el navegador no bloquee la impresión.
+    const ventanaImpresion = modo === "imprimir" ? window.open("", "_blank") : null;
+    if (modo === "imprimir" && !ventanaImpresion) {
+      setError("El navegador bloqueó la ventana. Permite ventanas emergentes para imprimir.");
+      return;
+    }
+    if (ventanaImpresion) {
+      ventanaImpresion.document.title = "Preparando remisión VIPACK";
+      ventanaImpresion.document.body.textContent = "Preparando la remisión para imprimir...";
+    }
     setGenerandoPdf(true);
     try {
       const respuesta = await fetch("/remision-plantilla.pdf", { cache: "no-store" });
@@ -238,8 +311,8 @@ export default function RemisionesPage() {
       };
       dibujar(remitente.nombre, posiciones.remitenteNombre);
       dibujar(remitente.telefono, posiciones.remitenteTelefono);
-      dibujar(seleccionado.nombre, posiciones.destinatarioNombre);
-      dibujar(telefonoParaRemision(seleccionado.telefono ?? ""), posiciones.destinatarioTelefono);
+      dibujar(nombreDestinatario, posiciones.destinatarioNombre);
+      dibujar(telefonoParaRemision(telefonoDestinatario), posiciones.destinatarioTelefono);
       dibujar(direccion.calle, posiciones.calle);
       dibujar(direccion.numero_exterior, posiciones.numeroExterior);
       dibujar(direccion.numero_interior, posiciones.numeroInterior);
@@ -251,15 +324,26 @@ export default function RemisionesPage() {
       const bytes = await pdf.save();
       const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
-      const enlace = document.createElement("a");
-      enlace.href = url;
-      enlace.download = `remision-vipack-cliente-${seleccionado.id_cliente}.pdf`;
-      document.body.appendChild(enlace);
-      enlace.click();
-      enlace.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 30000);
-      setMensaje("Remisión descargada. Revisa los datos antes de imprimir.");
+      if (modo === "imprimir" && ventanaImpresion) {
+        // Mostrar el mismo PDF generado en una pestaña nueva, sin descargarlo.
+        // El visor del navegador permite imprimir directamente.
+        ventanaImpresion.location.replace(url);
+        ventanaImpresion.focus();
+        setMensaje("Remisión abierta para imprimir. Usa el botón Imprimir del visor PDF (Ctrl + P).");
+        // Conservar el objeto mientras la pestaña del PDF lo esté utilizando.
+        window.setTimeout(() => URL.revokeObjectURL(url), 300000);
+      } else {
+        const enlace = document.createElement("a");
+        enlace.href = url;
+        enlace.download = `remision-vipack-${esManual ? "manual" : `cliente-${seleccionado?.id_cliente}`}.pdf`;
+        document.body.appendChild(enlace);
+        enlace.click();
+        enlace.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+        setMensaje("Remisión descargada. Revisa los datos antes de imprimir.");
+      }
     } catch (err) {
+      if (ventanaImpresion && !ventanaImpresion.closed) ventanaImpresion.close();
       setError(err instanceof Error ? err.message : "No se pudo generar el PDF.");
     } finally {
       setGenerandoPdf(false);
@@ -285,6 +369,11 @@ export default function RemisionesPage() {
       </section>
       <section style={{ marginTop: 28 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700 }}>Datos del destinatario</h2>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 18 }}>
+          <label><input type="radio" name="modo-remision" checked={modoCaptura === "registrado"} onChange={() => cambiarModo("registrado")} /> Seleccionar cliente registrado</label>
+          <label><input type="radio" name="modo-remision" checked={modoCaptura === "manual"} onChange={() => cambiarModo("manual")} /> Capturar destinatario manualmente</label>
+        </div>
+        {modoCaptura === "registrado" && <>
         <div style={{ marginTop: 16 }}>
           <label htmlFor="buscar-cliente">Buscar cliente por nombre o ID</label>
           <input id="buscar-cliente" style={{ ...inputStyle, marginTop: 6 }} value={busqueda}
@@ -303,11 +392,23 @@ export default function RemisionesPage() {
             {clientesFiltrados.length} de {clientes.length} clientes encontrados.
           </p>}
         </div>
-        {seleccionado && (
+        </>}
+        {(modoCaptura === "manual" || seleccionado) && (
           <div style={{ marginTop: 24 }}>
+            {modoCaptura === "manual" && <div style={{ marginBottom: 20, padding: 16, background: "#eef2ff", borderRadius: 10 }}>
+              <label htmlFor="whatsapp-datos" style={{ fontWeight: 700 }}>Pegar mensaje de WhatsApp (opcional)</label>
+              <textarea id="whatsapp-datos" value={mensajeWhatsApp} onChange={(e) => setMensajeWhatsApp(e.target.value)} rows={7}
+                placeholder={"Nombre: ...\nCalle y número: ...\nColonia: ...\nC.P.: ...\nCiudad: ...\nEstado: ...\nTeléfono: ..."}
+                style={{ ...inputStyle, marginTop: 8, resize: "vertical" }} />
+              <button type="button" onClick={interpretarWhatsApp}
+                style={{ marginTop: 10, padding: "10px 16px", background: "#4338ca", color: "white", border: "none", borderRadius: 8, fontWeight: 700 }}>
+                Llenar campos desde WhatsApp
+              </button>
+              <p style={{ fontSize: 12, marginTop: 8, color: "#475569" }}>Revisa todos los datos: las etiquetas no reconocidas no se completan automáticamente.</p>
+            </div>}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
-              <div><label>Nombre completo</label><input style={inputStyle} value={seleccionado.nombre} readOnly /></div>
-              <div><label>Teléfono</label><input style={inputStyle} value={seleccionado.telefono ?? ""} readOnly /></div>
+              <div><label>Nombre completo</label><input style={inputStyle} value={modoCaptura === "manual" ? nombreManual : (seleccionado?.nombre ?? "")} readOnly={modoCaptura === "registrado"} onChange={(e) => setNombreManual(e.target.value)} /></div>
+              <div><label>Teléfono</label><input style={inputStyle} value={modoCaptura === "manual" ? telefonoManual : (seleccionado?.telefono ?? "")} readOnly={modoCaptura === "registrado"} onChange={(e) => setTelefonoManual(e.target.value)} /></div>
               {campos.map((campo) => (
                 <div key={campo.key}>
                   <label htmlFor={`direccion-${campo.key}`}>{campo.label}</label>
@@ -316,19 +417,29 @@ export default function RemisionesPage() {
                 </div>
               ))}
             </div>
+            {modoCaptura === "manual" && <div style={{ marginTop: 16 }}>
+              <label htmlFor="referencia-manual">Referencia (solo consulta; la plantilla actual no tiene campo de referencia)</label>
+              <input id="referencia-manual" style={{ ...inputStyle, marginTop: 6 }} value={referenciaManual} onChange={(e) => setReferenciaManual(e.target.value)} />
+            </div>}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 24 }}>
-              <button type="button" onClick={() => void guardarDireccion()} disabled={guardando || cargandoDireccion || generandoPdf}
+              {modoCaptura === "registrado" && <button type="button" onClick={() => void guardarDireccion()} disabled={guardando || cargandoDireccion || generandoPdf}
                 style={{ padding: "12px 22px", background: "#0f766e", color: "white", border: "none", borderRadius: 8, fontWeight: 700 }}>
                 {guardando ? "Guardando..." : "Guardar dirección"}
-              </button>
-              <button type="button" onClick={() => void descargarRemision()}
+              </button>}
+              <button type="button" onClick={() => void descargarRemision("descargar")}
                 disabled={generandoPdf || cargandoDireccion || guardando}
                 style={{ padding: "12px 22px", background: "#0755aa", color: "white", border: "none", borderRadius: 8, fontWeight: 700 }}>
                 {generandoPdf ? "Generando PDF..." : "Descargar remisión PDF"}
               </button>
+              <button type="button" onClick={() => void descargarRemision("imprimir")}
+                disabled={generandoPdf || cargandoDireccion || guardando}
+                style={{ padding: "12px 22px", background: "#374151", color: "white", border: "none", borderRadius: 8, fontWeight: 700 }}>
+                {generandoPdf ? "Preparando PDF..." : "🖨️ Imprimir remisión"}
+              </button>
             </div>
             <p style={{ fontSize: 13, color: "#64748b", marginTop: 12 }}>
               Se utiliza la plantilla original; no se rellenan mercancía, costos ni otros apartados.
+              {modoCaptura === "manual" ? " Esta captura no crea clientes ni guarda destinatarios en Supabase." : ""}
             </p>
           </div>
         )}
