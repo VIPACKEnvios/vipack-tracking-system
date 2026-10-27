@@ -325,12 +325,42 @@ export default function RemisionesPage() {
       const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       if (modo === "imprimir" && ventanaImpresion) {
-        // Mostrar el mismo PDF generado en una pestaña nueva, sin descargarlo.
-        // El visor del navegador permite imprimir directamente.
-        ventanaImpresion.location.replace(url);
-        ventanaImpresion.focus();
-        setMensaje("Remisión abierta para imprimir. Usa el botón Imprimir del visor PDF (Ctrl + P).");
-        // Conservar el objeto mientras la pestaña del PDF lo esté utilizando.
+        // Abrir el PDF en un marco e intentar mostrar directamente el diálogo
+        // de impresión. Algunos navegadores bloquean la impresión automática
+        // de PDF: se conserva un botón alternativo dentro de la ventana.
+        const documento = ventanaImpresion.document;
+        documento.body.replaceChildren();
+        documento.title = "Imprimir remisión VIPACK";
+        documento.body.style.cssText = "margin:0;font-family:Arial,sans-serif;background:#f1f5f9";
+        const barra = documento.createElement("div");
+        barra.style.cssText = "padding:12px;display:flex;gap:12px;align-items:center;background:white";
+        const boton = documento.createElement("button");
+        boton.textContent = "🖨️ Imprimir remisión";
+        boton.style.cssText = "padding:10px 16px;background:#0755aa;color:white;border:0;border-radius:7px;cursor:pointer";
+        const marco = documento.createElement("iframe");
+        marco.title = "Remisión VIPACK";
+        marco.style.cssText = "width:100%;height:calc(100vh - 62px);border:0";
+        marco.src = url;
+        const imprimir = () => {
+          try {
+            marco.contentWindow?.focus();
+            marco.contentWindow?.print();
+          } catch {
+            // Si el visor PDF no permite imprimir desde el iframe,
+            // el usuario puede usar el botón de impresión del visor.
+            ventanaImpresion.focus();
+            ventanaImpresion.print();
+          }
+        };
+        boton.onclick = imprimir;
+        barra.appendChild(boton);
+        documento.body.append(barra, marco);
+        marco.onload = () => {
+          ventanaImpresion.focus();
+          ventanaImpresion.setTimeout(imprimir, 700);
+        };
+        setMensaje("Se solicitó la impresión de la remisión. Si no aparece el cuadro de impresión, usa el botón de la nueva ventana.");
+        // Mantener el PDF disponible mientras se utiliza la ventana.
         window.setTimeout(() => URL.revokeObjectURL(url), 300000);
       } else {
         const enlace = document.createElement("a");
