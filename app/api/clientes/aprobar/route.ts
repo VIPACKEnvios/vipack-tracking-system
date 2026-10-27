@@ -20,11 +20,17 @@ const RUTA_EXCEL = "Envios/control_recolecciones_bodega.xlsx";
 
 const HOJA_CLIENTES = "Clientes";
 
-const RECUPERACION = { solicitud: 16, id: 84, nombre: "laura guadalupe cruz muñoz" };
+const RECUPERACION = {
 
-// Recuperación específica de la solicitud 8. El bloqueo debe estar inactivo al menos 5 minutos.
+  solicitud: 16,
 
-const EDAD_MINIMA_BLOQUEO_MS = 5 * 60 * 1000;
+  id: 84,
+
+  nombre: "laura guadalupe cruz muñoz"
+
+};
+
+// Recuperación excepcional de Laura, solicitud 16. Conserva la reserva 84.
 
 type Fila = Record<string, unknown>;
 
@@ -33,9 +39,13 @@ type Solicitud = {
   id: number; estado: string; nombre: string; telefono: string;
 
   direccion: string | null; referencia_domicilio: string | null;
+
   calle: string | null; numero_exterior: string | null;
+
   numero_interior: string | null; colonia: string | null;
+
   delegacion: string | null; codigo_postal: string | null;
+
   ciudad: string | null; estado_domicilio: string | null;
 
   id_cliente_asignado: number | null; carpeta_cliente: string | null;
@@ -62,7 +72,7 @@ function telefono(v: unknown) {
 
   let s = typeof v === "number" ? Math.trunc(v).toString() : limpiar(v);
 
-  if (/^[+-]?\d+(?:\.\d+)?e[+-]?\d+$/i.test(s)) s = Math.trunc(Number(s)).toString();
+  if (/^[+-]?\d+(?:**\\.**\d+)?e[+-]?\d+$/i.test(s)) s = Math.trunc(Number(s)).toString();
 
   const n = s.replace(/\D/g, "");
 
@@ -92,7 +102,7 @@ function errorHttp(msg: string, status = 409): never {
 
 function graphPath(path: string) {
 
-  return `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(path)}`;
+  return `https\://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(path)}`;
 
 }
 
@@ -144,7 +154,7 @@ async function subirExcel(token: string, id: string, etag: string, contenido: Bu
 
   // If-Match evita sobrescribir cambios hechos por otra operación.
 
-  const r = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(id)}/content`, {
+  const r = await fetch(`https\://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(id)}/content`, {
 
     method: "PUT",
 
@@ -186,7 +196,7 @@ async function buscarCarpetaPorNumero(token: string, raiz: string, id: number) {
 
   const prefijo = numero(id);
 
-  let url: string | null = `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(raiz)}/children?$select=id,name,folder&$top=200`;
+  let url: string | null = `https\://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(raiz)}/children?$select=id,name,folder&$top=200`;
 
   const encontradas: { id: string; name: string }[] = [];
 
@@ -216,7 +226,7 @@ async function buscarCarpetaPorNumero(token: string, raiz: string, id: number) {
 
 async function crearCarpeta(token: string, raiz: string, nombre: string) {
 
-  const url = `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(raiz)}/children`;
+  const url = `https\://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(raiz)}/children`;
 
   return graphJson(url, token, {
 
@@ -284,6 +294,14 @@ export async function POST(request: NextRequest) {
 
   let bloqueoAdquirido = false;
 
+  // Se vuelve true ANTES de invocar una operación que puede reservar un ID
+
+  // o escribir en OneDrive/Excel. Ante un resultado incierto, no liberar.
+
+  let operacionConEfectosPosibles = false;
+
+  let solicitudIdActual: number | null = null;
+
   const bloqueoToken = randomUUID();
 
   try {
@@ -291,6 +309,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
 
     const solicitudId = Number(body?.solicitud_id);
+
+    if (Number.isInteger(solicitudId) && solicitudId > 0) {
+
+      solicitudIdActual = solicitudId;
+
+    }
 
     if (!Number.isInteger(solicitudId) || solicitudId <= 0) errorHttp("Solicitud inválida", 400);
 
@@ -320,77 +344,37 @@ export async function POST(request: NextRequest) {
 
     etapa = "adquirir_bloqueo";
 
-    if (solicitudId === RECUPERACION.solicitud) {
+    // Tanto las aprobaciones normales como la recuperación de Laura
 
-      // Recuperar solo el bloqueo previo de esta solicitud, mediante CAS del token.
+    // adquieren un bloqueo NUEVO. Nunca desplazamos un bloqueo activo.
 
-      // Un proceso que siga activo no debe ser desplazado.
+    const { data: bloqueo, error: eBloqueo } = await supabase
 
-      const { data: previo, error: ePrevio } = await supabase
+      .from("vipack_bloqueo_aprobaciones")
 
-        .from("vipack_bloqueo_aprobaciones")
+      .insert({ id: 1, token: bloqueoToken, solicitud_id: solicitudId })
 
-        .select("id,solicitud_id,token,creado_en")
+      .select("id").maybeSingle();
 
-        .eq("id", 1).maybeSingle();
+    if (eBloqueo?.code === "23505") {
 
-      if (ePrevio || !previo || Number(previo.solicitud_id) !== solicitudId) {
+      errorHttp("Ya existe una aprobación en curso o pendiente de revisión.", 409);
 
-        errorHttp("No hay un bloqueo de recuperación válido para Isabel.", 409);
+    }
 
-      }
+    if (eBloqueo || !bloqueo) {
 
-      const edad = Date.now() - new Date(previo.creado_en).getTime();
-
-      if (!Number.isFinite(edad) || edad < EDAD_MINIMA_BLOQUEO_MS) {
-
-        errorHttp("El bloqueo es demasiado reciente para recuperarlo con seguridad.", 409);
-
-      }
-
-      const { data: tomado, error: eTomar } = await supabase
-
-        .from("vipack_bloqueo_aprobaciones")
-
-        .update({ token: bloqueoToken })
-
-        .eq("id", 1).eq("solicitud_id", solicitudId)
-
-        .eq("token", previo.token).eq("creado_en", previo.creado_en)
-
-        .select("id").maybeSingle();
-
-      if (eTomar || !tomado) {
-
-        errorHttp("El bloqueo cambió o ya fue tomado. No se ejecutó la recuperación.", 409);
-
-      }
-
-    } else {
-
-      const { data: bloqueo, error: eBloqueo } = await supabase
-
-        .from("vipack_bloqueo_aprobaciones")
-
-        .insert({ id: 1, token: bloqueoToken, solicitud_id: solicitudId })
-
-        .select("id").maybeSingle();
-
-      if (eBloqueo?.code === "23505") {
-
-        errorHttp("Ya existe una aprobación en curso o pendiente de revisión.", 409);
-
-      }
-
-      if (eBloqueo || !bloqueo) {
-
-        errorHttp(`No se pudo obtener el bloqueo: ${eBloqueo?.message || "sin confirmación"}`, 500);
-
-      }
+      errorHttp(`No se pudo obtener el bloqueo: ${eBloqueo?.message || "sin confirmación"}`, 500);
 
     }
 
     bloqueoAdquirido = true;
+
+    if (solicitudId === RECUPERACION.solicitud) {
+
+      operacionConEfectosPosibles = true;
+
+    }
 
     const { data: solicitud, error: eSolicitud } = await supabase
 
@@ -410,7 +394,7 @@ export async function POST(request: NextRequest) {
 
     if (solicitudId === RECUPERACION.solicitud && !recuperando) {
 
-      errorHttp("La solicitud 8 ya no está en estado procesando; no ejecutar recuperación.", 409);
+      errorHttp("La solicitud 16 ya no está en estado procesando; no ejecutar recuperación.", 409);
 
     }
 
@@ -442,7 +426,7 @@ export async function POST(request: NextRequest) {
 
     if (eConexion || !conexion?.refresh_token) errorHttp("No existe conexión OneDrive", 500);
 
-    const rToken = await fetch("https://login.microsoftonline.com/consumers/oauth2/v2.0/token", {
+    const rToken = await fetch("https\://login.microsoftonline.com/consumers/oauth2/v2.0/token", {
 
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
 
@@ -530,6 +514,10 @@ export async function POST(request: NextRequest) {
 
       etapa = "reservar_numero";
 
+      // La RPC puede confirmar en BD aunque la respuesta de red se pierda.
+
+      operacionConEfectosPosibles = true;
+
       const { data, error } = await supabase.rpc("reservar_numero_cliente", {
 
         p_solicitud_id: solicitudId, p_ids_excel: ids,
@@ -585,6 +573,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar estructura antes de cualquier creación de carpeta en OneDrive.
+
     const encabezados = (XLSX.utils.sheet_to_json<unknown[]>(hoja, {
 
       header: 1, blankrows: false,
@@ -599,7 +588,6 @@ export async function POST(request: NextRequest) {
 
     }
 
-
     etapa = "verificar_carpetas";
 
     const raiz = await obtenerRaiz(token);
@@ -609,19 +597,33 @@ export async function POST(request: NextRequest) {
     let carpeta: { id: string; name?: string };
 
     if (recuperando) {
-      // Solo para la solicitud 8: reutilizar una carpeta exacta o crearla si no existe.
+
+      // Solo para la solicitud 16: reutilizar una carpeta exacta o crearla si no existe.
+
       // Si hay nombres distintos o duplicados, detenerse para revisión manual.
+
       if (existentes.length > 1) {
-        errorHttp("Hay varias carpetas con el ID 00055. Revisión manual.", 409);
+
+        errorHttp("Hay varias carpetas con el ID 00084. Revisión manual.", 409);
+
       }
+
       if (existentes.length === 1) {
+
         if (existentes[0].name !== carpetaNombre) {
-          errorHttp("La carpeta 00055 tiene un nombre distinto. Revisión manual.", 409);
+
+          errorHttp("La carpeta 00084 tiene un nombre distinto. Revisión manual.", 409);
+
         }
+
         carpeta = existentes[0];
+
       } else {
+
         carpeta = { id: "" };
+
       }
+
     } else {
 
       if (existentes.length) {
@@ -697,6 +699,7 @@ export async function POST(request: NextRequest) {
     const { error: eInventario } = await supabase.from("clientes_inventario").insert({
 
       id_cliente: id, nombre, carpeta_cliente: carpetaNombre,
+
       telefono_whatsapp: tel,
 
       onedrive_folder_id: String(carpeta.id), token_inventario: tokenInventario,
@@ -760,37 +763,65 @@ export async function POST(request: NextRequest) {
     bloqueoAdquirido = false;
 
     // Sincronización secundaria: solo después de finalizar la aprobación.
+
     // No alterar ni revertir una aprobación exitosa si falla Remisiones.
+
     let advertenciaRemisiones: string | null = null;
+
     const domicilioRemisiones = {
+
       calle: limpiar(s.calle) || null,
+
       numero_exterior: limpiar(s.numero_exterior) || null,
+
       numero_interior: limpiar(s.numero_interior) || null,
+
       colonia: limpiar(s.colonia) || null,
+
       delegacion: limpiar(s.delegacion) || null,
+
       codigo_postal: limpiar(s.codigo_postal) || null,
+
       ciudad: limpiar(s.ciudad) || null,
+
       estado: limpiar(s.estado_domicilio) || null,
+
     };
+
     if (Object.values(domicilioRemisiones).some(Boolean)) {
+
       try {
+
         const { error: eDireccion } = await supabase
+
           .from("remisiones_direcciones")
+
           .upsert({ id_cliente: id, ...domicilioRemisiones }, { onConflict: "id_cliente" });
+
         if (eDireccion) throw new Error(eDireccion.message);
+
       } catch (e: unknown) {
+
         advertenciaRemisiones = "Cliente aprobado, pero no se pudo sincronizar su domicilio con Remisiones.";
+
         console.error("VIPACK sincronización Remisiones pendiente", {
+
           solicitudId, idCliente: id,
+
           error: e instanceof Error ? e.message : String(e),
+
         });
+
       }
+
     }
 
     return NextResponse.json({
 
       success: true,
+
       ...(advertenciaRemisiones ? { advertencia: advertenciaRemisiones } : {}),
+
       cliente: {
 
         id_cliente: id, nombre, telefono: tel, direccion: s.direccion,
@@ -809,7 +840,65 @@ export async function POST(request: NextRequest) {
 
     const e = error as Error & { status?: number };
 
-    console.error("VIPACK aprobación requiere revisión", { etapa, idAsignado, error: e.message });
+    console.error("VIPACK aprobación fallida", {
+
+      etapa, solicitudId: solicitudIdActual, idAsignado, error: e.message
+
+    });
+
+    // Solo liberar cuando no se llamó a la RPC de reserva ni se inició
+
+    // recuperación; el token impide borrar el bloqueo de otro proceso.
+
+    if (bloqueoAdquirido && !operacionConEfectosPosibles) {
+
+      try {
+
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+        const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+        if (url && key) {
+
+          const db = createClient(url, key, {
+
+            auth: { autoRefreshToken: false, persistSession: false },
+
+          });
+
+          const { data: liberados, error: errorLiberacion } = await db
+
+            .from("vipack_bloqueo_aprobaciones")
+
+            .delete()
+
+            .eq("id", 1)
+
+            .eq("token", bloqueoToken)
+
+            .eq("solicitud_id", solicitudIdActual)
+
+            .select("id");
+
+          if (!errorLiberacion && liberados?.length === 1) {
+
+            bloqueoAdquirido = false;
+
+          } else {
+
+            console.error("VIPACK bloqueo no liberado", errorLiberacion);
+
+          }
+
+        }
+
+      } catch (errorLiberacion) {
+
+        console.error("VIPACK error liberando bloqueo", errorLiberacion);
+
+      }
+
+    }
 
     return NextResponse.json({
 
@@ -817,7 +906,7 @@ export async function POST(request: NextRequest) {
 
       etapa, id_cliente: idAsignado,
 
-      requiere_revision: bloqueoAdquirido || idAsignado !== null,
+      requiere_revision: bloqueoAdquirido || operacionConEfectosPosibles || idAsignado !== null,
 
     }, { status: e.status || 500 });
 
