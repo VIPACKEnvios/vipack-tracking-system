@@ -1066,6 +1066,13 @@ export default function CotizacionesPage() {
 
     lineas.push(
       "",
+      "*DATOS PARA TRANSFERENCIA*",
+      "Banco: BBVA",
+      "Titular: Viridiana Málaga",
+      "Tarjeta de débito: 4152314408243486",
+      "Descripción o concepto: Escribe tu nombre completo para identificar tu pago.",
+      "Una vez realizada la transferencia, envíanos tu comprobante de pago.",
+      "",
       "Quedamos pendientes de tu confirmación."
     );
 
