@@ -1,6 +1,6 @@
 // Archivo: app/api/enviar-actualizacion/route.ts
-// VIPACK: envío manual con sesión firmada y reserva atómica contra duplicados.
-// IMPORTANTE: No hace reintentos automáticos; un resultado incierto requiere revisión en Twilio.
+// VIPACK: envío manual autenticado, reserva atómica y limpieza de variables de Twilio.
+// No reintenta automáticamente. Un resultado incierto requiere revisión en Twilio.
 import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
 import { createClient } from "@supabase/supabase-js";
@@ -21,7 +21,6 @@ type Envio = {
   estado_17track?: string | null;
   estatus_actual?: string | null;
   ultimo_estado_enviado?: string | null;
-  fecha_envio?: string | null;
 };
 
 function normalizarTelefono(valor: unknown): string | null {
@@ -30,6 +29,16 @@ function normalizarTelefono(valor: unknown): string | null {
   if (/^52\d{10}$/.test(digitos)) return `521${digitos.slice(2)}`;
   if (/^521\d{10}$/.test(digitos)) return digitos;
   return null;
+}
+
+// Reemplaza controles ASCII (tabulaciones, saltos de línea, etc.) y
+// espacios Unicode por un único espacio. Evita enviar variables vacías.
+function limpiarVariable(valor: unknown, respaldo: string): string {
+  const texto = String(valor ?? "")
+    .replace(/[\x00-\x1f\x7f]/g, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+  return texto || respaldo;
 }
 
 function respuestaError(error: string, status: number) {
@@ -81,19 +90,22 @@ export async function POST(request: NextRequest) {
 
   const envio = data as Envio;
   const telefono = normalizarTelefono(envio.telefono_whatsapp);
-  const estado = String(
-    envio.estatus_actual || envio.estado_17track || envio.ultimo_estado_enviado || ""
-  ).trim();
-  const guia = String(envio.guia || "").trim();
-  const paqueteria = String(envio.paqueteria || "").trim();
+  const cliente = limpiarVariable(envio.cliente, "Cliente");
+  const pedido = limpiarVariable(envio.pedido, "Sin pedido");
+  const guia = limpiarVariable(envio.guia, "");
+  const paqueteria = limpiarVariable(envio.paqueteria, "");
+  const estado = limpiarVariable(
+    envio.estatus_actual || envio.estado_17track || envio.ultimo_estado_enviado,
+    ""
+  );
 
   if (!telefono) return respuestaError("Teléfono mexicano inválido para WhatsApp.", 400);
   if (!estado || !guia || !paqueteria) {
     return respuestaError("El envío necesita guía, paquetería y estado.", 400);
   }
 
-  // La restricción UNIQUE(canal, clave_evento) de Supabase es el bloqueo atómico.
-  // No repetir automáticamente el mismo estado para la misma guía y envío.
+  // La restricción UNIQUE(canal, clave_evento) bloquea envíos simultáneos idénticos.
+  // Un intento fallido NO se reintenta automáticamente ni se borra.
   const claveEvento = `manual:${envio.id}:${paqueteria.toUpperCase()}:${guia}:${estado.toLowerCase()}`;
 
   const { data: reserva, error: errorReserva } = await supabase
@@ -136,8 +148,8 @@ export async function POST(request: NextRequest) {
       to: `whatsapp:+${telefono}`,
       contentSid: ACTUALIZACION_TEMPLATE,
       contentVariables: JSON.stringify({
-        "1": String(envio.cliente || "Cliente"),
-        "2": String(envio.pedido || "Sin pedido"),
+        "1": cliente,
+        "2": pedido,
         "3": paqueteria,
         "4": guia,
         "5": estado,
@@ -186,8 +198,8 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     const descripcion = error instanceof Error ? error.message : "Error desconocido";
     const ahora = new Date().toISOString();
-    // Con errores de red puede existir un envío aceptado por Twilio sin respuesta.
-    // Mantener la reserva bloqueada hasta revisión manual para evitar duplicados.
+    // Incluso si hubo error de red, el proveedor podría haber aceptado el mensaje.
+    // Conservar la reserva y exigir revisión manual antes de cualquier reintento.
     const { error: errorRegistro } = await supabase
       .from("notificaciones_envios")
       .update({
