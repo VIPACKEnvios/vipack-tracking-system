@@ -238,20 +238,47 @@ export async function POST(request: Request) {
     const ahora = new Date().toISOString();
     const esEntregado = estadoNuevo === "Entregado";
 
-    const { error: errorUpdate } = await supabase
-      .from("envios")
-      .update({
-        estatus_actual: estadoNuevo,
-        entregado: esEntregado,
-        fecha_ultima_revision: ahora,
-        trackingmore_id: payload.id || null,
-        trackingmore_courier: payload.courier_code || null,
-        trackingmore_status: payload.delivery_status || null,
-        trackingmore_substatus: payload.substatus || null,
-        trackingmore_event: payload.latest_event || null,
-        trackingmore_checkpoint: payload.latest_checkpoint_time || null,
-      })
-      .eq("id", envio.id);
+    const estadoManualProtegido =
+  ["En reparto", "Entregado"].includes(estadoAnterior);
+
+const estadoAutomaticoReservado =
+  ["En reparto", "Entregado"].includes(estadoNuevo);
+
+const permitirCambioAutomatico =
+  !estadoManualProtegido &&
+  !estadoAutomaticoReservado;
+
+const cambiosTrackingMore: Record<string, unknown> = {
+  fecha_ultima_revision: ahora,
+  trackingmore_id: payload.id || null,
+  trackingmore_courier: payload.courier_code || null,
+  trackingmore_status: payload.delivery_status || null,
+  trackingmore_substatus: payload.substatus || null,
+  trackingmore_event: payload.latest_event || null,
+  trackingmore_checkpoint: payload.latest_checkpoint_time || null,
+};
+
+if (permitirCambioAutomatico) {
+  cambiosTrackingMore.estatus_actual = estadoNuevo;
+}
+
+let consultaActualizacion = supabase
+  .from("envios")
+  .update(cambiosTrackingMore)
+  .eq("id", envio.id);
+
+if (permitirCambioAutomatico) {
+  consultaActualizacion = consultaActualizacion.eq(
+    "estado_manual_bloqueado",
+    false
+  );
+}
+
+const {
+  data: filasActualizadas,
+  error: errorUpdate,
+} = await consultaActualizacion
+  .select("id, estatus_actual");
 
     if (errorUpdate) {
       return NextResponse.json(
@@ -259,6 +286,33 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+    if (
+  permitirCambioAutomatico &&
+  (!filasActualizadas || filasActualizadas.length === 0)
+) {
+  return NextResponse.json({
+    success: true,
+    ignored: true,
+    tracking_number: numeroGuia,
+    envio_id: envio.id,
+    whatsapp_enviado: false,
+    motivo:
+      "Actualización automática bloqueada en Supabase.",
+  });
+}
+if (!permitirCambioAutomatico) {
+  return NextResponse.json({
+    success: true,
+    ignored: true,
+    tracking_number: numeroGuia,
+    envio_id: envio.id,
+    estado_detectado: estadoNuevo,
+    estado_conservado: estadoAnterior,
+    whatsapp_enviado: false,
+    motivo:
+      "Estado reservado para actualización manual en VIPACK.",
+  });
+}
 
     if (!cambioEstado) {
       return NextResponse.json({
@@ -270,6 +324,22 @@ export async function POST(request: Request) {
         whatsapp_enviado: false,
       });
     }
+    const esPaquetexpress = /paquet\s*express/i.test(
+  String(envio.paqueteria || "")
+);
+
+if (esPaquetexpress) {
+  return NextResponse.json({
+    success: true,
+    tracking_number: numeroGuia,
+    envio_id: envio.id,
+    estado: estadoNuevo,
+    cambio_estado: true,
+    whatsapp_enviado: false,
+    motivo:
+      "Paquetexpress: notificación automática reservada para Hotmail.",
+  });
+}
 
     const ultimoEstadoEnviado = String(envio.ultimo_estado_enviado || "").trim();
 

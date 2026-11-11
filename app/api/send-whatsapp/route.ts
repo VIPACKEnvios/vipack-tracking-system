@@ -1,5 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verificarSesionAdmin } from "@/lib/vipack-auth";
 import twilio from "twilio";
+
+export const runtime = "nodejs";
 
 const client = twilio(
   process.env.TWILIO_ACCOUNT_SID!,
@@ -21,7 +24,18 @@ function normalizarTelefonoWhatsApp(valor: unknown): string | null {
   return null;
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  // Solo una sesión administrativa válida puede enviar WhatsApps.
+  if (!verificarSesionAdmin(req)) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Sesión administrativa no autorizada.",
+      },
+      { status: 401 }
+    );
+  }
+
   try {
     const body = await req.json();
     const { to, cliente, pedido, guia, paqueteria, pdfUrl, folio, tipo } = body;
@@ -31,7 +45,10 @@ export async function POST(req: Request) {
 
     if (!fromWhatsApp) {
       return NextResponse.json(
-        { success: false, error: "Falta configurar TWILIO_WHATSAPP_FROM en .env.local" },
+        {
+          success: false,
+          error: "Falta configurar TWILIO_WHATSAPP_FROM en el servidor.",
+        },
         { status: 500 }
       );
     }
@@ -74,16 +91,23 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ success: true, sid: message.sid });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Twilio Error completo:", error);
+
+    const detalle = error as {
+      message?: string;
+      code?: number | string;
+      moreInfo?: string;
+      status?: number;
+    };
 
     return NextResponse.json(
       {
         success: false,
-        error: error?.message || "Error desconocido de Twilio",
-        code: error?.code || null,
-        moreInfo: error?.moreInfo || null,
-        status: error?.status || null,
+        error: detalle?.message || "Error desconocido de Twilio",
+        code: detalle?.code || null,
+        moreInfo: detalle?.moreInfo || null,
+        status: detalle?.status || null,
       },
       { status: 500 }
     );

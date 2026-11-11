@@ -201,24 +201,26 @@ function obtenerStatusOriginal(
 
 async function actualizarEnvio(
   id: number,
-  cambios: Record<
-    string,
-    unknown
-  >
-) {
-  const {
-    error,
-  } =
-    await supabase
-      .from("envios")
-      .update(cambios)
-      .eq("id", id);
+  cambios: Record<string, unknown>
+): Promise<boolean> {
+  let consulta = supabase
+    .from("envios")
+    .update(cambios)
+    .eq("id", id);
+
+  if (Object.prototype.hasOwnProperty.call(cambios, "estatus_actual")) {
+    consulta = consulta.eq("estado_manual_bloqueado", false);
+  }
+
+  const { data, error } = await consulta.select("id");
 
   if (error) {
     throw new Error(
       `Error actualizando envío ${id}: ${error.message}`
     );
   }
+
+  return Boolean(data && data.length > 0);
 }
 
 async function consultar17Track(
@@ -570,28 +572,42 @@ export async function GET() {
          * Solo actualizamos.
          * NUNCA hacemos delete().
          */
-        await actualizarEnvio(
-          envio.id,
-          {
-            estatus_actual:
-              statusTraducido,
+        const estadoActualGuardado = String(
+          envio.estatus_actual || ""
+        ).trim();
 
-            entregado:
-              esEntregado,
+        const estadoManualProtegido =
+          Boolean(envio.estado_manual_bloqueado) ||
+          ["En reparto", "Entregado"].includes(estadoActualGuardado);
 
-            fecha_ultima_revision:
-              new Date()
-                .toISOString(),
-          }
+        const estadoAutomaticoReservado =
+          ["OutForDelivery", "Delivered"].includes(statusOriginal) ||
+          ["En reparto", "Entregado"].includes(statusTraducido);
+
+        // Solo permitimos WhatsApp si el estado pudo guardarse.
+        // La condicion en Supabase evita sobrescribir un bloqueo concurrente.
+        let estadoActualizado = false;
+        if (!estadoManualProtegido && !estadoAutomaticoReservado) {
+          estadoActualizado = await actualizarEnvio(envio.id, {
+            estatus_actual: statusTraducido,
+            fecha_ultima_revision: new Date().toISOString(),
+          });
+        }
+
+        let whatsappEnviado = false;
+
+        // Paquetexpress tendrá sus dos avisos desde Hotmail, no desde 17TRACK.
+        const esPaquetexpress = /paquetexpress|paquet express/i.test(
+          String(envio.paqueteria || "")
         );
 
-        let whatsappEnviado =
-          false;
-
         if (
+          estadoActualizado &&
+          !estadoManualProtegido &&
+          !estadoAutomaticoReservado &&
+          !esPaquetexpress &&
           !yaSeEnvioEseEstado &&
-          statusTraducido !==
-            "Sin actualización"
+          statusTraducido !== "Sin actualización"
         ) {
           const telefono =
             limpiarTelefono(

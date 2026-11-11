@@ -1,341 +1,166 @@
-import {
-  NextRequest,
-  NextResponse,
-} from "next/server";
-
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-export const runtime =
-  "nodejs";
-
-export const dynamic =
-  "force-dynamic";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 type RouteContext = {
-  params: Promise<{
-    token: string;
-  }>;
+  params: Promise<{ token: string }>;
 };
 
 type PushBody = {
   subscription?: {
     endpoint?: string;
-
-    keys?: {
-      p256dh?: string;
-      auth?: string;
-    };
+    keys?: { p256dh?: string; auth?: string };
   };
 };
 
 function obtenerSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !key) {
-    throw new Error("Faltan variables de Supabase.");
-  }
-
+  if (!url || !key) throw new Error("Faltan variables de Supabase.");
   return createClient(url, key, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
+    auth: { autoRefreshToken: false, persistSession: false },
   });
 }
-async function obtenerClientePorToken(
-  token: string
-) {
-  const {
-    data,
-    error,
-  } =
-    await obtenerSupabaseAdmin()
-      .from(
-        "clientes_inventario"
-      )
-      .select(
-        `
-          id_cliente,
-          nombre,
-          activo
-        `
-      )
-      .eq(
-        "token_inventario",
-        token
-      )
-      .eq(
-        "activo",
-        true
-      )
-      .maybeSingle();
+
+async function obtenerClientePorToken(token: string) {
+  const { data, error } = await obtenerSupabaseAdmin()
+    .from("clientes_inventario")
+    .select("id_cliente, nombre, activo")
+    .eq("token_inventario", token)
+    .eq("activo", true)
+    .maybeSingle();
 
   if (error) {
-    console.error(
-      "Error consultando cliente push:",
-      error
-    );
-
-    return null;
+    console.error("Error consultando cliente push:", error);
+    throw new Error("No se pudo verificar el cliente.");
   }
-
   return data;
 }
 
-/*
- * ==========================
- * GET
- *
- * Comprueba si ESTE dispositivo
- * está activado específicamente
- * para ESTE cliente.
- * ==========================
- */
-
-export async function GET(
-  request: NextRequest,
-  context: RouteContext
-) {
+// GET: verifica que este dispositivo esté activado para este cliente.
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { token } = await context.params;
-
     if (!token) {
-      return NextResponse.json(
-        { success: false, error: "Token no válido." },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: "Token no válido." }, { status: 400 });
     }
 
     const cliente = await obtenerClientePorToken(token);
-
     if (!cliente?.id_cliente) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Cliente no encontrado o acceso inactivo.",
-        },
+        { success: false, error: "Cliente no encontrado o acceso inactivo." },
         { status: 404 }
       );
     }
 
-    const endpoint =
-      request.nextUrl.searchParams.get("endpoint");
-
+    const endpoint = request.nextUrl.searchParams.get("endpoint");
     if (!endpoint) {
-      return NextResponse.json({
-        success: true,
-        activado: false,
-      });
+      return NextResponse.json({ success: true, activado: false });
+    }
+    if (endpoint.length > 4096) {
+      return NextResponse.json({ success: false, error: "Endpoint no válido." }, { status: 400 });
     }
 
-    const {
-      data: suscripcion,
-      error: suscripcionError,
-    } = await obtenerSupabaseAdmin()
+    const { data, error } = await obtenerSupabaseAdmin()
       .from("push_subscriptions")
-      .select(`
-        id,
-        cliente_id,
-        endpoint,
-        activo
-      `)
-      .eq("cliente_id", Number(cliente.id_cliente))
+      .select("id, activo")
+      .eq("cliente_id", cliente.id_cliente)
       .eq("endpoint", endpoint)
       .maybeSingle();
 
-    if (suscripcionError) {
-      console.error(
-        "Error verificando suscripción:",
-        suscripcionError
-      );
-
+    if (error) {
+      console.error("Error verificando suscripción:", error);
       return NextResponse.json(
-        {
-          success: false,
-          activado: false,
-          error: "No se pudo comprobar la suscripción.",
-        },
+        { success: false, activado: false, error: "No se pudo comprobar la suscripción." },
         { status: 500 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      activado: suscripcion?.activo === true,
+      activado: data?.activo === true,
       cliente_id: cliente.id_cliente,
     });
   } catch (error) {
-    console.error(
-      "Error GET push subscribe:",
-      error
-    );
-
+    console.error("Error GET push subscribe:", error);
     return NextResponse.json(
-      {
-        success: false,
-        activado: false,
-        error:
-          "Error interno verificando las notificaciones.",
-      },
+      { success: false, activado: false, error: "Error interno verificando las notificaciones." },
       { status: 500 }
     );
   }
 }
 
-/*
- * ==========================
- * POST
- *
- * Registra este dispositivo para
- * el cliente correspondiente al token.
- *
- * Un mismo dispositivo puede estar
- * asociado a varios inventarios VIPACK.
- * La combinación única es:
- * cliente_id + endpoint.
- * ==========================
- */
-
-export async function POST(
-  request: NextRequest,
-  context: RouteContext
-) {
+// POST: registra o actualiza la suscripción del cliente sin duplicados.
+export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { token } = await context.params;
-
     if (!token) {
-      return NextResponse.json(
-        { success: false, error: "Token no válido." },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: "Token no válido." }, { status: 400 });
     }
 
     const cliente = await obtenerClientePorToken(token);
-
     if (!cliente?.id_cliente) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Cliente no encontrado o acceso inactivo.",
-        },
+        { success: false, error: "Cliente no encontrado o acceso inactivo." },
         { status: 404 }
       );
     }
 
-    const body = (await request.json()) as PushBody;
+    let body: PushBody;
+    try {
+      body = (await request.json()) as PushBody;
+    } catch {
+      return NextResponse.json({ success: false, error: "JSON no válido." }, { status: 400 });
+    }
 
-    const endpoint =
-      body?.subscription?.endpoint;
+    const endpoint = body?.subscription?.endpoint;
+    const p256dh = body?.subscription?.keys?.p256dh;
+    const auth = body?.subscription?.keys?.auth;
 
-    const p256dh =
-      body?.subscription?.keys?.p256dh;
-
-    const auth =
-      body?.subscription?.keys?.auth;
-
-    if (!endpoint || !p256dh || !auth) {
+    if (
+      typeof endpoint !== "string" ||
+      typeof p256dh !== "string" ||
+      typeof auth !== "string" ||
+      !endpoint || !p256dh || !auth ||
+      endpoint.length > 4096 || p256dh.length > 1024 || auth.length > 1024
+    ) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "La suscripción push está incompleta.",
-        },
+        { success: false, error: "La suscripción push no es válida." },
         { status: 400 }
       );
     }
 
-    const clienteId = Number(cliente.id_cliente);
+    try {
+      const url = new URL(endpoint);
+      if (url.protocol !== "https:" || !url.hostname) throw new Error("Endpoint no permitido");
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Endpoint push no válido." },
+        { status: 400 }
+      );
+    }
 
-    const {
-      data: existente,
-      error: existenteError,
-    } = await obtenerSupabaseAdmin()
+    const { error: guardarError } = await obtenerSupabaseAdmin()
       .from("push_subscriptions")
-      .select(`
-        id,
-        cliente_id,
-        endpoint,
-        activo
-      `)
-      .eq("cliente_id", clienteId)
-      .eq("endpoint", endpoint)
-      .maybeSingle();
-
-    if (existenteError) {
-      console.error(
-        "Error buscando suscripción push:",
-        existenteError
-      );
-
-      return NextResponse.json(
+      .upsert(
         {
-          success: false,
-          error: "No se pudo comprobar el dispositivo.",
-        },
-        { status: 500 }
-      );
-    }
-
-    const datosSuscripcion = {
-      p256dh,
-      auth,
-      activo: true,
-      user_agent: request.headers.get("user-agent"),
-      updated_at: new Date().toISOString(),
-    };
-
-    if (existente) {
-      const { error: actualizarError } =
-        await obtenerSupabaseAdmin()
-          .from("push_subscriptions")
-          .update(datosSuscripcion)
-          .eq("id", existente.id);
-
-      if (actualizarError) {
-        console.error(
-          "Error actualizando push:",
-          actualizarError
-        );
-
-        return NextResponse.json(
-          {
-            success: false,
-            error: "No se pudo actualizar la suscripción.",
-          },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json({
-        success: true,
-        activado: true,
-        cliente: {
-          id_cliente: cliente.id_cliente,
-          nombre: cliente.nombre,
-        },
-      });
-    }
-
-    const { error: insertarError } =
-      await obtenerSupabaseAdmin()
-        .from("push_subscriptions")
-        .insert({
-          cliente_id: clienteId,
+          cliente_id: Number(cliente.id_cliente),
           endpoint,
-          ...datosSuscripcion,
-        });
-
-    if (insertarError) {
-      console.error(
-        "Error guardando push:",
-        insertarError
+          p256dh,
+          auth,
+          activo: true,
+          user_agent: request.headers.get("user-agent"),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "cliente_id,endpoint" }
       );
 
+    if (guardarError) {
+      console.error("Error guardando suscripción push:", guardarError);
       return NextResponse.json(
-        {
-          success: false,
-          error: "No se pudo guardar la suscripción.",
-        },
+        { success: false, error: "No se pudo registrar el dispositivo." },
         { status: 500 }
       );
     }
@@ -343,23 +168,12 @@ export async function POST(
     return NextResponse.json({
       success: true,
       activado: true,
-      cliente: {
-        id_cliente: cliente.id_cliente,
-        nombre: cliente.nombre,
-      },
+      cliente: { id_cliente: cliente.id_cliente, nombre: cliente.nombre },
     });
   } catch (error) {
-    console.error(
-      "Error POST push subscribe:",
-      error
-    );
-
+    console.error("Error POST push subscribe:", error);
     return NextResponse.json(
-      {
-        success: false,
-        error:
-          "Error interno al registrar las notificaciones.",
-      },
+      { success: false, error: "Error interno al registrar las notificaciones." },
       { status: 500 }
     );
   }

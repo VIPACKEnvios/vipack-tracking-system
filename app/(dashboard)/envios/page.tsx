@@ -294,10 +294,13 @@ export default function EnviosPage() {
     const { error } = await supabase
       .from("envios")
       .update({
-        estatus_actual: estado,
-        ultimo_estado_enviado: estado,
-        fecha_ultima_revision: new Date().toISOString(),
-      })
+  estatus_actual: estado,
+  estado_manual_bloqueado:
+    estado === "En reparto" ||
+    estado === "Entregado",
+  fecha_ultima_revision:
+    new Date().toISOString(),
+})
       .eq("id", id);
 
     if (error) {

@@ -10,7 +10,9 @@ function convertirHex(bytes: Uint8Array): string {
     .join("");
 }
 
-async function validarSesion(token: string | undefined) {
+async function validarSesion(
+  token: string | undefined
+): Promise<boolean> {
   const secret = process.env.VIPACK_SESSION_SECRET;
 
   if (!token || !secret || secret.length < 32) {
@@ -25,7 +27,10 @@ async function validarSesion(token: string | undefined) {
 
   const [, expiresTexto, firma] = partes;
 
-  if (!/^\d+$/.test(expiresTexto) || !/^[a-f0-9]{64}$/.test(firma)) {
+  if (
+    !/^\d+$/.test(expiresTexto) ||
+    !/^[a-f0-9]{64}$/.test(firma)
+  ) {
     return false;
   }
 
@@ -61,11 +66,16 @@ async function validarSesion(token: string | undefined) {
     new Uint8Array(firmaCalculada)
   );
 
+  if (firmaEsperada.length !== firma.length) {
+    return false;
+  }
+
   let diferencia = 0;
 
   for (let i = 0; i < firmaEsperada.length; i++) {
     diferencia |=
-      firmaEsperada.charCodeAt(i) ^ firma.charCodeAt(i);
+      firmaEsperada.charCodeAt(i) ^
+      firma.charCodeAt(i);
   }
 
   return diferencia === 0;
@@ -74,6 +84,7 @@ async function validarSesion(token: string | undefined) {
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
+  // Páginas que no requieren sesión administrativa.
   const isPublicPage =
     path === "/login" ||
     path === "/registro-bazar" ||
@@ -83,6 +94,9 @@ export async function proxy(request: NextRequest) {
     path.startsWith("/informacion/") ||
     path.startsWith("/inventario/");
 
+  // APIs con mecanismos de autorización propios.
+  // Las rutas Hotmail verifican sesión o CRON_SECRET
+  // mediante verificarAccesoHotmail().
   const isPublicApi =
     path === "/api/login" ||
     path === "/api/push/confirmar-recepcion" ||
@@ -91,6 +105,8 @@ export async function proxy(request: NextRequest) {
     path.startsWith("/api/consulta-bazares") ||
     path.startsWith("/api/trackingmore/") ||
     path === "/api/cron/paquetexpress" ||
+    path === "/api/hotmail/revisar" ||
+    path === "/api/hotmail/registrar" ||
     path === "/api/onedrive/login" ||
     path === "/api/onedrive/callback" ||
     path.startsWith("/api/inventario/");
@@ -99,6 +115,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Protección administrativa para las demás rutas.
   const token = request.cookies.get("vipack-auth")?.value;
 
   const autorizado = await validarSesion(token);
@@ -127,5 +144,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico).*)",
+  ],
 };

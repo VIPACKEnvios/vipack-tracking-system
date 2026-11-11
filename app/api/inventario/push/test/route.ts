@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import webpush from "web-push";
@@ -20,24 +21,39 @@ function obtenerSupabaseAdmin() {
     },
   });
 }
-export async function GET(request: NextRequest) {
-  try {
-    // Esta ruta solo puede utilizarse con el secreto del servidor.
-    const cronSecret = process.env.CRON_SECRET;
-    const authHeader = request.headers.get("authorization");
 
-    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+export async function POST(request: NextRequest) {
+  try {
+    const secreto = process.env.CRON_SECRET;
+    const autorizacion = request.headers.get("authorization");
+
+    if (!secreto || autorizacion !== `Bearer ${secreto}`) {
       return NextResponse.json(
         { success: false, error: "No autorizado." },
         { status: 401 }
       );
     }
 
-    const clienteParam = request.nextUrl.searchParams.get("cliente");
-    const clienteId = Number(clienteParam);
+    let datos: unknown;
+
+    try {
+      datos = await request.json();
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "JSON no válido." },
+        { status: 400 }
+      );
+    }
+
+    const clienteId =
+      datos !== null &&
+      typeof datos === "object" &&
+      "cliente" in datos
+        ? (datos as { cliente: unknown }).cliente
+        : null;
 
     if (
-      !clienteParam ||
+      typeof clienteId !== "number" ||
       !Number.isSafeInteger(clienteId) ||
       clienteId <= 0
     ) {
@@ -47,26 +63,30 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Antes de consultar dispositivos, verificar que el cliente exista
-    // y tenga acceso activo al inventario.
-    const { data: cliente, error: clienteError } = await obtenerSupabaseAdmin()
-      .from("clientes_inventario")
-      .select("id_cliente, activo")
-      .eq("id_cliente", clienteId)
-      .eq("activo", true)
-      .maybeSingle();
+    const supabase = obtenerSupabaseAdmin();
+
+    const { data: cliente, error: clienteError } =
+      await supabase
+        .from("clientes_inventario")
+        .select("id_cliente")
+        .eq("id_cliente", clienteId)
+        .eq("activo", true)
+        .maybeSingle();
 
     if (clienteError) {
-      console.error("Error verificando cliente para push:", clienteError);
+      console.error("Error verificando cliente:", clienteError);
       return NextResponse.json(
-        { success: false, error: "No se pudo verificar el estado del cliente." },
+        { success: false, error: "Error verificando cliente." },
         { status: 500 }
       );
     }
 
     if (!cliente) {
       return NextResponse.json(
-        { success: false, error: "Cliente no encontrado o acceso inactivo." },
+        {
+          success: false,
+          error: "Cliente inexistente o inactivo.",
+        },
         { status: 404 }
       );
     }
@@ -79,85 +99,110 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Faltan variables VAPID.",
-          variables: {
-            publicKey: Boolean(publicKey),
-            privateKey: Boolean(privateKey),
-            subject: Boolean(subjectOriginal),
-          },
+          error: "Configuración VAPID incompleta.",
         },
         { status: 500 }
       );
     }
 
     const subject =
-      subjectOriginal.startsWith("mailto:") || subjectOriginal.includes("://")
+      subjectOriginal.startsWith("mailto:") ||
+      subjectOriginal.startsWith("https://")
         ? subjectOriginal
         : `mailto:${subjectOriginal}`;
 
     webpush.setVapidDetails(subject, publicKey, privateKey);
 
-    const { data: suscripciones, error: suscripcionesError } = await obtenerSupabaseAdmin()
-      .from("push_subscriptions")
-      .select("id, cliente_id, endpoint, p256dh, auth, activo")
-      .eq("cliente_id", clienteId)
-      .eq("activo", true);
+    const { data: suscripciones, error: errorSuscripciones } =
+      await supabase
+        .from("push_subscriptions")
+        .select("id, endpoint, p256dh, auth")
+        .eq("cliente_id", clienteId)
+        .eq("activo", true);
 
-    if (suscripcionesError) {
+    if (errorSuscripciones) {
+      console.error("Error consultando suscripciones:", errorSuscripciones);
+
       return NextResponse.json(
         {
           success: false,
-          error: "No se pudieron consultar las suscripciones.",
-          detalle: suscripcionesError.message,
+          error: "No se pudieron consultar los dispositivos.",
         },
         { status: 500 }
       );
     }
 
-    if (!suscripciones || suscripciones.length === 0) {
+    if (!suscripciones?.length) {
       return NextResponse.json(
         {
           success: false,
-          error: "Este cliente no tiene dispositivos push activos.",
           cliente: clienteId,
+          dispositivos: 0,
+          error: "No hay dispositivos activos.",
         },
         { status: 404 }
       );
     }
 
     const payload = JSON.stringify({
-      title: "VIPACK Envíos",
-      body: "🔔 Prueba de notificación VIPACK. Si ves este mensaje, las notificaciones funcionan correctamente.",
+      title: "VIPACK Envíos 📦",
+      body: "🔔 Prueba de notificación. Tu dispositivo está conectado a VIPACK.",
       url: "/",
       tag: `vipack-prueba-${Date.now()}`,
     });
 
     const resultados: Array<{
       id: number;
-      success: boolean;
-      statusCode: number | null;
-      headers?: unknown;
-      message?: string;
-      body?: unknown;
+      enviado: boolean;
+      codigo: number | null;
+      estado: string;
     }> = [];
 
     for (const suscripcion of suscripciones) {
-      // Evitar envíos posteriores si la clienta fue dada de baja
-      // mientras se procesaban los dispositivos anteriores.
-      const { data: clienteVigente, error: vigenciaError } = await obtenerSupabaseAdmin()
-        .from("clientes_inventario")
-        .select("id_cliente")
-        .eq("id_cliente", clienteId)
-        .eq("activo", true)
-        .maybeSingle();
+      const { data: clienteVigente, error: errorVigencia } =
+        await supabase
+          .from("clientes_inventario")
+          .select("id_cliente")
+          .eq("id_cliente", clienteId)
+          .eq("activo", true)
+          .maybeSingle();
 
-      if (vigenciaError || !clienteVigente) {
-        console.warn("Prueba push detenida: cliente inactivo o estado no verificable.");
-        break;
+      if (errorVigencia || !clienteVigente) {
+        console.warn("Prueba detenida: cliente inactivo o no verificable.");
+
+        return NextResponse.json(
+          {
+            success: false,
+            cliente: clienteId,
+            error: "La prueba se detuvo al verificar el cliente.",
+            resultados,
+          },
+          { status: 409 }
+        );
+      }
+
+      // Comprobar que la suscripción sigue activa.
+      const { data: suscripcionVigente, error: errorEstado } =
+        await supabase
+          .from("push_subscriptions")
+          .select("id")
+          .eq("id", suscripcion.id)
+          .eq("cliente_id", clienteId)
+          .eq("activo", true)
+          .maybeSingle();
+
+      if (errorEstado || !suscripcionVigente) {
+        resultados.push({
+          id: suscripcion.id,
+          enviado: false,
+          codigo: null,
+          estado: "Suscripción inactiva o no verificable",
+        });
+        continue;
       }
 
       try {
-        const response = await webpush.sendNotification(
+        const respuesta = await webpush.sendNotification(
           {
             endpoint: suscripcion.endpoint,
             keys: {
@@ -171,45 +216,84 @@ export async function GET(request: NextRequest) {
 
         resultados.push({
           id: suscripcion.id,
-          success: true,
-          statusCode: response.statusCode,
-          headers: response.headers,
+          enviado: true,
+          codigo: respuesta.statusCode,
+          estado: "Aceptado por el servicio push",
         });
       } catch (error: unknown) {
-        const pushError = error as {
-          statusCode?: number;
-          message?: string;
-          body?: unknown;
-          headers?: unknown;
-        };
+        const codigo =
+          typeof error === "object" &&
+          error !== null &&
+          "statusCode" in error &&
+          typeof error.statusCode === "number"
+            ? error.statusCode
+            : null;
 
-        resultados.push({
-          id: suscripcion.id,
-          success: false,
-          statusCode: pushError?.statusCode ?? null,
-          message: pushError?.message ?? "Error desconocido",
-          body: pushError?.body ?? null,
-          headers: pushError?.headers ?? null,
-        });
+        if (codigo === 404 || codigo === 410) {
+          const { error: errorDesactivacion } =
+            await supabase
+              .from("push_subscriptions")
+              .update({
+                activo: false,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", suscripcion.id)
+              .eq("cliente_id", clienteId)
+              .eq("activo", true);
+
+          if (errorDesactivacion) {
+            console.error(
+              "No se pudo desactivar la suscripción:",
+              suscripcion.id,
+              errorDesactivacion
+            );
+          }
+
+          resultados.push({
+            id: suscripcion.id,
+            enviado: false,
+            codigo,
+            estado: errorDesactivacion
+              ? "Suscripción vencida; error al desactivar"
+              : "Suscripción vencida y desactivada",
+          });
+        } else {
+          console.error(
+            "Error enviando push a suscripción:",
+            suscripcion.id,
+            codigo
+          );
+
+          resultados.push({
+            id: suscripcion.id,
+            enviado: false,
+            codigo,
+            estado: "Error de envío",
+          });
+        }
       }
     }
 
-    const exitosos = resultados.filter((resultado) => resultado.success).length;
+    const exitosos = resultados.filter(
+      (resultado) => resultado.enviado
+    ).length;
 
     return NextResponse.json({
       success: exitosos > 0,
       cliente: clienteId,
       dispositivos: suscripciones.length,
+      procesados: resultados.length,
       exitosos,
       errores: resultados.length - exitosos,
       resultados,
     });
   } catch (error) {
-    console.error("Error prueba push:", error);
+    console.error("Error interno de prueba push:", error);
+
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Error desconocido.",
+        error: "Error interno al procesar la prueba.",
       },
       { status: 500 }
     );
