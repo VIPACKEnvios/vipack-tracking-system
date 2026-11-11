@@ -49,6 +49,7 @@ export async function GET(
         correo,
         productos,
         facebook,
+        logo_url,
         referencia_1_nombre,
         referencia_1_telefono,
         referencia_2_nombre,

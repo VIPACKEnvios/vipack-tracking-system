@@ -24,6 +24,7 @@ type Bazar = {
   correo: string | null;
   productos: string;
   facebook: string;
+  logo_url: string | null;
   referencia_1_nombre: string;
   referencia_1_telefono: string;
   referencia_2_nombre: string;
@@ -109,6 +110,19 @@ function formatoFecha(fecha: string | null | undefined) {
     timeStyle: "short",
   }).format(fechaConvertida);
 }
+function enlaceFacebookValido(valor: string | null | undefined): string | null {
+  if (!valor) return null;
+  try {
+    const url = new URL(valor.trim());
+    const host = url.hostname.toLowerCase();
+    if (url.protocol !== "https:" || url.username || url.password) return null;
+    if (!["facebook.com", "www.facebook.com", "web.facebook.com", "m.facebook.com", "fb.com", "www.fb.com"].includes(host)) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 export default function AdminBazaresPage() {
   const [bazares, setBazares] = useState<Bazar[]>([]);
   const [busqueda, setBusqueda] = useState("");
@@ -760,9 +774,9 @@ function DetalleBazar({
                 Facebook
               </p>
 
-              {bazar.facebook ? (
+              {enlaceFacebookValido(bazar.facebook) ? (
                 <a
-                  href={bazar.facebook}
+                  href={enlaceFacebookValido(bazar.facebook) || "#"}
                   target="_blank"
                   rel="noreferrer"
                   className="mt-1 inline-block break-all font-semibold text-blue-700 underline"
@@ -776,7 +790,10 @@ function DetalleBazar({
               )}
             </div>
           </SeccionDetalle>
-
+<PerfilPublicoBazar
+  bazar={bazar}
+  alActualizar={alActualizar}
+/>
           <SeccionDetalle titulo="Referencias">
             <Dato
               etiqueta="Referencia 1"
@@ -1072,6 +1089,140 @@ function DetalleBazar({
         </div>
       </div>
     </div>
+  );
+}
+
+function PerfilPublicoBazar({
+  bazar,
+  alActualizar,
+}: {
+  bazar: Bazar;
+  alActualizar: (id: string, cambios: Partial<Bazar>) => void;
+}) {
+  const [facebook, setFacebook] = useState(bazar.facebook || "");
+  const [logo, setLogo] = useState<File | null>(null);
+  const [arrastrando, setArrastrando] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [mensaje, setMensaje] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setFacebook(bazar.facebook || "");
+  }, [bazar.id, bazar.facebook]);
+
+  const logoActual = bazar.logo_url
+    ? bazar.logo_url.startsWith("https://")
+      ? bazar.logo_url
+      : process.env.NEXT_PUBLIC_SUPABASE_URL
+        ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/bazares-logos/${bazar.logo_url}`
+        : null
+    : null;
+
+  function seleccionarLogo(archivo: File | null) {
+    setError("");
+    if (!archivo) {
+      setLogo(null);
+      return;
+    }
+    if (!["image/jpeg", "image/png", "image/webp"].includes(archivo.type)) {
+      setError("Selecciona una imagen JPG, PNG o WebP.");
+      return;
+    }
+    if (archivo.size > 2 * 1024 * 1024 || archivo.size === 0) {
+      setError("El logotipo debe pesar más de 0 bytes y máximo 2 MB.");
+      return;
+    }
+    setLogo(archivo);
+  }
+
+  async function guardarPerfil(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    if (guardando) return;
+    const enlace = facebook.trim();
+    if (enlace && !enlaceFacebookValido(enlace)) {
+      setError("Ingresa una dirección HTTPS válida de Facebook.");
+      return;
+    }
+    setGuardando(true);
+    setMensaje("");
+    setError("");
+    try {
+      const datos = new FormData();
+      datos.append("facebook", enlace);
+      if (logo) datos.append("logo", logo);
+      const respuesta = await fetch(`/api/admin/bazares/${bazar.id}/perfil`, {
+        method: "PATCH",
+        body: datos,
+      });
+      const resultado = await respuesta.json();
+      if (!respuesta.ok || !resultado.success || !resultado.bazar) {
+        throw new Error(resultado.error || "No fue posible guardar el perfil.");
+      }
+      alActualizar(bazar.id, resultado.bazar);
+      setLogo(null);
+      setMensaje("Perfil público actualizado correctamente.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ocurrió un error al guardar.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <section className="md:col-span-2 rounded-2xl border border-cyan-200 bg-slate-50 p-4 sm:p-5">
+      <h3 className="mb-4 text-lg font-bold text-slate-900">Perfil público del bazar</h3>
+      <form onSubmit={guardarPerfil} className="space-y-5">
+        <div>
+          <label htmlFor="facebook-publico" className="mb-2 block text-sm font-semibold text-slate-800">
+            Enlace de Facebook
+          </label>
+          <input
+            id="facebook-publico"
+            type="url"
+            value={facebook}
+            onChange={(evento) => setFacebook(evento.target.value)}
+            placeholder="https://www.facebook.com/..."
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-600"
+          />
+          <p className="mt-1 text-xs text-slate-600">Solo se publicará el enlace real de Facebook.</p>
+        </div>
+        <div>
+          <label htmlFor="logo-publico" className="mb-2 block text-sm font-semibold text-slate-800">
+            Logotipo del bazar
+          </label>
+          {logoActual && (
+            <img src={logoActual} alt={`Logotipo de ${bazar.nombre_bazar}`} className="mb-3 h-24 w-24 rounded-xl border border-slate-200 bg-white object-contain" />
+          )}
+          <div
+            onDragEnter={(evento) => { evento.preventDefault(); setArrastrando(true); }}
+            onDragOver={(evento) => { evento.preventDefault(); evento.dataTransfer.dropEffect = "copy"; setArrastrando(true); }}
+            onDragLeave={(evento) => { evento.preventDefault(); setArrastrando(false); }}
+            onDrop={(evento) => {
+              evento.preventDefault();
+              setArrastrando(false);
+              seleccionarLogo(evento.dataTransfer.files?.[0] || null);
+            }}
+            className={`rounded-xl border-2 border-dashed p-5 text-center transition ${arrastrando ? "border-blue-600 bg-blue-50" : "border-slate-300 bg-white"}`}
+          >
+            <p className="mb-3 text-sm font-semibold text-slate-800">Arrastra aquí el logotipo o selecciona un archivo</p>
+            <input
+              id="logo-publico"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(evento) => seleccionarLogo(evento.target.files?.[0] || null)}
+              className="block w-full text-sm text-slate-800"
+            />
+          </div>
+          <p className="mt-2 text-xs text-slate-600">JPG, PNG o WebP. Máximo 2 MB.</p>
+          {logo && <p className="mt-2 break-all text-sm font-semibold text-blue-800">Seleccionado: {logo.name}</p>}
+        </div>
+        {mensaje && <p role="status" className="text-sm font-semibold text-green-800">{mensaje}</p>}
+        {error && <p role="alert" className="text-sm font-semibold text-red-800">{error}</p>}
+        <button type="submit" disabled={guardando} className="rounded-xl bg-[#072c74] px-5 py-3 font-bold text-white hover:bg-blue-900 disabled:opacity-60">
+          {guardando ? "Guardando..." : "Guardar perfil público"}
+        </button>
+      </form>
+    </section>
   );
 }
 
