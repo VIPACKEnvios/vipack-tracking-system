@@ -1,3 +1,4 @@
+import { procesarWhatsappPaquetexpressAutomatico } from "@/lib/paquetexpress-whatsapp-automatico";
 
 import { NextRequest, NextResponse } from "next/server";
 import { verificarAccesoHotmail } from "@/lib/vipack-cron-auth";
@@ -6,6 +7,12 @@ import { GET as revisarCorreos } from "../revisar/route";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const whatsappAutomaticoHabilitado =
+  process.env.VIPACK_WHATSAPP_PAQUEXPRESS_AUTOMATICO === "true" &&
+  process.env.VIPACK_ENVIAR_WHATSAPP_PAQUEXPRESS === "true" &&
+  process.env.VIPACK_RESERVAR_WHATSAPP_PAQUEXPRESS === "true";
+
 
 type EventoDetectado = {
   guia: string | null;
@@ -99,6 +106,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const guiasConEventosNuevos = new Set<string>();
+    const eventosNuevosPorGuia = new Map<string, Set<string>>();
     let registrados = 0;
     let duplicados = 0;
     let omitidos = 0;
@@ -186,6 +195,11 @@ export async function POST(request: NextRequest) {
           );
         } else if (data === "registrado") {
           registrados++;
+          guiasConEventosNuevos.add(evento.guia);
+          const clavesNuevas =
+            eventosNuevosPorGuia.get(evento.guia) ?? new Set<string>();
+          clavesNuevas.add(`${cuenta.cuenta}:${evento.mensaje_id}:${evento.evento}`);
+          eventosNuevosPorGuia.set(evento.guia, clavesNuevas);
         } else if (data === "duplicado") {
           duplicados++;
         } else if (data === "registro_desactivado") {
@@ -198,16 +212,45 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    let resultadoWhatsapp: {
+      modo: string;
+      guiasDetectadas: number;
+      guiasElegibles?: number;
+      mensajesEnviados: number;
+    };
+
+    try {
+      resultadoWhatsapp =
+        await procesarWhatsappPaquetexpressAutomatico(
+          errores.length === 0
+            ? guiasConEventosNuevos
+            : new Set<string>(),
+          errores.length === 0
+            ? eventosNuevosPorGuia
+            : new Map<string, Set<string>>()
+        );
+    } catch (error) {
+      console.error("VIPACK: error en procesador WhatsApp:", error);
+      resultadoWhatsapp = {
+        modo: "error_procesador_sin_envio_confirmado",
+        guiasDetectadas: guiasConEventosNuevos.size,
+        mensajesEnviados: 0,
+      };
+    }
+
     return NextResponse.json(
       {
         success: errores.length === 0,
-        modo: "solo_historial_sin_whatsapp",
+        modo: resultadoWhatsapp.modo,
+        whatsappAutomaticoConfigurado: whatsappAutomaticoHabilitado,
+        guiasNuevasDetectadas: guiasConEventosNuevos.size,
+        resultadoWhatsapp,
         registrados,
         duplicados,
         omitidos,
         errores,
         modificaEnvios: false,
-        enviaWhatsapp: false,
+        enviaWhatsapp: resultadoWhatsapp.mensajesEnviados > 0,
       },
       {
         status: errores.length ? 409 : 200,

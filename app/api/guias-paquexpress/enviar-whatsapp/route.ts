@@ -1,8 +1,15 @@
+import {
+  ACTUALIZACION_TEMPLATE_PAQUETEXPRESS,
+  enviarMensajePaquetexpress,
+  ESTADOS_PAQUETEXPRESS,
+  normalizarTelefonoWhatsapp,
+  limpiarVariableWhatsapp,
+  consentimientoWhatsappVigente,
+} from "@/lib/paquetexpress-whatsapp";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import twilio from "twilio";
 
-const ACTUALIZACION_TEMPLATE = "HX23277e717da845d5b292d5c196900566";
+const ACTUALIZACION_TEMPLATE = ACTUALIZACION_TEMPLATE_PAQUETEXPRESS;
 import { verificarSesionAdmin } from "@/lib/vipack-auth";
 
 export const runtime = "nodejs";
@@ -15,48 +22,10 @@ function errorJson(error: string, status: number) {
   );
 }
 
-function normalizarTelefono(valor: unknown): string | null {
-  const digitos = String(valor ?? "").replace(/\D/g, "");
-
-  if (/^\d{10}$/.test(digitos)) return `521${digitos}`;
-  if (/^52\d{10}$/.test(digitos)) return `521${digitos.slice(2)}`;
-  if (/^521\d{10}$/.test(digitos)) return digitos;
-
-  return null;
-}
-
-function limpiarVariable(valor: unknown, respaldo: string): string {
-  const texto = String(valor ?? "")
-    .replace(/[\x00-\x1f\x7f]/g, " ")
-    .replace(/\s+/gu, " ")
-    .trim();
-
-  return texto || respaldo;
-}
-function consentimientoVigente(
-  registro: {
-    telefono_whatsapp?: unknown;
-    whatsapp_autorizado?: unknown;
-    fecha_autorizacion?: unknown;
-    origen_autorizacion?: unknown;
-    evidencia_autorizacion?: unknown;
-  },
-  telefonoReservado: string
-): boolean {
-  return (
-    registro.whatsapp_autorizado === true &&
-    Boolean(registro.fecha_autorizacion) &&
-    Boolean(String(registro.origen_autorizacion ?? "").trim()) &&
-    Boolean(String(registro.evidencia_autorizacion ?? "").trim()) &&
-    normalizarTelefono(registro.telefono_whatsapp) === telefonoReservado
-  );
-}
-const ESTADOS: Record<string, string> = {
-  recoleccion: "Recolectado",
-  comienzo_viaje: "En tránsito",
-  entregado: "Entregado",
-};
-
+const normalizarTelefono = normalizarTelefonoWhatsapp;
+const limpiarVariable = limpiarVariableWhatsapp;
+const consentimientoVigente = consentimientoWhatsappVigente;
+const ESTADOS = ESTADOS_PAQUETEXPRESS;
 export async function POST(request: NextRequest) {
   if (!verificarSesionAdmin(request)) {
     return errorJson("Sesión administrativa no válida", 401);
@@ -324,14 +293,12 @@ export async function POST(request: NextRequest) {
         let mensajeAceptadoPorTwilio = false;
 
         try {
-          const clienteTwilio = twilio(sid, token);
-          const mensaje = await clienteTwilio.messages.create({
-            from: remitente.startsWith("whatsapp:")
-              ? remitente
-              : `whatsapp:${remitente}`,
-            to: `whatsapp:+${reservaActual.telefono_destino}`,
-            contentSid: ACTUALIZACION_TEMPLATE,
-            contentVariables: JSON.stringify(variablesTwilio),
+          const mensaje = await enviarMensajePaquetexpress({
+            sid,
+            token,
+            remitente,
+            telefonoDestino: reservaActual.telefono_destino,
+            variables: variablesTwilio,
           });
 
           mensajeAceptadoPorTwilio = true;
