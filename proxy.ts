@@ -86,6 +86,7 @@ export async function proxy(request: NextRequest) {
 
   // Páginas que no requieren sesión administrativa.
   const isPublicPage =
+    path === "/banner-bazares-nuevo.png" ||
     path === "/login" ||
     path === "/registro-bazar" ||
     path === "/registro-cliente" ||
