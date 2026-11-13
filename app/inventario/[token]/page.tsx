@@ -1943,7 +1943,34 @@ export default function InventarioClientePage() {
 
 
 
-        <section className="relative mx-auto -mt-4 max-w-6xl px-3.5 pb-10 sm:-mt-10 sm:px-8">
+        {/* AVISO TEMPORAL ONEDRIVE - cambiar a false para ocultar */}
+        {true && (
+          <div className="relative mx-auto mt-5 max-w-6xl px-3.5 sm:px-8">
+            <div role="status" className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm sm:p-5">
+              <div className="flex items-start gap-3">
+                <span className="text-xl" aria-hidden="true">ℹ️</span>
+                <div className="min-w-0">
+                  <h2 className="font-bold text-blue-950">
+                    Aviso importante para nuestros clientes
+                  </h2>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-700">
+                    Actualmente presentamos intermitencias en la visualización
+                    de fotografías relacionadas con el servicio de Microsoft
+                    OneDrive.
+                  </p>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-700">
+                    Tu inventario y los registros de tu mercancía continúan
+                    disponibles. Estamos atentos al restablecimiento del servicio.
+                  </p>
+                  <p className="mt-3 text-xs font-semibold text-blue-900">
+                    VIPACK ENVÍOS · Agradecemos tu comprensión.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        <section className="relative mx-auto mt-4 max-w-6xl px-3.5 pb-10 sm:mt-5 sm:px-8">
 
           <div className="rounded-[24px] border border-slate-200/80 bg-white p-4 shadow-xl shadow-slate-200/60 sm:rounded-[28px] sm:p-8">
 
