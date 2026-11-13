@@ -664,9 +664,13 @@ export async function GET(
         }
       );
 
-    if (
-      !contentResponse.ok
-    ) {
+    if (!contentResponse.ok) {
+      console.error("VIPACK OneDrive descarga fallida:", {
+        status: contentResponse.status,
+        contentType: contentResponse.headers.get("content-type"),
+        retryAfter: contentResponse.headers.get("retry-after"),
+      });
+
       return NextResponse.json(
         {
           success: false,
