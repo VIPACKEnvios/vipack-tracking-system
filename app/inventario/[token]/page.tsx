@@ -1944,7 +1944,7 @@ export default function InventarioClientePage() {
 
 
         {/* AVISO TEMPORAL ONEDRIVE - cambiar a false para ocultar */}
-        {true && (
+        {false && (
           <div className="relative mx-auto mt-5 max-w-6xl px-3.5 sm:px-8">
             <div role="status" className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm sm:p-5">
               <div className="flex items-start gap-3">
