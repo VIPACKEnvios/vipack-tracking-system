@@ -53,6 +53,26 @@ type Recoleccion = {
   foto: string;
 };
 
+type RecolectorOption = {
+  id: string;
+  nombre: string;
+  email: string;
+  activo: boolean;
+  rol: string;
+};
+
+type AsignacionRecolector = {
+  folio: string;
+  recolector_id: string;
+  asignado_en: string;
+};
+
+type RespuestaAsignaciones = {
+  success: boolean;
+  recolectores?: RecolectorOption[];
+  asignaciones?: AsignacionRecolector[];
+  error?: string;
+};
 type ClienteOption = {
   nombre: string;
   telefono: string;
@@ -661,6 +681,127 @@ export default function RecoleccionesPage() {
   >(null);
 
 
+  const [recolectoresDisponibles, setRecolectoresDisponibles] =
+    useState<RecolectorOption[]>([]);
+
+  const [asignacionesRecolectores, setAsignacionesRecolectores] =
+    useState<Record<string, AsignacionRecolector>>({});
+
+  const [recoleccionParaAsignar, setRecoleccionParaAsignar] =
+    useState<Recoleccion | null>(null);
+
+  const [recolectorSeleccionado, setRecolectorSeleccionado] =
+    useState("");
+  const [guardandoAsignacion, setGuardandoAsignacion] =
+    useState(false);
+
+  const [errorAsignacion, setErrorAsignacion] =
+    useState("");
+  const cargarAsignaciones = useCallback(async () => {
+    try {
+      const response = await fetch(
+        "/api/admin/recolecciones/asignaciones",
+        { cache: "no-store" }
+      );
+
+      const data =
+        (await response.json()) as RespuestaAsignaciones;
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error ||
+            "No se pudieron cargar las asignaciones."
+        );
+      }
+
+      setRecolectoresDisponibles(
+        (data.recolectores ?? []).filter(
+          (recolector) => recolector.activo
+        )
+      );
+
+      const asignaciones: Record<
+        string,
+        AsignacionRecolector
+      > = {};
+
+      for (const asignacion of data.asignaciones ?? []) {
+        asignaciones[asignacion.folio] = asignacion;
+      }
+
+      setAsignacionesRecolectores(asignaciones);
+      setErrorAsignacion("");
+      return true;
+    } catch (error: unknown) {
+      setErrorAsignacion(
+        error instanceof Error
+          ? error.message
+          : "Error al consultar asignaciones."
+      );
+      return false;
+    }
+  }, []);
+  const guardarAsignacionRecolector = async () => {
+    if (guardandoAsignacion) return;
+
+    if (!recoleccionParaAsignar) {
+      setErrorAsignacion("No hay una recolección seleccionada.");
+      return;
+    }
+
+    if (
+      !recolectorSeleccionado ||
+      !recolectoresDisponibles.some(
+        (r) => r.id === recolectorSeleccionado && r.activo
+      )
+    ) {
+      setErrorAsignacion("Selecciona un recolector activo.");
+      return;
+    }
+
+    setGuardandoAsignacion(true);
+    setErrorAsignacion("");
+
+    try {
+      const response = await fetch(
+        "/api/admin/recolecciones/asignaciones",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            folio: recoleccionParaAsignar.folio,
+            recolector_id: recolectorSeleccionado,
+          }),
+        }
+      );
+
+      const data = (await response.json()) as {
+        success?: boolean;
+        error?: string;
+      };
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error || "No se pudo guardar la asignación."
+        );
+      }
+
+      const actualizada = await cargarAsignaciones();
+      if (!actualizada) return;
+      setRecoleccionParaAsignar(null);
+      setRecolectorSeleccionado("");
+    } catch (error: unknown) {
+      setErrorAsignacion(
+        error instanceof Error
+          ? error.message
+          : "Error al guardar la asignación."
+      );
+    } finally {
+      setGuardandoAsignacion(false);
+    }
+  };
   const aplicarActualizacionLocal =
     useCallback(
       (
@@ -880,7 +1021,8 @@ export default function RecoleccionesPage() {
 
   useEffect(() => {
     void cargar();
-  }, [cargar]);
+    void cargarAsignaciones();
+  }, [cargar, cargarAsignaciones]);
 
   const resumen =
     useMemo(() => {
@@ -1912,6 +2054,19 @@ export default function RecoleccionesPage() {
 
                                 <button
                                   type="button"
+                                  onClick={() => {
+                                    setErrorAsignacion("");
+                                    setRecolectorSeleccionado(
+                                      asignacionesRecolectores[item.folio]?.recolector_id || ""
+                                    );
+                                    setRecoleccionParaAsignar(item);
+                                  }}
+                                  className="rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-black text-cyan-800 hover:bg-cyan-100"
+                                >
+                                  Asignar recolector
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={() =>
                                     setSeleccionada(
                                       item
@@ -2325,6 +2480,92 @@ export default function RecoleccionesPage() {
         />
       )}
 
+      {/* ASIGNACION DE RECOLECTOR */}
+      {recoleccionParaAsignar && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Asignar recolector"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-xl font-black text-[#072c74]">
+              Asignar recolector
+            </h2>
+
+            <p className="mt-3 text-sm font-bold text-slate-800">
+              {recoleccionParaAsignar.cliente || "Sin cliente"}
+            </p>
+
+            <p className="mt-1 text-xs text-slate-500">
+              Folio: {recoleccionParaAsignar.folio}
+            </p>
+
+            <p className="mt-4 text-xs font-bold text-slate-600">
+              Recolector actual
+            </p>
+
+            <p className="mt-1 text-sm text-slate-700">
+              {recolectoresDisponibles.find(
+                (recolector) =>
+                  recolector.id ===
+                  asignacionesRecolectores[
+                    recoleccionParaAsignar.folio
+                  ]?.recolector_id
+              )?.nombre || "Sin asignar"}
+            </p>
+
+            <label
+              htmlFor="vipack-selector-recolector"
+              className="mt-5 block text-sm font-bold text-slate-700"
+            >
+              Seleccionar recolector
+            </label>
+
+            <select
+              id="vipack-selector-recolector"
+              value={recolectorSeleccionado}
+              onChange={(event) => setRecolectorSeleccionado(event.target.value)}
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
+            >
+              <option value="">Selecciona un recolector</option>
+              {recolectoresDisponibles.map((recolector) => (
+                <option key={recolector.id} value={recolector.id}>
+                  {recolector.nombre}
+                </option>
+              ))}
+            </select>
+
+            {errorAsignacion && (
+              <p role="alert" className="mt-3 text-sm text-red-600">
+                {errorAsignacion}
+              </p>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setRecoleccionParaAsignar(null);
+                  setErrorAsignacion("");
+                }}
+                className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700"
+              >
+                Cancelar
+              </button>
+
+              <button
+  type="button"
+  onClick={() => void guardarAsignacionRecolector()}
+  disabled={guardandoAsignacion || !recolectorSeleccionado}
+  className="rounded-xl bg-indigo-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-50"
+>
+  {guardandoAsignacion ? "Guardando..." : "Guardar asignación"}
+</button>
+            </div>
+          </div>
+        </div>
+      )}
       {modalNueva && (
         <FormularioNuevaRecoleccion
           recolecciones={recolecciones}

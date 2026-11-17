@@ -99,6 +99,8 @@ export async function proxy(request: NextRequest) {
   // Las rutas Hotmail verifican sesión o CRON_SECRET
   // mediante verificarAccesoHotmail().
   const isPublicApi =
+    path === "/api/recolector/recolecciones" ||
+    /^\/api\/recolector\/recolecciones\/[A-Za-z0-9_-]+\/evidencias$/.test(path) ||
     path === "/api/login" ||
     path === "/api/push/confirmar-recepcion" ||
     path.startsWith("/api/registro-bazar") ||
