@@ -1002,21 +1002,26 @@ export default function CotizacionesPage() {
       );
     }
 
+    const emojiCaja = "\uD83D\uDCE6";
+    const emojiPeso = "\u2696\uFE0F";
+    const emojiDinero = "\uD83D\uDCB0";
+    const emojiSaludo = "\uD83D\uDC4B";
+
     const lineas: string[] = [
-      `Hola${cliente ? ` ${cliente}` : ""} 👋📦`,
+      `Hola${cliente ? ` ${cliente}` : ""} ${emojiSaludo}${emojiCaja}`,
       "",
       "Te compartimos tu cotización de *VIPACK ENVÍOS*.",
       "",
-      `📦 *TOTAL DE CAJAS: ${cajas.length}*`,
+      `${emojiCaja} *TOTAL DE CAJAS: ${cajas.length}*`,
       "",
-      `⚖️ Peso real total: ${calculo.pesoRealTotal.toFixed(1)} kg`,
-      `⚖️ Peso cobrable total: ${calculo.pesoCobrableTotal.toFixed(1)} kg`,
+      `${emojiPeso} Peso real total: ${calculo.pesoRealTotal.toFixed(1)} kg`,
+      `${emojiPeso} Peso cobrable total: ${calculo.pesoCobrableTotal.toFixed(1)} kg`,
       "",
     ];
 
     calculo.detalle.forEach((caja) => {
       lineas.push(
-        `📦 *CAJA ${caja.numero}*`,
+        `${emojiCaja} *CAJA ${caja.numero}*`,
         `Peso real: ${caja.pesoReal.toFixed(1)} kg`,
         `Peso volumétrico: ${caja.pesoVolumetrico.toFixed(1)} kg`,
         `Peso cobrable: ${caja.pesoCobrable.toFixed(1)} kg`,
@@ -1024,44 +1029,32 @@ export default function CotizacionesPage() {
       );
 
       if (enviarAereo && caja.tarifaAerea) {
-        lineas.push(
-          `*Costo aéreo: ${dinero(caja.tarifaAerea.precio)}*`
-        );
+        lineas.push(`*Costo aéreo: ${dinero(caja.tarifaAerea.precio)}*`);
       }
 
       if (enviarTerrestre && caja.tarifaTerrestre) {
-        lineas.push(
-          `*Costo terrestre: ${dinero(caja.tarifaTerrestre.precio)}*`
-        );
+        lineas.push(`*Costo terrestre: ${dinero(caja.tarifaTerrestre.precio)}*`);
       }
 
       if (enviarDHLExpress && caja.tarifaDHLExpress) {
-        lineas.push(
-          `*Costo DHL Express: ${dinero(caja.tarifaDHLExpress.precio)}*`
-        );
+        lineas.push(`*Costo DHL Express: ${dinero(caja.tarifaDHLExpress.precio)}*`);
       }
 
       lineas.push("");
     });
 
-    lineas.push("💰 *RESUMEN DE COTIZACIÓN*");
+    lineas.push(`${emojiDinero} *RESUMEN DE COTIZACIÓN*`);
 
     if (enviarAereo) {
-      lineas.push(
-        `*TOTAL AÉREO: ${dinero(calculo.totalAereo)}*`
-      );
+      lineas.push(`*TOTAL AÉREO: ${dinero(calculo.totalAereo)}*`);
     }
 
     if (enviarTerrestre) {
-      lineas.push(
-        `*TOTAL TERRESTRE: ${dinero(calculo.totalTerrestre)}*`
-      );
+      lineas.push(`*TOTAL TERRESTRE: ${dinero(calculo.totalTerrestre)}*`);
     }
 
     if (enviarDHLExpress) {
-      lineas.push(
-        `*TOTAL DHL EXPRESS: ${dinero(calculo.totalDHLExpress)}*`
-      );
+      lineas.push(`*TOTAL DHL EXPRESS: ${dinero(calculo.totalDHLExpress)}*`);
     }
     if (
       observaciones.trim()
