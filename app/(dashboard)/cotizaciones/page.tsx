@@ -58,6 +58,7 @@ const TARIFAS: Tarifa[] = [
   { tipo: "Terrestre", peso_min: 51, peso_max: 55, precio: 2450 },
   { tipo: "Terrestre", peso_min: 56, peso_max: 60, precio: 2650 },
   { tipo: "Terrestre", peso_min: 61, peso_max: 65, precio: 2950 },
+  { tipo: "Terrestre", peso_min: 66, peso_max: 70, precio: 3350 },
 
   { tipo: "Aereo", peso_min: 2, peso_max: 5, precio: 850 },
   { tipo: "Aereo", peso_min: 6, peso_max: 10, precio: 1130 },
