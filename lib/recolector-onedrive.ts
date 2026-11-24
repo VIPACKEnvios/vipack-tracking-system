@@ -1,3 +1,4 @@
+import { leerExcelRecoleccionesSeguro } from "./recolecciones-excel-seguro";
 import { createClient } from "@supabase/supabase-js";
 import * as XLSX from "xlsx";
 
@@ -280,7 +281,7 @@ async function descargarExcel(
     );
   }
 
-  return await response.arrayBuffer();
+  return await leerExcelRecoleccionesSeguro(response);
 }
 
 async function obtenerClientePorFolio(

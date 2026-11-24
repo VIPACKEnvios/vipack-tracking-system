@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
       .filter((fila): fila is Record<string, unknown> => Boolean(fila))
       .filter((fila) => {
         const estado = String(fila["Estatus"] ?? "").trim().toLowerCase();
-        return ["pendiente", "en ruta", "no lista", "reprogramada"].includes(
+        return ["pendiente", "en ruta", "no lista", "reprogramada", "recolectada", "cancelada"].includes(
           estado
         );
       })

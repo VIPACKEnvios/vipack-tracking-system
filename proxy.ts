@@ -100,6 +100,7 @@ export async function proxy(request: NextRequest) {
   // mediante verificarAccesoHotmail().
   const isPublicApi =
     path === "/api/recolector/recolecciones" ||
+    /^\/api\/recolector\/recolecciones\/[A-Za-z0-9_-]+\/estado$/.test(path) ||
     /^\/api\/recolector\/recolecciones\/[A-Za-z0-9_-]+\/notas$/.test(path) ||
     /^\/api\/recolector\/recolecciones\/[A-Za-z0-9_-]+\/evidencias$/.test(path) ||
     path === "/api/login" ||

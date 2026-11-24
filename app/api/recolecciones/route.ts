@@ -1,6 +1,9 @@
+import { leerExcelRecoleccionesSeguro } from "@/lib/recolecciones-excel-seguro";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import * as XLSX from "xlsx";
+import { puedeCambiarEstadoRecolector } from "@/lib/recolecciones-transiciones";
+import { esSolicitudInternaRecolector } from "@/lib/recolecciones-origen-interno";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -313,87 +316,117 @@ async function obtenerAccessToken() {
 async function descargarExcel(
   accessToken: string
 ) {
+  const LIMITE_EXCEL = 10 * 1024 * 1024;
+
   const excelUrl =
     `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
       RUTA_EXCEL
     )}:/content`;
 
-  const excelResponse =
-    await fetch(
-      excelUrl,
-      {
-        headers: {
-          Authorization:
-            `Bearer ${accessToken}`,
-        },
+  const excelResponse = await fetch(excelUrl, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    cache: "no-store",
+  });
 
-        cache:
-          "no-store",
-      }
-    );
-
-  if (
-    !excelResponse.ok
-  ) {
-    const detalle =
-      await excelResponse.text();
-
+  if (!excelResponse.ok) {
     throw new Error(
-      `No se pudo descargar el Excel de recolecciones. ${detalle}`
+      `No se pudo descargar el Excel de recolecciones. HTTP ${excelResponse.status}`
     );
   }
 
-  return await excelResponse
-    .arrayBuffer();
+  return await leerExcelRecoleccionesSeguro(excelResponse);
 }
+type VersionExcel = {
+  id: string;
+  etag: string;
+};
+async function obtenerVersionExcel(
+  accessToken: string
+): Promise<VersionExcel> {
+  const url =
+    `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
+      RUTA_EXCEL
+    )}:?$select=id,eTag`;
 
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `No se pudo consultar la version del Excel (HTTP ${response.status}).`
+    );
+  }
+
+  const item = (await response.json()) as {
+    id?: string;
+    eTag?: string;
+  };
+
+  if (!item.id || !item.eTag) {
+    throw new Error(
+      "OneDrive no devolvio el identificador o eTag del Excel."
+    );
+  }
+
+  return {
+    id: item.id,
+    etag: item.eTag,
+  };
+}
 async function subirExcel(
   accessToken: string,
-  buffer: ArrayBuffer
+  buffer: ArrayBuffer,
+  version: VersionExcel
 ) {
   const excelUrl =
     `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURI(
       RUTA_EXCEL
     )}:/content`;
 
-  const response =
-    await fetch(
-      excelUrl,
-      {
-        method: "PUT",
+  const versionActual = await obtenerVersionExcel(accessToken);
 
-        headers: {
-          Authorization:
-            `Bearer ${accessToken}`,
-
-          "Content-Type":
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        },
-
-        body:
-          new Uint8Array(
-            buffer
-          ),
-
-        cache:
-          "no-store",
-      }
+  if (
+    versionActual.id !== version.id ||
+    versionActual.etag !== version.etag
+  ) {
+    throw new Error(
+      "CONFLICTO_EXCEL: La matriz cambio mientras se procesaba. Actualiza e intenta nuevamente."
     );
+  }
+
+  const response = await fetch(excelUrl, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type":
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "If-Match": version.etag,
+    },
+    body: new Uint8Array(buffer),
+    cache: "no-store",
+  });
+
+  if (response.status === 412) {
+    throw new Error(
+      "CONFLICTO_EXCEL: OneDrive rechazo la escritura por cambio de version."
+    );
+  }
 
   if (!response.ok) {
-    const detalle =
-      await response.text();
-
+    const detalle = await response.text();
     throw new Error(
       `No se pudo guardar el Excel en OneDrive. ${detalle}`
     );
   }
 
-  return await leerJsonSeguro(
-    response
-  );
+  return await leerJsonSeguro(response);
 }
-
 function generarFolio(
   existentes: Set<string>
 ) {
@@ -794,6 +827,8 @@ export async function POST(
     } =
       await obtenerAccessToken();
 
+    const versionExcel = await obtenerVersionExcel(accessToken);
+
     const arrayBuffer =
       await descargarExcel(
         accessToken
@@ -965,7 +1000,8 @@ export async function POST(
 
     await subirExcel(
       accessToken,
-      salida
+      salida,
+      versionExcel
     );
 
     return NextResponse.json({
@@ -997,15 +1033,21 @@ export async function POST(
             : "Error desconocido.",
       },
       {
-        status: 500,
+        status:
+          error instanceof Error &&
+          error.message.startsWith("CONFLICTO_EXCEL:")
+            ? 409
+            : 500,
       }
     );
   }
 }
 
-export async function PATCH(
+async function procesarActualizacionRecoleccion(
   request: Request
 ) {
+  const validarTransicionRecolector =
+    esSolicitudInternaRecolector(request);
   try {
     const body =
       (await request.json()) as ActualizarRecoleccionBody;
@@ -1184,6 +1226,8 @@ export async function PATCH(
     } =
       await obtenerAccessToken();
 
+    const versionExcel = await obtenerVersionExcel(accessToken);
+
     const arrayBuffer =
       await descargarExcel(
         accessToken
@@ -1256,6 +1300,23 @@ export async function PATCH(
       );
     }
 
+    if (
+      validarTransicionRecolector &&
+      tieneEstado &&
+      estado &&
+      !puedeCambiarEstadoRecolector(
+        String(filas[indice].Estatus ?? ""),
+        estado
+      )
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Transicion de estado no permitida para el recolector.",
+        },
+        { status: 409 }
+      );
+    }
     const actualizada = {
       ...filas[indice],
     };
@@ -1382,7 +1443,8 @@ export async function PATCH(
 
     await subirExcel(
       accessToken,
-      salida
+      salida,
+      versionExcel
     );
 
     return NextResponse.json({
@@ -1421,8 +1483,16 @@ export async function PATCH(
             : "Error desconocido.",
       },
       {
-        status: 500,
+        status:
+          error instanceof Error &&
+          error.message.startsWith("CONFLICTO_EXCEL:")
+            ? 409
+            : 500,
       }
     );
   }
+}
+
+export async function PATCH(request: Request) {
+  return procesarActualizacionRecoleccion(request);
 }
