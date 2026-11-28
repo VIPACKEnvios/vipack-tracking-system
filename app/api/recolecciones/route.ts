@@ -1,3 +1,10 @@
+import {
+  consultarOperacionOffline,
+  registrarOperacionOffline,
+  validarOperacionOffline,
+  type OperacionOffline,
+} from "@/lib/recolecciones-operaciones-offline";
+
 import { leerExcelRecoleccionesSeguro } from "@/lib/recolecciones-excel-seguro";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -1050,7 +1057,40 @@ async function procesarActualizacionRecoleccion(
     esSolicitudInternaRecolector(request);
   try {
     const body =
-      (await request.json()) as ActualizarRecoleccionBody;
+      (await request.json()) as ActualizarRecoleccionBody & {
+        operacionOffline?: unknown;
+      };
+
+    let operacionOffline: OperacionOffline | undefined;
+
+    if (
+      Object.prototype.hasOwnProperty.call(
+        body,
+        "operacionOffline"
+      )
+    ) {
+      const candidata = body.operacionOffline;
+
+      if (
+        !validarTransicionRecolector ||
+        !candidata ||
+        typeof candidata !== "object" ||
+        Array.isArray(candidata) ||
+        !validarOperacionOffline(
+          candidata as OperacionOffline
+        )
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            codigo: "OPERACION_INVALIDA",
+          },
+          { status: 400 }
+        );
+      }
+
+      operacionOffline = candidata as OperacionOffline;
+    }
 
     const folio =
       String(
@@ -1221,6 +1261,26 @@ async function procesarActualizacionRecoleccion(
       );
     }
 
+    if (
+      operacionOffline &&
+      (
+        operacionOffline.folio !== folio ||
+        operacionOffline.estado !== estado ||
+        !tieneEstado ||
+        tieneOrdenRuta ||
+        tieneFechaRecoleccion ||
+        tieneHoraCita
+      )
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          codigo: "OPERACION_INVALIDA",
+        },
+        { status: 400 }
+      );
+    }
+
     const {
       accessToken,
     } =
@@ -1298,6 +1358,57 @@ async function procesarActualizacionRecoleccion(
           status: 404,
         }
       );
+    }
+
+    if (operacionOffline) {
+
+      const resultado = consultarOperacionOffline(
+        workbook,
+        operacionOffline
+      );
+
+      if (resultado === "CONFIRMADA") {
+        return NextResponse.json({
+          success: true,
+          folio,
+          operationId: operacionOffline.operationId,
+          duplicado: true,
+          estadoActual: String(
+            filas[indice].Estatus ?? ""
+          ).trim(),
+        });
+      }
+
+      if (resultado === "CONFLICTO") {
+        return NextResponse.json(
+          {
+            success: false,
+            codigo: "CONFLICTO_OPERACION",
+          },
+          { status: 409 }
+        );
+      }
+
+      const estadoActual = String(
+        filas[indice].Estatus ?? ""
+      ).trim();
+
+      if (
+        estadoActual !== operacionOffline.estadoAnterior ||
+        !puedeCambiarEstadoRecolector(
+          estadoActual,
+          operacionOffline.estado
+        )
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            codigo: "CONFLICTO_ESTADO",
+            estadoActual,
+          },
+          { status: 409 }
+        );
+      }
     }
 
     if (
@@ -1431,6 +1542,20 @@ async function procesarActualizacionRecoleccion(
       HOJA_SOLICITUDES
     ] = nuevaHoja;
 
+    if (operacionOffline) {
+
+      const resultado = registrarOperacionOffline(
+        workbook,
+        operacionOffline
+      );
+
+      if (resultado !== "NUEVA") {
+        throw new Error(
+          "No se pudo registrar la operacion offline."
+        );
+      }
+    }
+
     const salida =
       XLSX.write(
         workbook,
@@ -1454,6 +1579,13 @@ async function procesarActualizacionRecoleccion(
         "Recolección actualizada correctamente.",
 
       folio,
+
+      ...(operacionOffline
+        ? {
+            operationId: operacionOffline.operationId,
+            duplicado: false,
+          }
+        : {}),
 
       registro:
         actualizada,
@@ -1481,6 +1613,11 @@ async function procesarActualizacionRecoleccion(
           error instanceof Error
             ? error.message
             : "Error desconocido.",
+
+        ...(error instanceof Error &&
+          error.message.startsWith("CONFLICTO_EXCEL:")
+          ? { codigo: "CONFLICTO_EXCEL" }
+          : {}),
       },
       {
         status:
